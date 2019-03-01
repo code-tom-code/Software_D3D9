@@ -1,6 +1,6 @@
 # Software_D3D9
 
-Performs software emulation for all of Direct3D9 via a proxy DLL (drop-in replacement for d3d9.dll).This project is intended to be a working full software emulation of Direct3D9 for educational purposes. It is intended to work with real games and other programs, and eventually should support a high level of compatibility with a wide range of existing D3D9 games and programs. Since this is software emulating hardware, this will never be as fast as a real GPU. Hopefully people can use this to learn more about how D3D9 works under the hood and to feel inspired about how 3D graphics works as a larger whole.
+Performs software emulation for all of Direct3D9 via a proxy DLL (drop-in replacement for d3d9.dll). This project is intended to be a working full software emulation of Direct3D9 for educational purposes. It is intended to work with real games and other programs, and eventually should support a high level of compatibility with a wide range of existing D3D9 games and programs. Since this is software emulating hardware, this will never be as fast as a real GPU. Hopefully people can use this to learn more about how D3D9 works under the hood and to feel inspired about how 3D graphics works as a larger whole.
 
 ## Getting Started
 
