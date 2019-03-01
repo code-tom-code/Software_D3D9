@@ -1,0 +1,189 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{FFDB895B-11C0-4996-8C2E-194D85FFFAE6}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>Software_d3d9</RootNamespace>
+    <ProjectName>d3d9</ProjectName>
+    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;D3D9PROXYDLL_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <CallingConvention>FastCall</CallingConvention>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ModuleDefinitionFile>Source.def</ModuleDefinitionFile>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;D3D9PROXYDLL_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>false</OmitFramePointers>
+      <ExceptionHandling>false</ExceptionHandling>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <StringPooling>true</StringPooling>
+      <AssemblerOutput>NoListing</AssemblerOutput>
+      <CallingConvention>FastCall</CallingConvention>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <ModuleDefinitionFile>Source.def</ModuleDefinitionFile>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="FixedFunctionToShader.cpp" />
+    <ClCompile Include="hookd3d9.cpp" />
+    <ClCompile Include="IDirect3D9Hook.cpp" />
+    <ClCompile Include="IDirect3DBaseTexture9Hook.cpp" />
+    <ClCompile Include="IDirect3DCubeTexture9Hook.cpp" />
+    <ClCompile Include="IDirect3DDevice9Hook.cpp" />
+    <ClCompile Include="IDirect3DDevice9Hook_Accessors.cpp" />
+    <ClCompile Include="IDirect3DDevice9Hook_Creators.cpp" />
+    <ClCompile Include="IDirect3DIndexBuffer9Hook.cpp" />
+    <ClCompile Include="IDirect3DPixelShader9Hook.cpp" />
+    <ClCompile Include="IDirect3DQuery9Hook.cpp" />
+    <ClCompile Include="IDirect3DResource9Hook.cpp" />
+    <ClCompile Include="IDirect3DStateBlock9Hook.cpp" />
+    <ClCompile Include="IDirect3DSurface9Hook.cpp" />
+    <ClCompile Include="IDirect3DSwapChain9Hook.cpp" />
+    <ClCompile Include="IDirect3DTexture9Hook.cpp" />
+    <ClCompile Include="IDirect3DVertexBuffer9Hook.cpp" />
+    <ClCompile Include="IDirect3DVertexDeclaration9Hook.cpp" />
+    <ClCompile Include="IDirect3DVertexShader9Hook.cpp" />
+    <ClCompile Include="IDirect3DVolume9Hook.cpp" />
+    <ClCompile Include="IDirect3DVolumeTexture9Hook.cpp" />
+    <ClCompile Include="PShaderEngine.cpp" />
+    <ClCompile Include="SemanticMappings.cpp" />
+    <ClCompile Include="ShaderAnalysis.cpp" />
+    <ClCompile Include="ShaderTextureFunctions.cpp" />
+    <ClCompile Include="ShaderJIT.cpp" />
+    <ClCompile Include="ShaderTextureFunctions4.cpp" />
+    <ClCompile Include="VShaderEngine_InterpreterExec1.cpp" />
+    <ClCompile Include="VShaderEngine_InterpreterExec4.cpp" />
+    <None Include="ShaderJIT_PrefixFile.cpp" />
+    <ClCompile Include="ShaderJIT_HLSL_to_CPP.cpp" />
+    <ClCompile Include="VShaderEngine.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Source.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="d3d9include.h" />
+    <ClInclude Include="DebuggableEnums.h" />
+    <ClInclude Include="FixedFunctionToShader.h" />
+    <ClInclude Include="GlobalToggles.h" />
+    <ClInclude Include="IDirect3D9Hook.h" />
+    <ClInclude Include="IDirect3DBaseTexture9Hook.h" />
+    <ClInclude Include="IDirect3DCubeTexture9Hook.h" />
+    <ClInclude Include="IDirect3DDevice9Hook.h" />
+    <ClInclude Include="IDirect3DIndexBuffer9Hook.h" />
+    <ClInclude Include="IDirect3DPixelShader9Hook.h" />
+    <ClInclude Include="IDirect3DQuery9Hook.h" />
+    <ClInclude Include="IDirect3DResource9Hook.h" />
+    <ClInclude Include="IDirect3DStateBlock9Hook.h" />
+    <ClInclude Include="IDirect3DSurface9Hook.h" />
+    <ClInclude Include="IDirect3DSwapChain9Hook.h" />
+    <ClInclude Include="IDirect3DTexture9Hook.h" />
+    <ClInclude Include="IDirect3DVertexBuffer9Hook.h" />
+    <ClInclude Include="IDirect3DVertexDeclaration9Hook.h" />
+    <ClInclude Include="IDirect3DVertexShader9Hook.h" />
+    <ClInclude Include="IDirect3DVolume9Hook.h" />
+    <ClInclude Include="IDirect3DVolumeTexture9Hook.h" />
+    <ClInclude Include="PShaderEngine.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="SemanticMappings.h" />
+    <ClInclude Include="ShaderAnalysis.h" />
+    <ClInclude Include="ShaderBase.h" />
+    <ClInclude Include="ShaderEngineBase.h" />
+    <ClInclude Include="ShaderIntrinsicFunctions.h" />
+    <ClInclude Include="ShaderIntrinsicFunctions4.h" />
+    <ClInclude Include="ShaderJIT.h" />
+    <ClInclude Include="ShaderJIT_HLSL_to_CPP_Tables.h" />
+    <ClInclude Include="VShaderEngine.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="FixedFunctionPixelShader.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">3.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">3.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="FixedFunctionVertexShader.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">3.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">3.0</ShaderModel>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="d3d9.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="SimpleFont256x256.png" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

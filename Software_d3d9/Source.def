@@ -1,0 +1,18 @@
+LIBRARY d3d9
+EXPORTS
+D3DPERF_BeginEvent=__E__0__ @20
+D3DPERF_EndEvent=__E__1__ @21
+D3DPERF_GetStatus=__E__2__ @22
+D3DPERF_QueryRepeatFrame=__E__3__ @23
+D3DPERF_SetMarker=__E__4__ @24
+D3DPERF_SetOptions=__E__5__ @25
+D3DPERF_SetRegion=__E__6__ @26
+DebugSetLevel=__E__7__ @27
+DebugSetMute=__E__8__ @28
+Direct3D9EnableMaximizedWindowedModeShim=__E__9__ @29
+Direct3DCreate9=__E__10__ @30
+Direct3DCreate9Ex=__E__11__ @31
+Direct3DShaderValidatorCreate9=__E__12__ @17
+PSGPError=__E__13__ @18
+PSGPSampleTexture=__E__14__ @19
+___XXX___16=__E__15__ @16 NONAME
