@@ -96,6 +96,6 @@ TODO: Pick a good license for this open-source project.
 
 ## Acknowledgments
 
-* Thanks to Michael Chourdakis for his Wrappit code. It's been useful for me for years now for easily generating a starting-point for a proxy DLL.
+* Thanks to Michael Chourdakis for his Wrappit code (https://www.codeproject.com/Articles/16541/Create-your-Proxy-DLLs-automatically). It's been useful for me for years now for easily generating a starting-point for a proxy DLL.
 * Thanks to Microsoft and MSDN for having awesome documentation for the Direct3D9/9Ex and the HLSL shader bytecode format docs to go off of. They have really helped with navigating edge cases and solving tricky problems.
 * Thanks to rygorous (Fabian 'ryg' Giesen) for authoring his series of articles that illuminate how modern GPUs work under the hood in great detail (https://fgiesen.wordpress.com/2011/07/09/a-trip-through-the-graphics-pipeline-2011-index/).
