@@ -333,6 +333,10 @@ void IDirect3DTexture9Hook::CreateTexture(const UINT _Width, const UINT _Height,
 
 		surfaces.push_back(newSurface);
 	}
+
+	surfaceCountMinusOne = surfaces.size() - 1;
+	surfaceCountMinusTwo = ( (const int)surfaceCountMinusOne) - 1; // This can be negative
+	surfaceCountMinusOneF = (const float)surfaceCountMinusOne;
 }
 
 const bool IDirect3DTexture9Hook::UpdateTextureInternal(const IDirect3DTexture9Hook* const sourceTexture)
@@ -502,12 +506,12 @@ void IDirect3DTexture9Hook::SampleTextureLoD(float x, float y, float mip, const 
 
 	mip += samplerState.stateUnion.namedStates.mipMapLoDBias;
 
-	const float maxMipLevel = (const float)samplerState.stateUnion.namedStates.maxMipLevel;
+	const float maxMipLevel = samplerState.cachedFloatMaxMipLevel;
 
 	if (mip < maxMipLevel)
 		mip = maxMipLevel;
 
-	const float minMipLevel = (const float)(surfaces.size() - 1);
+	const float minMipLevel = surfaceCountMinusOneF;
 
 	if (mip > minMipLevel)
 		mip = minMipLevel;
@@ -533,7 +537,7 @@ void IDirect3DTexture9Hook::SampleTextureLoD(float x, float y, float mip, const 
 		case D3DTEXF_POINT          :
 		{
 			int mipLevel = (const int)(mip + 0.5f);
-			const int maxMip = surfaces.size() - 1;
+			const int maxMip = surfaceCountMinusOne;
 			if (mipLevel > maxMip)
 				mipLevel = maxMip;
 			surfaces[mipLevel]->SampleSurface<writeMask>(x, y, samplerState, outColor);
@@ -556,9 +560,9 @@ void IDirect3DTexture9Hook::SampleTextureLoD(float x, float y, float mip, const 
 			{
 				surfaces[mipLevelLow]->SampleSurface<writeMask>(x, y, samplerState, outColor);
 			}
-			else if (mipLevelLow >= (const int)(surfaces.size() - 2) )
+			else if (mipLevelLow >= surfaceCountMinusTwo)
 			{
-				surfaces[surfaces.size() - 1]->SampleSurface<writeMask>(x, y, samplerState, outColor);
+				surfaces[surfaceCountMinusOne]->SampleSurface<writeMask>(x, y, samplerState, outColor);
 			}
 			else
 			{
@@ -852,7 +856,7 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 	mip4[2] += samplerState.stateUnion.namedStates.mipMapLoDBias;
 	mip4[3] += samplerState.stateUnion.namedStates.mipMapLoDBias;
 
-	const float maxMipLevel = (const float)samplerState.stateUnion.namedStates.maxMipLevel;
+	const float maxMipLevel = samplerState.cachedFloatMaxMipLevel;
 
 	if (mip4[0] < maxMipLevel)
 		mip4[0] = maxMipLevel;
@@ -863,7 +867,7 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 	if (mip4[3] < maxMipLevel)
 		mip4[3] = maxMipLevel;
 
-	const float minMipLevel = (const float)(surfaces.size() - 1);
+	const float minMipLevel = surfaceCountMinusOneF;
 
 	if (mip4[0] > minMipLevel)
 		mip4[0] = minMipLevel;
@@ -904,7 +908,7 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 		break;
 	case D3DTEXF_POINT          :
 	{
-		const int maxMip = surfaces.size() - 1;
+		const int maxMip = surfaceCountMinusOne;
 		int mipLevel4[4] =
 		{
 			(const int)(mip4[0] + 0.5f),
@@ -957,7 +961,7 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 			mip4[3] - mipLevelLow4[3]
 		};
 
-		const int maxMip = (const int)(surfaces.size() - 1);
+		const int maxMip = (const int)surfaceCountMinusOne;
 		const int maxMipLevelLow = maxMip - 1;
 
 		// TODO: Make a SampleSurface4 function

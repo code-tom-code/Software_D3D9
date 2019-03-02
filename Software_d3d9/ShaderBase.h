@@ -292,6 +292,8 @@ struct SamplerState
 		stateUnion.namedStates.sRGBTexture = FALSE; // Not sure if this is a BOOL or a float (see variable definition for more info)
 		stateUnion.namedStates.elementIndex = 0;
 		stateUnion.namedStates.dMapOffset = 0;
+
+		cachedFloatMaxMipLevel = 0.0f;
 	}
 
 	union _stateUnion
@@ -315,6 +317,8 @@ struct SamplerState
 		DWORD state[D3DSAMP_DMAPOFFSET];
 	} stateUnion;
 	static_assert(sizeof(_stateUnion) == sizeof(DWORD) * D3DSAMP_DMAPOFFSET, "Error: Unexpected union size!");
+
+	float cachedFloatMaxMipLevel;
 };
 
 struct sampler

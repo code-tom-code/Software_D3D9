@@ -7,7 +7,8 @@ struct SamplerState;
 class IDirect3DTexture9Hook : public IDirect3DTexture9
 {
 public:
-	IDirect3DTexture9Hook(LPDIRECT3DTEXTURE9 _realObject, IDirect3DDevice9Hook* _parentDevice) : realObject(_realObject), parentDevice(_parentDevice), refCount(1), AutoGenFilter(D3DTEXF_LINEAR)
+	IDirect3DTexture9Hook(LPDIRECT3DTEXTURE9 _realObject, IDirect3DDevice9Hook* _parentDevice) : realObject(_realObject), parentDevice(_parentDevice), refCount(1), AutoGenFilter(D3DTEXF_LINEAR), 
+		surfaceCountMinusOne(0), surfaceCountMinusTwo(0), surfaceCountMinusOneF(0.0f)
 #ifdef DUMP_TEXTURES_ON_FIRST_SET
 		, dumped(0)
 #endif
@@ -98,6 +99,10 @@ protected:
 	D3DFORMAT InternalFormat;
 	D3DPOOL InternalPool;
 	D3DTEXTUREFILTERTYPE AutoGenFilter;
+
+	UINT surfaceCountMinusOne;
+	INT surfaceCountMinusTwo;
+	float surfaceCountMinusOneF;
 
 	std::vector<IDirect3DSurface9Hook*> surfaces;
 };

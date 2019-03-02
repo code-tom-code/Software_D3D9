@@ -1282,7 +1282,13 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetSamplerS
 		return D3DERR_INVALIDCALL;
 	}
 
-	currentState.currentSamplerStates[Sampler].stateUnion.state[Type - 1] = Value;
+	SamplerState& thisSampler = currentState.currentSamplerStates[Sampler];	
+	thisSampler.stateUnion.state[Type - 1] = Value;
+
+	if (Type == D3DSAMP_MAXMIPLEVEL)
+	{
+		thisSampler.cachedFloatMaxMipLevel = (const float)Value;
+	}
 
 	return ret;
 }
