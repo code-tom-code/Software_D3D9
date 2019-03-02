@@ -70,7 +70,8 @@ class IDirect3DSurface9Hook : public IDirect3DSurface9
 public:
 	IDirect3DSurface9Hook(LPDIRECT3DSURFACE9 _realObject, IDirect3DDevice9Hook* _parentDevice) : realObject(_realObject), parentDevice(_parentDevice), refCount(1),
 		InternalWidth(0), InternalHeight(0), TextureSurfaceLevel(0), InternalFormat(D3DFMT_UNKNOWN), InternalPool(D3DPOOL_DEFAULT), InternalUsage(UsageNone), DiscardRT(FALSE), LockableRT(FALSE), HookParentTexturePtr(NULL),
-		creationMethod(unknown), surfaceBytesRaw(NULL), auxSurfaceBytesRaw(NULL), surfaceBytesRawSize(0), auxSurfaceBytesRawSize(0), InternalMultiSampleType(D3DMULTISAMPLE_NONE), InternalMultiSampleQuality(0)
+		creationMethod(unknown), surfaceBytesRaw(NULL), auxSurfaceBytesRaw(NULL), surfaceBytesRawSize(0), auxSurfaceBytesRawSize(0), InternalMultiSampleType(D3DMULTISAMPLE_NONE), InternalMultiSampleQuality(0),
+		is1x1surface(false), InternalWidthM1(0), InternalHeightM1(0), InternalWidthM1F(0.0f), InternalHeightM1F(0.0f)
 	{
 #ifdef _DEBUG
 		if (realObject)
@@ -111,6 +112,7 @@ public:
 #endif
 	}
 
+	// Creation functions:
 	void CreateOffscreenPlainSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DPOOL _Pool);
 	void CreateDepthStencilSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DMULTISAMPLE_TYPE _MultiSample, DWORD _MultisampleQuality, BOOL _Discard);
 	void CreateRenderTarget(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DMULTISAMPLE_TYPE _MultiSample, DWORD _MultisampleQuality, BOOL _Lockable);
@@ -286,4 +288,10 @@ protected:
 	BYTE* auxSurfaceBytesRaw; // Aux surface data is nly present for compressed surface types and stencil buffers
 	UINT surfaceBytesRawSize;
 	UINT auxSurfaceBytesRawSize;
+
+	UINT InternalWidthM1;
+	UINT InternalHeightM1;
+	float InternalWidthM1F;
+	float InternalHeightM1F;
+	bool is1x1surface;
 };

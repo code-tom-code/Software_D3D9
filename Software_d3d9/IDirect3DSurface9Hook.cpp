@@ -1335,6 +1335,11 @@ void IDirect3DSurface9Hook::CreateOffscreenPlainSurface(UINT _Width, UINT _Heigh
 	InternalPool = _Pool;
 	LockableRT = TRUE;
 	DiscardRT = FALSE;
+	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
+	InternalWidthM1 = InternalWidth - 1;
+	InternalHeightM1 = InternalHeight - 1;
+	InternalWidthM1F = (const float)InternalWidthM1;
+	InternalHeightM1F = (const float)InternalHeightM1;
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
 #ifdef SURFACE_MAGIC_COOKIE
@@ -1371,6 +1376,11 @@ void IDirect3DSurface9Hook::CreateDepthStencilSurface(UINT _Width, UINT _Height,
 	LockableRT = FALSE;
 	InternalPool = D3DPOOL_DEFAULT;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_RENDERTARGET | D3DUSAGE_DEPTHSTENCIL);
+	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
+	InternalWidthM1 = InternalWidth - 1;
+	InternalHeightM1 = InternalHeight - 1;
+	InternalWidthM1F = (const float)InternalWidthM1;
+	InternalHeightM1F = (const float)InternalHeightM1;
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
 #ifdef SURFACE_MAGIC_COOKIE
@@ -1407,6 +1417,11 @@ void IDirect3DSurface9Hook::CreateRenderTarget(UINT _Width, UINT _Height, D3DFOR
 	DiscardRT = FALSE;
 	InternalPool = D3DPOOL_DEFAULT;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_RENDERTARGET);
+	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
+	InternalWidthM1 = InternalWidth - 1;
+	InternalHeightM1 = InternalHeight - 1;
+	InternalWidthM1F = (const float)InternalWidthM1;
+	InternalHeightM1F = (const float)InternalHeightM1;
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
 #ifdef SURFACE_MAGIC_COOKIE
@@ -1449,6 +1464,11 @@ void IDirect3DSurface9Hook::CreateTextureImplicitSurface(UINT _Width, UINT _Heig
 		LockableRT = FALSE;
 	}
 	DiscardRT = FALSE;
+	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
+	InternalWidthM1 = InternalWidth - 1;
+	InternalHeightM1 = InternalHeight - 1;
+	InternalWidthM1F = (const float)InternalWidthM1;
+	InternalHeightM1F = (const float)InternalHeightM1;
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
 #ifdef SURFACE_MAGIC_COOKIE
@@ -1483,6 +1503,11 @@ void IDirect3DSurface9Hook::CreateDeviceImplicitSurface(const D3DPRESENT_PARAMET
 	InternalFormat = d3dpp.BackBufferFormat;
 	InternalPool = D3DPOOL_DEFAULT;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_RENDERTARGET); // The implicit backbuffer is a rendertarget
+	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
+	InternalWidthM1 = InternalWidth - 1;
+	InternalHeightM1 = InternalHeight - 1;
+	InternalWidthM1F = (const float)InternalWidthM1;
+	InternalHeightM1F = (const float)InternalHeightM1;
 
 	if (d3dpp.Flags & D3DPRESENTFLAG_LOCKABLE_BACKBUFFER)
 		LockableRT = TRUE;
@@ -1525,6 +1550,11 @@ void IDirect3DSurface9Hook::CreateDeviceImplicitDepthStencil(const D3DPRESENT_PA
 	InternalPool = D3DPOOL_DEFAULT;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_DEPTHSTENCIL); // Important not to mark this with the D3DUSAGE_RENDERTARGET Usage because that will get a Usage-mismatch with real D3D9!
 	LockableRT = FALSE;
+	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
+	InternalWidthM1 = InternalWidth - 1;
+	InternalHeightM1 = InternalHeight - 1;
+	InternalWidthM1F = (const float)InternalWidthM1;
+	InternalHeightM1F = (const float)InternalHeightM1;
 
 	if (d3dpp.Flags & D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL)
 		DiscardRT = TRUE;
@@ -1866,8 +1896,8 @@ void IDirect3DSurface9Hook::InternalColorFill(const D3DCOLOR color, const D3DREC
 
 	if (pRect)
 	{
-		const LONG WidthM1 = InternalWidth - 1;
-		const LONG HeightM1 = InternalHeight - 1;
+		const LONG WidthM1 = InternalWidthM1;
+		const LONG HeightM1 = InternalHeightM1;
 
 		D3DRECT clippedRect;
 		if (pRect->x1 < 0)
@@ -2628,7 +2658,7 @@ template <const unsigned char writeMask, const bool sRGBSurface>
 void IDirect3DSurface9Hook::SampleSurface(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const
 {
 	// Keep the simple case simple
-	if (InternalWidth == 1 && InternalHeight == 1)
+	if (is1x1surface)
 	{
 		GetPixelVec<writeMask, sRGBSurface>(0, 0, outColor);
 		return;
@@ -2643,11 +2673,11 @@ void IDirect3DSurface9Hook::SampleSurface(const float x, const float y, const D3
 	float u = x * InternalWidth;
 	float v = y * InternalHeight;
 
-	const unsigned WidthM1 = InternalWidth - 1;
-	const unsigned HeightM1 = InternalHeight - 1;
+	const unsigned WidthM1 = InternalWidthM1;
+	const unsigned HeightM1 = InternalHeightM1;
 
-	const float maxU = (const float)WidthM1;
-	const float maxV = (const float)HeightM1;
+	const float maxU = InternalWidthM1F;
+	const float maxV = InternalHeightM1F;
 
 	if (u > maxU)
 		u = maxU;
