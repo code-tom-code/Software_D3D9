@@ -240,7 +240,11 @@ static inline void WorkUntilNoMoreWork(void* const jobData)
 		switch (item->jobType)
 		{
 		default:
+#ifdef _DEBUG
 			DbgBreakPrint("Error: Unknown job type!");
+#else
+			__assume(0);
+#endif
 		case vertexShade1Job:
 			VertexShadeJob1(*item, myPtr);
 			break;
@@ -5079,7 +5083,12 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromStream(const DeclarationSemantic
 
 					// TODO: Don't assume less-than test for Z CMPFUNC
 					if (compareDepth < earlyZTestDepthValue)
+					{
+						currentBarycentric0 += barycentricXDelta1;
+						currentBarycentric1 += barycentricXDelta2;
+						currentBarycentric2 += barycentricXDelta0;
 						continue;
+					}
 				}
 #ifdef MULTITHREAD_SHADING
 				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
@@ -5273,7 +5282,12 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_p
 
 					// TODO: Don't assume less-than test for Z CMPFUNC
 					if (compareDepth < earlyZTestDepthValue)
+					{
+						currentBarycentric0 += barycentricXDelta1;
+						currentBarycentric1 += barycentricXDelta2;
+						currentBarycentric2 += barycentricXDelta0;
 						continue;
+					}
 				}
 #ifdef MULTITHREAD_SHADING
 				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
