@@ -734,7 +734,11 @@ struct DeviceState
 	IDirect3DVertexDeclaration9Hook* currentVertexDecl;
 	DWORD currentFVF;
 
-	const bool CurrentStateHasInputVertexColor(void) const;
+	// Returns true if the current vertex FVF or decl has a COLOR0 component, or false otherwise
+	const bool CurrentStateHasInputVertexColor0(void) const;
+
+	// Returns true if the current vertex FVF or decl has a COLOR1 component, or false otherwise
+	const bool CurrentStateHasInputVertexColor1(void) const;
 };
 
 struct DeviceFrameStats

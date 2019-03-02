@@ -6184,7 +6184,8 @@ IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D
 #endif
 }
 
-const bool DeviceState::CurrentStateHasInputVertexColor(void) const
+// Returns true if the current vertex FVF or decl has a COLOR0 component, or false otherwise
+const bool DeviceState::CurrentStateHasInputVertexColor0(void) const
 {
 	switch (declTarget)
 	{
@@ -6195,7 +6196,7 @@ const bool DeviceState::CurrentStateHasInputVertexColor(void) const
 		__assume(0);
 #endif
 	case targetFVF:
-		return (currentFVF & D3DFVF_DIFFUSE) ? true : false;
+		return (currentFVF & D3DFVF_DIFFUSE) ? true : false; // Diffuse color is always COLOR0
 	case targetVertexDecl:
 		if (currentVertexDecl)
 		{
@@ -6204,7 +6205,36 @@ const bool DeviceState::CurrentStateHasInputVertexColor(void) const
 			for (unsigned x = 0; x < numElements; ++x)
 			{
 				const DebuggableD3DVERTEXELEMENT9& thisElement = elements[x];
-				if (thisElement.Usage == D3DDECLUSAGE_COLOR)
+				if (thisElement.Usage == D3DDECLUSAGE_COLOR && thisElement.UsageIndex == 0) // Diffuse color is always COLOR0
+					return true;
+			}
+		}
+		return false;
+	}
+}
+
+// Returns true if the current vertex FVF or decl has a COLOR1 component, or false otherwise
+const bool DeviceState::CurrentStateHasInputVertexColor1(void) const
+{
+	switch (declTarget)
+	{
+	default:
+#ifdef _DEBUG
+		DbgBreakPrint("Error: Should never be here!");
+#else
+		__assume(0);
+#endif
+	case targetFVF:
+		return (currentFVF & D3DFVF_SPECULAR) ? true : false; // Specular color is always COLOR1
+	case targetVertexDecl:
+		if (currentVertexDecl)
+		{
+			const std::vector<DebuggableD3DVERTEXELEMENT9>& elements = currentVertexDecl->GetElementsInternal();
+			const unsigned numElements = elements.size();
+			for (unsigned x = 0; x < numElements; ++x)
+			{
+				const DebuggableD3DVERTEXELEMENT9& thisElement = elements[x];
+				if (thisElement.Usage == D3DDECLUSAGE_COLOR && thisElement.UsageIndex == 1) // Specular color is always COLOR1
 					return true;
 			}
 		}

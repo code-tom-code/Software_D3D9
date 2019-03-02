@@ -185,90 +185,82 @@ static inline const FixedFunctionStateHash HashPixelState(const DeviceState& sta
 
 static inline void BuildVertexStateDefines(const DeviceState& state, std::vector<D3DXMACRO>& defines)
 {
+	D3DXMACRO diffuseSourceMacro = {0};
+	diffuseSourceMacro.Name = "MATERIAL_DIFFUSE_SOURCE";
+	diffuseSourceMacro.Definition = "0";
+	// From: Diffuse Lighting https://msdn.microsoft.com/en-us/library/windows/desktop/bb219656(v=vs.85).aspx
+	// Note: If either DIFFUSEMATERIALSOURCE option is used, and the vertex color is not provided, the material diffuse color is used.
+	if (state.currentRenderStates.renderStatesUnion.namedStates.diffuseMaterialSource == D3DMCS_COLOR1 && state.CurrentStateHasInputVertexColor0() )
+		diffuseSourceMacro.Definition = "1";
+	else if (state.currentRenderStates.renderStatesUnion.namedStates.diffuseMaterialSource == D3DMCS_COLOR2 && state.CurrentStateHasInputVertexColor1() )
+		diffuseSourceMacro.Definition = "2";
+	defines.push_back(diffuseSourceMacro);
+
 	if (state.currentRenderStates.renderStatesUnion.namedStates.lighting)
 	{
-		D3DXMACRO newMacro = {0};
-		newMacro.Name = "WITH_LIGHTING";
-		newMacro.Definition = "1";
-		defines.push_back(newMacro);
+		D3DXMACRO lightingMacro = {0};
+		lightingMacro.Name = "WITH_LIGHTING";
+		lightingMacro.Definition = "1";
+		defines.push_back(lightingMacro);
 
-		// From: Diffuse Lighting https://msdn.microsoft.com/en-us/library/windows/desktop/bb219656(v=vs.85).aspx
-		// Note: If either DIFFUSEMATERIALSOURCE option is used, and the vertex color is not provided, the material diffuse color is used.
-		if (state.currentRenderStates.renderStatesUnion.namedStates.diffuseMaterialSource > D3DMCS_MATERIAL && !state.CurrentStateHasInputVertexColor() )
-		{
-			D3DXMACRO newMacro = {0};
-			newMacro.Name = "MATERIAL_DIFFUSE_OVERRIDES_VERTEX_DIFFUSE";
-			newMacro.Definition = "1";
-			defines.push_back(newMacro);
-		}
-
+		D3DXMACRO specularSourceMacro = {0};
+		specularSourceMacro.Name = "MATERIAL_SPECULAR_SOURCE";
+		specularSourceMacro.Definition = "0";
 		// From: Specular Lighting https://msdn.microsoft.com/en-us/library/windows/desktop/bb147399(v=vs.85).aspx
 		// Note: If either specular material source option is used and the vertex color is not provided, then the material specular color is used.
-		if (state.currentRenderStates.renderStatesUnion.namedStates.specularMaterialSource > D3DMCS_MATERIAL && !state.CurrentStateHasInputVertexColor() )
-		{
-			D3DXMACRO newMacro = {0};
-			newMacro.Name = "MATERIAL_SPECULAR_OVERRIDES_VERTEX_SPECULAR";
-			newMacro.Definition = "1";
-			defines.push_back(newMacro);
-		}
+		if (state.currentRenderStates.renderStatesUnion.namedStates.specularMaterialSource == D3DMCS_COLOR1 && state.CurrentStateHasInputVertexColor0() )
+			specularSourceMacro.Definition = "1";
+		else if (state.currentRenderStates.renderStatesUnion.namedStates.specularMaterialSource == D3DMCS_COLOR2 && state.CurrentStateHasInputVertexColor1() )
+			specularSourceMacro.Definition = "2";
+		defines.push_back(specularSourceMacro);
 
+		D3DXMACRO ambientSourceMacro = {0};
+		ambientSourceMacro.Name = "MATERIAL_AMBIENT_SOURCE";
+		ambientSourceMacro.Definition = "0";
 		// From: Ambient Lighting https://msdn.microsoft.com/en-us/library/windows/desktop/bb172256(v=vs.85).aspx
 		// Note: If either AMBIENTMATERIALSOURCE option is used, and the vertex color is not provided, then the material ambient color is used.
-		if (state.currentRenderStates.renderStatesUnion.namedStates.ambientMaterialSource > D3DMCS_MATERIAL && !state.CurrentStateHasInputVertexColor() )
+		if (state.currentRenderStates.renderStatesUnion.namedStates.ambientMaterialSource == D3DMCS_COLOR1 && state.CurrentStateHasInputVertexColor0() )
 		{
-			D3DXMACRO newMacro = {0};
-			newMacro.Name = "MATERIAL_AMBIENT_OVERRIDES_VERTEX_AMBIENT";
-			newMacro.Definition = "1";
-			defines.push_back(newMacro);
+			ambientSourceMacro.Definition = "1";
 		}
+		else if (state.currentRenderStates.renderStatesUnion.namedStates.ambientMaterialSource == D3DMCS_COLOR2 && state.CurrentStateHasInputVertexColor1() )
+		{
+			ambientSourceMacro.Definition = "2";
+		}
+		defines.push_back(ambientSourceMacro);
 
+		D3DXMACRO emissiveSourceMacro = {0};
+		emissiveSourceMacro.Name = "MATERIAL_EMISSIVE_SOURCE";
+		emissiveSourceMacro.Definition = "0";
 		// From: Emissive Lighting https://msdn.microsoft.com/en-us/library/windows/desktop/bb173352(v=vs.85).aspx
 		// Note: If either EMISSIVEMATERIALSOURCE option is used, and the vertex color is not provided, the material emissive color is used.
-		if (state.currentRenderStates.renderStatesUnion.namedStates.emissiveMaterialSource > D3DMCS_MATERIAL && !state.CurrentStateHasInputVertexColor() )
-		{
-			D3DXMACRO newMacro = {0};
-			newMacro.Name = "MATERIAL_EMISSIVE_OVERRIDES_VERTEX_EMISSIVE";
-			newMacro.Definition = "1";
-			defines.push_back(newMacro);
-		}
-
-		if (state.currentRenderStates.renderStatesUnion.namedStates.ambient)
-		{
-			D3DXMACRO newMacro = {0};
-			newMacro.Name = "WITH_GLOBAL_AMBIENT";
-			newMacro.Definition = "1";
-			defines.push_back(newMacro);
-		}
+		if (state.currentRenderStates.renderStatesUnion.namedStates.emissiveMaterialSource == D3DMCS_COLOR1 && state.CurrentStateHasInputVertexColor0() )
+			emissiveSourceMacro.Definition = "1";
+		else if (state.currentRenderStates.renderStatesUnion.namedStates.emissiveMaterialSource == D3DMCS_COLOR2 && state.CurrentStateHasInputVertexColor1() )
+			emissiveSourceMacro.Definition = "2";
+		defines.push_back(emissiveSourceMacro);
 
 		if (state.currentRenderStates.renderStatesUnion.namedStates.normalizeNormals)
 		{
-			D3DXMACRO newMacro = {0};
-			newMacro.Name = "NORMALIZE_NORMALS";
-			newMacro.Definition = "1";
-			defines.push_back(newMacro);
+			D3DXMACRO normalizeNormalsMacro = {0};
+			normalizeNormalsMacro.Name = "NORMALIZE_NORMALS";
+			normalizeNormalsMacro.Definition = "1";
+			defines.push_back(normalizeNormalsMacro);
 		}
 	}
 
 	if (state.currentRenderStates.renderStatesUnion.namedStates.colorVertex)
 	{
-		D3DXMACRO newMacro = {0};
-		newMacro.Name = "WITH_COLORVERTEX";
-		newMacro.Definition = "1";
-		defines.push_back(newMacro);
-	}
-
-	if (state.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_GOURAUD)
-	{
-		D3DXMACRO newMacro = {0};
-		newMacro.Name = "FLAT_SHADING";
-		newMacro.Definition = "1";
-		defines.push_back(newMacro);
+		D3DXMACRO colorVertexMacro = {0};
+		colorVertexMacro.Name = "WITH_COLORVERTEX";
+		colorVertexMacro.Definition = "1";
+		defines.push_back(colorVertexMacro);
 	}
 
 	if (!defines.empty() )
 	{
-		D3DXMACRO newMacro = {0};
-		defines.push_back(newMacro);
+		D3DXMACRO emptyLastMacro = {0};
+		defines.push_back(emptyLastMacro);
 	}
 }
 
@@ -302,7 +294,7 @@ static inline void BuildVertexShader(const DeviceState& state, IDirect3DDevice9H
 		OutputDebugStringA(errorMessage);
 		OutputDebugStringA("\n");
 
-		// Should never happen!
+		// Should never happen for fixed function shaders!
 		__debugbreak();
 
 		return;
@@ -311,7 +303,7 @@ static inline void BuildVertexShader(const DeviceState& state, IDirect3DDevice9H
 	IDirect3DVertexShader9* newVertShader = NULL;
 	if (FAILED(dev->CreateVertexShader( (const DWORD* const)outBytecode->GetBufferPointer(), &newVertShader) ) || !newVertShader)
 	{
-		// Should never happen!
+		// Should never happen for fixed function shaders!
 		__debugbreak();
 	}
 
@@ -324,6 +316,17 @@ static inline void BuildVertexShader(const DeviceState& state, IDirect3DDevice9H
 	newVertShaderHook->GetModifyShaderInfo().fixedFunctionMacroDefines = defines;
 
 	*outNewShader = newVertShaderHook;
+
+	if (outBytecode)
+	{
+		outBytecode->Release();
+		outBytecode = NULL;
+	}
+	if (errorMessages)
+	{
+		errorMessages->Release();
+		errorMessages = NULL;
+	}
 }
 
 void FixedFunctionStateToVertexShader(const DeviceState& state, IDirect3DVertexShader9Hook** const outVertShader, IDirect3DDevice9Hook* const dev)
@@ -363,32 +366,32 @@ static inline void BuildPixelStateDefines(const DeviceState& state, std::vector<
 {
 	if (state.currentRenderStates.renderStatesUnion.namedStates.lighting)
 	{
-		D3DXMACRO newMacro = {0};
-		newMacro.Name = "WITH_LIGHTING";
-		newMacro.Definition = "1";
-		defines.push_back(newMacro);
+		D3DXMACRO lightingMacro = {0};
+		lightingMacro.Name = "WITH_LIGHTING";
+		lightingMacro.Definition = "1";
+		defines.push_back(lightingMacro);
 
-		if (state.currentRenderStates.renderStatesUnion.namedStates.ambient)
+		if (state.currentRenderStates.renderStatesUnion.namedStates.specularEnable)
 		{
-			D3DXMACRO newMacro = {0};
-			newMacro.Name = "WITH_GLOBAL_AMBIENT";
-			newMacro.Definition = "1";
-			defines.push_back(newMacro);
+			D3DXMACRO specularEnableMacro = {0};
+			specularEnableMacro.Name = "SPECULAR_ENABLE";
+			specularEnableMacro.Definition = "1";
+			defines.push_back(specularEnableMacro);
 		}
 	}
 
 	if (state.currentRenderStates.renderStatesUnion.namedStates.colorVertex)
 	{
-		D3DXMACRO newMacro = {0};
-		newMacro.Name = "WITH_COLORVERTEX";
-		newMacro.Definition = "1";
-		defines.push_back(newMacro);
+		D3DXMACRO colorVertexMacro = {0};
+		colorVertexMacro.Name = "WITH_COLORVERTEX";
+		colorVertexMacro.Definition = "1";
+		defines.push_back(colorVertexMacro);
 	}
 
 	if (!defines.empty() )
 	{
-		D3DXMACRO newMacro = {0};
-		defines.push_back(newMacro);
+		D3DXMACRO emptyLastMacro = {0};
+		defines.push_back(emptyLastMacro);
 	}
 }
 
@@ -421,7 +424,7 @@ static inline void BuildPixelShader(const DeviceState& state, IDirect3DDevice9Ho
 		const char* const errorMessage = errorMessages ? ( (const char* const)errorMessages->GetBufferPointer() ) : NULL;
 		printf("%s", errorMessage); // Don't optimize this away
 
-		// Should never happen!
+		// Should never happen for fixed-function shaders!
 		__debugbreak();
 
 		return;
@@ -430,7 +433,7 @@ static inline void BuildPixelShader(const DeviceState& state, IDirect3DDevice9Ho
 	IDirect3DPixelShader9* newPixelShader = NULL;
 	if (FAILED(dev->CreatePixelShader( (const DWORD* const)outBytecode->GetBufferPointer(), &newPixelShader) ) || !newPixelShader)
 	{
-		// Should never happen!
+		// Should never happen for fixed-function shaders!
 		__debugbreak();
 	}
 
@@ -443,6 +446,17 @@ static inline void BuildPixelShader(const DeviceState& state, IDirect3DDevice9Ho
 	newPixelShaderHook->GetModifyShaderInfo().fixedFunctionMacroDefines = defines;
 
 	*outNewShader = newPixelShaderHook;
+
+	if (outBytecode)
+	{
+		outBytecode->Release();
+		outBytecode = NULL;
+	}
+	if (errorMessages)
+	{
+		errorMessages->Release();
+		errorMessages = NULL;
+	}
 }
 
 void FixedFunctionStateToPixelShader(const DeviceState& state, IDirect3DPixelShader9Hook** const outPixelShader, IDirect3DDevice9Hook* const dev)
