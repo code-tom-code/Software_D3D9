@@ -176,6 +176,20 @@ struct ShaderInfo
 		firstInstructionToken = NULL;
 	}
 
+	~ShaderInfo()
+	{
+#ifdef DISASM_SHADER
+		shaderDisasmBuffer = NULL;
+		D3DXDisasmString = NULL;
+		if (D3DXDisasm)
+		{
+			D3DXDisasm->Release();
+			D3DXDisasm = NULL;
+		}
+		shaderDisasmText.clear();
+#endif
+	}
+
 	// Disallow copying of ShaderInfos!
 	ShaderInfo(const ShaderInfo&) = delete;
 	ShaderInfo(ShaderInfo&&) = delete;
