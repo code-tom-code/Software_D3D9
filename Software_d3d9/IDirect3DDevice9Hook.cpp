@@ -3201,11 +3201,11 @@ const bool IDirect3DDevice9Hook::TotalDrawCallSkipTest(void) const
 			return false; // TODO: Check for stencil enable and stencil zFail here
 	}
 
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.colorWriteEnable == 0x00)
+		return false;
+
 	if (!DepthWriteEnabled)
 	{
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.colorWriteEnable == 0x00)
-			return false;
-
 		if (currentState.currentPixelShader != NULL)
 		{
 			const ShaderInfo& pixelShaderInfo = currentState.currentPixelShader->GetShaderInfo();
@@ -3266,6 +3266,24 @@ const bool IDirect3DDevice9Hook::TotalDrawCallSkipTest(void) const
 	return true;
 }
 
+// Returns true if the currently set pipeline can do early-Z testing, or false if it cannot (false if depth isn't enabled, or no depth buffer is bound, or the pixel shader outputs depth)
+const bool IDirect3DDevice9Hook::CurrentPipelineCanEarlyZTest(void) const
+{
+#ifndef DISALLOW_EARLY_Z_TESTING
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.zEnable != D3DZB_FALSE)
+	{
+		if (currentState.currentDepthStencil != NULL)
+		{
+			if (currentState.currentPixelShader == NULL)
+				return true;
+			else
+				return !currentState.currentPixelShader->GetShaderInfo().psWritesDepth;
+		}
+	}
+#endif // #ifndef DISALLOW_EARLY_Z_TESTING
+	return false;
+}
+
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimitive(THIS_ D3DPRIMITIVETYPE PrimitiveType, UINT StartVertex, UINT PrimitiveCount)
 {
 	if (!currentState.currentVertexDecl)
@@ -3300,7 +3318,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimiti
 	// This is the case if we have a D3DUSAGE_POSITIONT with usageindex 0
 	if (SkipVertexProcessing() )
 	{
-		DrawPrimitiveUBPretransformedSkipVS<false, unsigned>(PrimitiveType, 0, 0, PrimitiveCount);
+		if (CurrentPipelineCanEarlyZTest() )
+			DrawPrimitiveUBPretransformedSkipVS<false, unsigned, true>(PrimitiveType, 0, 0, PrimitiveCount);
+		else
+			DrawPrimitiveUBPretransformedSkipVS<false, unsigned, false>(PrimitiveType, 0, 0, PrimitiveCount);
 
 		if (usePassthroughPixelShader)
 			SetPixelShader(NULL);
@@ -3345,7 +3366,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimiti
 	}
 #endif
 
-	DrawPrimitiveUB(PrimitiveType, PrimitiveCount, *processedVertexBuffer);
+	if (CurrentPipelineCanEarlyZTest() )
+		DrawPrimitiveUB<true>(PrimitiveType, PrimitiveCount, *processedVertexBuffer);
+	else
+		DrawPrimitiveUB<false>(PrimitiveType, PrimitiveCount, *processedVertexBuffer);
 
 	if (usePassthroughVertexShader)
 		SetVertexShader(NULL);
@@ -3407,7 +3431,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 		switch (currentState.currentIndexBuffer->GetFormat() )
 		{
 		case D3DFMT_INDEX16:
-			DrawPrimitiveUBPretransformedSkipVS<true, unsigned short>(PrimitiveType, BaseVertexIndex, startIndex, primCount);
+			if (CurrentPipelineCanEarlyZTest() )
+				DrawPrimitiveUBPretransformedSkipVS<true, unsigned short, true>(PrimitiveType, BaseVertexIndex, startIndex, primCount);
+			else
+				DrawPrimitiveUBPretransformedSkipVS<true, unsigned short, false>(PrimitiveType, BaseVertexIndex, startIndex, primCount);
 			break;
 		default:
 #ifdef _DEBUG
@@ -3416,7 +3443,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 		}
 #endif
 		case D3DFMT_INDEX32:
-			DrawPrimitiveUBPretransformedSkipVS<true, unsigned>(PrimitiveType, BaseVertexIndex, startIndex, primCount);
+			if (CurrentPipelineCanEarlyZTest() )
+				DrawPrimitiveUBPretransformedSkipVS<true, unsigned, true>(PrimitiveType, BaseVertexIndex, startIndex, primCount);
+			else
+				DrawPrimitiveUBPretransformedSkipVS<true, unsigned, false>(PrimitiveType, BaseVertexIndex, startIndex, primCount);
 			break;
 		}
 
@@ -3466,7 +3496,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 	}
 #endif
 
-	DrawPrimitiveUB(PrimitiveType, primCount, *processedVertexBuffer);
+	if (CurrentPipelineCanEarlyZTest() )
+		DrawPrimitiveUB<true>(PrimitiveType, primCount, *processedVertexBuffer);
+	else
+		DrawPrimitiveUB<false>(PrimitiveType, primCount, *processedVertexBuffer);
 
 	if (usePassthroughVertexShader)
 		SetVertexShader(NULL);
@@ -4054,6 +4087,11 @@ void IDirect3DDevice9Hook::RenderOutput(IDirect3DSurface9Hook* const outSurface,
 	switch (currentState.currentRenderStates.renderStatesUnion.namedStates.colorWriteEnable)
 	{
 	case 0:
+#ifdef _DEBUG
+		__debugbreak(); // Should never be here
+#else
+		__assume(0);
+#endif
 		return;
 	case 1:
 		ROPBlendWriteMask<1>(outSurface, x, y, value);
@@ -4555,21 +4593,18 @@ void IDirect3DDevice9Hook::ShadePixel(const unsigned x, const unsigned y, PShade
 
 	if (pixelShader->outputRegisters->pixelStatus == normalWrite)
 	{
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.colorWriteEnable != 0x0)
-		{
-			// Perform pixel shading:
+		// Perform pixel shading:
 #ifndef FORCE_INTERPRETED_PIXEL_SHADER
-			if (currentState.currentPixelShader->jitShaderMain)
-			{
-				// Execute JIT pixel shader engine:
-				currentState.currentPixelShader->jitShaderMain(*pixelShader);
-			}
-			else
+		if (currentState.currentPixelShader->jitShaderMain)
+		{
+			// Execute JIT pixel shader engine:
+			currentState.currentPixelShader->jitShaderMain(*pixelShader);
+		}
+		else
 #endif
-			{
-				// Execute interpreted pixel shader engine:
-				pixelShader->InterpreterExecutePixel();
-			}
+		{
+			// Execute interpreted pixel shader engine:
+			pixelShader->InterpreterExecutePixel();
 		}
 	}
 
@@ -4587,16 +4622,13 @@ void IDirect3DDevice9Hook::ShadePixel(const unsigned x, const unsigned y, PShade
 
 		const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
 		const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.colorWriteEnable != 0x0)
+		for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
 		{
-			for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
-			{
-				IDirect3DSurface9Hook* const currentRenderTarget = currentState.currentRenderTargets[rt];
-				if (!currentRenderTarget)
-					continue;
+			IDirect3DSurface9Hook* const currentRenderTarget = currentState.currentRenderTargets[rt];
+			if (!currentRenderTarget)
+				continue;
 
-				RenderOutput(currentRenderTarget, xCoord, yCoord, *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters->oC[rt]) );
-			}
+			RenderOutput(currentRenderTarget, xCoord, yCoord, *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters->oC[rt]) );
 		}
 
 		if (currentState.currentDepthStencil)
@@ -4902,6 +4934,7 @@ void IDirect3DDevice9Hook::RasterizePointFromStream(const DeclarationSemanticMap
 }
 
 // Assumes pre-transformed vertices from a vertex declaration + raw vertex stream
+template <const bool rasterizerUsesEarlyZTest>
 void IDirect3DDevice9Hook::RasterizeTriangleFromStream(const DeclarationSemanticMapping& vertexDeclMapping, CONST D3DXVECTOR4* const v0, CONST D3DXVECTOR4* const v1, CONST D3DXVECTOR4* const v2, 
 	const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const
 {
@@ -5019,6 +5052,14 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromStream(const DeclarationSemantic
 	int row1 = computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin) + topleftEdgeBias1;
 	int row2 = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin) + topleftEdgeBias2;
 
+	float earlyZTestDepthValue;
+	if (rasterizerUsesEarlyZTest)
+	{
+		// TODO: Don't assume less-than test for Z CMPFUNC
+		earlyZTestDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
+		earlyZTestDepthValue = earlyZTestDepthValue < pos2.z ? earlyZTestDepthValue : pos2.z;
+	}
+
 	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData(v0, v1, v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
 	for (int y = yMin; y <= yMax; y += SUBPIXEL_ACCURACY_BIASMULT)
 	{
@@ -5032,6 +5073,14 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromStream(const DeclarationSemantic
 			// Is our test-pixel inside all three triangle edges?
 			if ( (currentBarycentric0 | currentBarycentric1 | currentBarycentric2) >= 0)
 			{
+				if (rasterizerUsesEarlyZTest)
+				{
+					const float compareDepth = currentState.currentDepthStencil->GetDepth(x, y);
+
+					// TODO: Don't assume less-than test for Z CMPFUNC
+					if (compareDepth < earlyZTestDepthValue)
+						continue;
+				}
 #ifdef MULTITHREAD_SHADING
 				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
 #else
@@ -5079,6 +5128,7 @@ void IDirect3DDevice9Hook::RasterizePointFromShader(const VStoPSMapping& vs_psMa
 }
 
 // Assumes pre-transformed vertices from a processed vertex shader
+template <const bool rasterizerUsesEarlyZTest>
 void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
 	const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const
 {
@@ -5196,6 +5246,14 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_p
 	int row1 = computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin) + topleftEdgeBias1;
 	int row2 = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin) + topleftEdgeBias2;
 
+	float earlyZTestDepthValue;
+	if (rasterizerUsesEarlyZTest)
+	{
+		// TODO: Don't assume less-than test for Z CMPFUNC
+		earlyZTestDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
+		earlyZTestDepthValue = earlyZTestDepthValue < pos2.z ? earlyZTestDepthValue : pos2.z;
+	}
+
 	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData(&v0, &v1, &v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
 	for (int y = yMin; y <= yMax; y += SUBPIXEL_ACCURACY_BIASMULT)
 	{
@@ -5209,6 +5267,14 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_p
 			// Is our test-pixel inside all three triangle edges?
 			if ( (currentBarycentric0 | currentBarycentric1 | currentBarycentric2) >= 0)
 			{
+				if (rasterizerUsesEarlyZTest)
+				{
+					const float compareDepth = currentState.currentDepthStencil->GetDepth(x, y);
+
+					// TODO: Don't assume less-than test for Z CMPFUNC
+					if (compareDepth < earlyZTestDepthValue)
+						continue;
+				}
 #ifdef MULTITHREAD_SHADING
 				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
 #else
@@ -5300,163 +5366,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimiti
 	}
 
 	return ret;
-
-	/*bool usePassthroughVertexShader = false;
-	bool usePassthroughPixelShader = false;
-
-	if (!currentState.currentPixelShader)
-	{
-		usePassthroughPixelShader = true;
-
-		IDirect3DPixelShader9Hook* FixedFunctionPixelShader = NULL;
-		FixedFunctionStateToPixelShader(currentState, &FixedFunctionPixelShader, this);
-		SetPixelShader(FixedFunctionPixelShader);
-		SetFixedFunctionPixelShaderState(currentState, this);
-	}
-
-	if (SkipVertexProcessing() )
-	{
-		ret = S_OK;
-
-		const float fWidth = currentState.cachedViewport.fWidth;
-		const float fHeight = currentState.cachedViewport.fHeight;
-
-		DeclarationSemanticMapping vertexDeclMapping;
-		vertexDeclMapping.ClearSemanticMapping();
-		vertexDeclMapping.ComputeMappingPS(currentState.currentVertexDecl, currentState.currentPixelShader);
-		InitPixelShader(currentState, currentState.currentPixelShader->GetShaderInfo() );
-
-		SetupCurrentDrawCallPixelData(false, &vertexDeclMapping);
-
-		const BYTE* const byteStreamZeroData = (const BYTE* const)pVertexStreamZeroData;
-
-		switch (PrimitiveType)
-		{
-		case D3DPT_TRIANGLELIST:
-			for (unsigned x = 0; x < PrimitiveCount; ++x)
-			{
-				const BYTE* const v0 = byteStreamZeroData + x * 3 * shortVertexStreamZeroStride;
-				const BYTE* const v1 = byteStreamZeroData + x * 3 * shortVertexStreamZeroStride + shortVertexStreamZeroStride;
-				const BYTE* const v2 = byteStreamZeroData + x * 3 * shortVertexStreamZeroStride + 2 * shortVertexStreamZeroStride;
-				switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
-				{
-				case D3DCULL_CCW:
-					RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x);
-					break;
-				case D3DCULL_CW:
-					RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x);
-					break;
-				case D3DCULL_NONE:
-					RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x);
-					RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x + PrimitiveCount);
-					break;
-				}
-			}
-			break;
-		case D3DPT_TRIANGLESTRIP:
-		{
-			const unsigned vertCount = PrimitiveCount + 2;
-			for (unsigned x = 2; x < vertCount; ++x)
-			{
-				const BYTE* const v2 = byteStreamZeroData + x * shortVertexStreamZeroStride;
-				const BYTE* const v1 = byteStreamZeroData + (x - 1) * shortVertexStreamZeroStride;
-				const BYTE* const v0 = byteStreamZeroData + (x - 2) * shortVertexStreamZeroStride;
-				if (x & 0x1) // This alternating winding is necessary to keep triangles from flipping CW to CCW and back on every other triangle in the strip: https://msdn.microsoft.com/en-us/library/windows/desktop/bb206274(v=vs.85).aspx
-				{
-					switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
-					{
-					case D3DCULL_CCW:
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x - 2);
-						break;
-					case D3DCULL_CW:
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x - 2);
-						break;
-					case D3DCULL_NONE:
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x - 2);
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x - 2 + PrimitiveCount);
-						break;
-					}
-				}
-				else
-				{
-					switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
-					{
-					case D3DCULL_CCW:
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x - 2);
-						break;
-					case D3DCULL_CW:
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x - 2);
-						break;
-					case D3DCULL_NONE:
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x - 2);
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x - 2 + PrimitiveCount);
-						break;
-					}
-				}
-			}
-		}
-			break;
-		default:
-			// Not yet supported!
-			DbgBreakPrint("Error: Not yet supported: Only triangles are currently supported for DrawPrimitiveUP");
-			break;
-		}
-
-#ifdef MULTITHREAD_SHADING
-		//CloseThreadpoolCleanupGroupMembers(cleanup, FALSE, NULL);
-		//RefreshThreadpoolWork();
-		SynchronizeThreads();
-#endif
-	}
-	else
-	{
-		processedVertexBuffer.clear();
-
-		if (!currentState.currentVertexShader)
-		{
-			usePassthroughVertexShader = true;
-
-			IDirect3DVertexShader9Hook* FixedFunctionVertexShader = NULL;
-			FixedFunctionStateToVertexShader(currentState, &FixedFunctionVertexShader, this);
-			SetVertexShader(FixedFunctionVertexShader);
-			SetFixedFunctionVertexShaderState(currentState, this);
-		}
-
-#ifdef _DEBUG
-		if (currentState.currentVertexShader && !currentState.currentVertexShader->jitShaderMain)
-		{
-			DbgPrint("Warning: Uncached vertex shader detected");
-		}
-#endif
-
-		DeclarationSemanticMapping vertexDeclMapping;
-		vertexDeclMapping.ClearSemanticMapping();
-		vertexDeclMapping.ComputeMappingVS(currentState.currentVertexDecl, currentState.currentVertexShader);
-		InitVertexShader(currentState, currentState.currentVertexShader->GetShaderInfo() );
-
-		SetupCurrentDrawCallVertexData(false, vertexDeclMapping, shortVertexStreamZeroStride, pVertexStreamZeroData);
-
-		RecomputeCachedStreamEndsForUP( (const BYTE* const)pVertexStreamZeroData, numInputVerts, shortVertexStreamZeroStride);
-
-		ProcessVerticesToBuffer<false, false>(currentState.currentVertexDecl, vertexDeclMapping, processedVertexBuffer, NULL, PrimitiveType, 0, 0, 0, PrimitiveCount, pVertexStreamZeroData, shortVertexStreamZeroStride);
-
-		DrawPrimitiveUB(PrimitiveType, PrimitiveCount, processedVertexBuffer);
-	}
-
-	// Following any IDirect3DDevice9::DrawPrimitiveUP call, the stream 0 settings, referenced by IDirect3DDevice9::GetStreamSource, are set to NULL.
-	// Source: https://msdn.microsoft.com/en-us/library/windows/desktop/bb174372(v=vs.85).aspx
-	if (currentState.currentStreams[0].vertexBuffer != NULL)
-	{
-		SetStreamSource(0, NULL, 0, 0);
-	}
-
-	if (usePassthroughVertexShader)
-		SetVertexShader(NULL);
-	if (usePassthroughPixelShader)
-		SetPixelShader(NULL);
-
-	ret = S_OK;
-	return ret;*/
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexedPrimitiveUP(THIS_ D3DPRIMITIVETYPE PrimitiveType, UINT MinVertexIndex, UINT NumVertices, UINT PrimitiveCount, CONST void* pIndexData, D3DFORMAT IndexDataFormat, CONST void* pVertexStreamZeroData, UINT VertexStreamZeroStride)
@@ -5546,256 +5455,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 	}
 
 	return ret;
-
-	/*bool usePassthroughVertexShader = false;
-	bool usePassthroughPixelShader = false;
-
-	if (!currentState.currentPixelShader)
-	{
-		usePassthroughPixelShader = true;
-
-		IDirect3DPixelShader9Hook* FixedFunctionPixelShader = NULL;
-		FixedFunctionStateToPixelShader(currentState, &FixedFunctionPixelShader, this);
-		SetPixelShader(FixedFunctionPixelShader);
-		SetFixedFunctionPixelShaderState(currentState, this);
-	}
-
-	if (SkipVertexProcessing() )
-	{
-		const float fWidth = currentState.cachedViewport.fWidth;
-		const float fHeight = currentState.cachedViewport.fHeight;
-
-		const BYTE* const byteStreamZeroData = (const BYTE* const)pVertexStreamZeroData;
-
-		DeclarationSemanticMapping vertexDeclMapping;
-		vertexDeclMapping.ClearSemanticMapping();
-		if (!currentState.currentVertexDecl)
-		{
-			DbgBreakPrint("Error: Vertex decl is NULL");
-		}
-
-		vertexDeclMapping.ComputeMappingPS(currentState.currentVertexDecl, currentState.currentPixelShader);
-		InitPixelShader(currentState, currentState.currentPixelShader->GetShaderInfo() );
-		SetupCurrentDrawCallPixelData(false, &vertexDeclMapping);
-
-		switch (IndexDataFormat)
-		{
-		case D3DFMT_INDEX16:
-		{
-			const unsigned short* const indices = (const unsigned short* const)pIndexData;
-			switch (PrimitiveType)
-			{
-			case D3DPT_TRIANGLELIST:
-				for (unsigned x = 0; x < PrimitiveCount; ++x)
-				{
-					const unsigned short i0 = indices[x * 3];
-					const unsigned short i1 = indices[x * 3 + 1];
-					const unsigned short i2 = indices[x * 3 + 2];
-
-					// Skip degenerate triangles
-					if (i0 == i1 || i1 == i2 || i0 == i2)
-						continue;
-
-					const BYTE* const v0 = byteStreamZeroData + i0 * shortVertexStreamZeroStride;
-					const BYTE* const v1 = byteStreamZeroData + i1 * shortVertexStreamZeroStride;
-					const BYTE* const v2 = byteStreamZeroData + i2 * shortVertexStreamZeroStride;
-					RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x);
-				}
-				break;
-			case D3DPT_TRIANGLESTRIP:
-			{
-				const unsigned vertCount = PrimitiveCount + 2;
-				for (unsigned x = 2; x < vertCount; ++x)
-				{
-					const unsigned short i2 = indices[x];
-					const unsigned short i1 = indices[x - 1];
-					const unsigned short i0 = indices[x - 2];
-
-					// Skip degenerate triangles
-					if (i0 == i1 || i1 == i2 || i0 == i2)
-						continue;
-
-					const BYTE* const v2 = byteStreamZeroData + i2 * shortVertexStreamZeroStride;
-					const BYTE* const v1 = byteStreamZeroData + i1 * shortVertexStreamZeroStride;
-					const BYTE* const v0 = byteStreamZeroData + i0 * shortVertexStreamZeroStride;
-					if (x & 0x1) // This alternating winding is necessary to keep triangles from flipping CW to CCW and back on every other triangle in the strip: https://msdn.microsoft.com/en-us/library/windows/desktop/bb206274(v=vs.85).aspx
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x - 2);
-					else
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x - 2);
-				}
-			}
-				break;
-			default:
-				// Not yet supported
-				DbgBreakPrint("Error: Only triangles are currently supported in DrawIndexedPrimitiveUP");
-				break;
-			}
-		}
-			break;
-		default:
-#ifdef _DEBUG
-			DbgBreakPrint("Error: Unknown index buffer format specified");
-#endif
-		case D3DFMT_INDEX32:
-		{
-			const unsigned* const indices = (const unsigned* const)pIndexData;
-			switch (PrimitiveType)
-			{
-			case D3DPT_TRIANGLELIST:
-				for (unsigned x = 0; x < PrimitiveCount; ++x)
-				{
-					const unsigned i0 = indices[x * 3];
-					const unsigned i1 = indices[x * 3 + 1];
-					const unsigned i2 = indices[x * 3 + 2];
-
-					// Skip degenerate triangles
-					if (i0 == i1 || i1 == i2 || i0 == i2)
-						continue;
-
-					const BYTE* const v0 = byteStreamZeroData + i0 * shortVertexStreamZeroStride;
-					const BYTE* const v1 = byteStreamZeroData + i1 * shortVertexStreamZeroStride;
-					const BYTE* const v2 = byteStreamZeroData + i2 * shortVertexStreamZeroStride;
-					
-					switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
-					{
-					case D3DCULL_CCW:
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x);
-						break;
-					case D3DCULL_CW:
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x);
-						break;
-					case D3DCULL_NONE:
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x);
-						RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x + PrimitiveCount);
-						break;
-					}
-				}
-				break;
-			case D3DPT_TRIANGLESTRIP:
-			{
-				const unsigned vertCount = PrimitiveCount + 2;
-				for (unsigned x = 2; x < vertCount; ++x)
-				{
-					const unsigned i2 = indices[x];
-					const unsigned i1 = indices[x - 1];
-					const unsigned i0 = indices[x - 2];
-
-					// Skip degenerate triangles
-					if (i0 == i1 || i1 == i2 || i0 == i2)
-						continue;
-
-					const BYTE* const v2 = byteStreamZeroData + i2 * shortVertexStreamZeroStride;
-					const BYTE* const v1 = byteStreamZeroData + i1 * shortVertexStreamZeroStride;
-					const BYTE* const v0 = byteStreamZeroData + i0 * shortVertexStreamZeroStride;
-					if (x & 0x1) // This alternating winding is necessary to keep triangles from flipping CW to CCW and back on every other triangle in the strip: https://msdn.microsoft.com/en-us/library/windows/desktop/bb206274(v=vs.85).aspx
-					{
-						switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
-						{
-						case D3DCULL_CCW:
-							RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x - 2);
-							break;
-						case D3DCULL_CW:
-							RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x - 2);
-							break;
-						case D3DCULL_NONE:
-							RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x - 2);
-							RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x - 2 + PrimitiveCount);
-							break;
-						}
-					}
-					else
-					{
-						switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
-						{
-						case D3DCULL_CCW:
-							RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x - 2);
-							break;
-						case D3DCULL_CW:
-							RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x - 2);
-							break;
-						case D3DCULL_NONE:
-							RasterizeTriangleFromStream(vertexDeclMapping, v0, v1, v2, fWidth, fHeight, x - 2);
-							RasterizeTriangleFromStream(vertexDeclMapping, v0, v2, v1, fWidth, fHeight, x - 2 + PrimitiveCount);
-							break;
-						}
-					}
-				}
-			}
-				break;
-			default:
-				// Not yet supported
-				DbgBreakPrint("Error: Only triangles are currently supported in DrawIndexedPrimitiveUP");
-				break;
-			}
-		}
-			break;
-		}
-
-#ifdef MULTITHREAD_SHADING
-		//CloseThreadpoolCleanupGroupMembers(cleanup, FALSE, NULL);
-		//RefreshThreadpoolWork();
-		SynchronizeThreads();
-#endif
-	}
-	else
-	{
-		processedVertexBuffer.clear();
-
-		if (!currentState.currentVertexShader)
-		{
-			usePassthroughVertexShader = true;
-
-			IDirect3DVertexShader9Hook* FixedFunctionVertexShader = NULL;
-			FixedFunctionStateToVertexShader(currentState, &FixedFunctionVertexShader, this);
-			SetVertexShader(FixedFunctionVertexShader);
-			SetFixedFunctionVertexShaderState(currentState, this);
-		}
-
-#ifdef _DEBUG
-		if (currentState.currentVertexShader && !currentState.currentVertexShader->jitShaderMain)
-		{
-			DbgPrint("Warning: Uncached vertex shader detected");
-		}
-#endif
-
-		DeclarationSemanticMapping vertexDeclMapping;
-		vertexDeclMapping.ClearSemanticMapping();
-		vertexDeclMapping.ComputeMappingVS(currentState.currentVertexDecl, currentState.currentVertexShader);
-		InitVertexShader(currentState, currentState.currentVertexShader->GetShaderInfo() );
-
-		SetupCurrentDrawCallVertexData(false, vertexDeclMapping, shortVertexStreamZeroStride, pVertexStreamZeroData);
-
-		RecomputeCachedStreamEndsForUP( (const BYTE* const)pVertexStreamZeroData, NumVertices, shortVertexStreamZeroStride);
-
-		ProcessVerticesToBuffer<false, true>(currentState.currentVertexDecl, vertexDeclMapping, processedVertexBuffer, (const BYTE* const)pIndexData, IndexDataFormat, PrimitiveType, 0, MinVertexIndex, 0, PrimitiveCount, pVertexStreamZeroData, shortVertexStreamZeroStride);
-
-		DrawPrimitiveUB(PrimitiveType, PrimitiveCount, processedVertexBuffer);
-	}
-
-	// Following any IDirect3DDevice9::DrawIndexedPrimitiveUP call, the stream 0 settings, referenced by IDirect3DDevice9::GetStreamSource, are set to NULL.
-	// Source: https://msdn.microsoft.com/en-us/library/windows/desktop/bb174370(v=vs.85).aspx
-	if (currentState.currentStreams[0].vertexBuffer != NULL)
-	{
-		//currentState.currentStreams[0].vertexBuffer->Release();
-		//currentState.currentStreams[0].vertexBuffer = NULL;
-		SetStreamSource(0, NULL, 0, 0);
-	}
-
-	// Also, the index buffer setting for IDirect3DDevice9::SetIndices is set to NULL.
-	// Source: https://msdn.microsoft.com/en-us/library/windows/desktop/bb174370(v=vs.85).aspx
-	if (currentState.currentIndexBuffer != NULL)
-	{
-		//SetStreamSource(0, NULL, 0, 0);
-		SetIndices(NULL);
-	}
-
-	if (usePassthroughVertexShader)
-		SetVertexShader(NULL);
-	if (usePassthroughPixelShader)
-		SetPixelShader(NULL);
-
-	ret = S_OK;
-	return ret;*/
 }
 
 const bool IDirect3DDevice9Hook::ShouldCullEntireTriangle(const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2)
@@ -5815,7 +5474,7 @@ const bool IDirect3DDevice9Hook::ShouldCullEntirePoint(const VS_2_0_OutputRegist
 	return v0.vertexClip.clipCodesCombined != 0x0000;
 }
 
-template <const bool useIndexBuffer, typename indexFormat>
+template <const bool useIndexBuffer, typename indexFormat, const bool rasterizerUsesEarlyZTest>
 void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIVETYPE PrimitiveType, INT BaseVertexIndex, UINT startIndex, UINT primCount) const
 {
 #ifdef _DEBUG
@@ -5883,14 +5542,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 			{
 			case D3DCULL_CCW:
-				RasterizeTriangleFromStream(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
 				break;
 			case D3DCULL_CW:
-				RasterizeTriangleFromStream(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
 				break;
 			case D3DCULL_NONE:
-				RasterizeTriangleFromStream(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
-				RasterizeTriangleFromStream(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*hack*/, i0, i2, i1);
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*hack*/, i0, i2, i1);
 				break;
 			}
 		}
@@ -5920,14 +5579,50 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 			{
 			case D3DCULL_CCW:
-				RasterizeTriangleFromStream(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
 				break;
 			case D3DCULL_CW:
-				RasterizeTriangleFromStream(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
 				break;
 			case D3DCULL_NONE:
-				RasterizeTriangleFromStream(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
-				RasterizeTriangleFromStream(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*hack*/, i0, i2, i1);
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*hack*/, i0, i2, i1);
+				break;
+			}
+		}
+	}
+		break;
+	case D3DPT_TRIANGLEFAN:
+	{
+		const unsigned vertCount = primCount + 2;
+		for (unsigned x = 2; x < vertCount; ++x)
+		{
+			const UINT primitiveID = x - 2;
+
+			const indexFormat i2 = useIndexBuffer ? (indices[0] + BaseVertexIndex) : (0);
+			const indexFormat i1 = useIndexBuffer ? (indices[x] + BaseVertexIndex) : (x);
+			const indexFormat i0 = useIndexBuffer ? (indices[x - 1] + BaseVertexIndex) : (x - 1);
+
+			// Skip degenerate triangles
+			if (useIndexBuffer)
+				if (i0 == i1 || i1 == i2 || i0 == i2)
+					continue;
+
+			const BYTE* const v0 = positionT0stream + i0 * positionT0streamStride;
+			const BYTE* const v1 = positionT0stream + i1 * positionT0streamStride;
+			const BYTE* const v2 = positionT0stream + i2 * positionT0streamStride;
+
+			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
+			{
+			case D3DCULL_CCW:
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				break;
+			case D3DCULL_CW:
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
+				break;
+			case D3DCULL_NONE:
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*TODO: Hack*/, i0, i2, i1);
 				break;
 			}
 		}
@@ -5944,6 +5639,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 #endif
 }
 
+template <const bool rasterizerUsesEarlyZTest>
 void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType, const UINT PrimitiveCount, const std::vector<VS_2_0_OutputRegisters>& processedVerts) const
 {
 #ifdef _DEBUG
@@ -6000,20 +5696,24 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 			const unsigned i1 = i0 + 1;
 			const unsigned i2 = i0 + 2;
 
+			// Skip degenerate triangles
+			if (i0 == i1 || i1 == i2 || i0 == i2)
+				continue;
+
 			if (ShouldCullEntireTriangle(processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2]) )
 				continue;
 
 			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 			{
 			case D3DCULL_CCW:
-				RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x, i0, i1, i2);
+				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x, i0, i1, i2);
 				break;
 			case D3DCULL_CW:
-				RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x, i0, i2, i1);
+				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x, i0, i2, i1);
 				break;
 			case D3DCULL_NONE:
-				RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x, i0, i1, i2);
-				RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
+				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x, i0, i1, i2);
+				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
 				break;
 			}
 		}
@@ -6030,9 +5730,15 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 #endif
 		for (unsigned x = 2; x < vertCount; ++x)
 		{
+			const UINT primitiveID = x - 2;
+
 			const unsigned i2 = x;
 			const unsigned i1 = x - 1;
-			const unsigned i0 = x - 2;
+			const unsigned i0 = primitiveID;
+
+			// Skip degenerate triangles
+			if (i0 == i1 || i1 == i2 || i0 == i2)
+				continue;
 
 			if (ShouldCullEntireTriangle(processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2]) )
 				continue;
@@ -6042,14 +5748,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 				switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 				{
 				case D3DCULL_CCW:
-					RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x - 2, i0, i2, i1);
+					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
 					break;
 				case D3DCULL_CW:
-					RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x - 2, i0, i1, i2);
+					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
 					break;
 				case D3DCULL_NONE:
-					RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x - 2, i0, i2, i1);
-					RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x - 2 + PrimitiveCount /*TODO: Hack*/, i0, i1, i2);
+					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
+					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i1, i2);
 					break;
 				}
 			}
@@ -6058,14 +5764,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 				switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 				{
 				case D3DCULL_CCW:
-					RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x - 2, i0, i1, i2);
+					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
 					break;
 				case D3DCULL_CW:
-					RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x - 2, i0, i2, i1);
+					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
 					break;
 				case D3DCULL_NONE:
-					RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x - 2, i0, i1, i2);
-					RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x - 2 + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
+					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
+					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
 					break;
 				}
 			}
@@ -6083,21 +5789,30 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 #endif
 		for (unsigned x = 2; x < vertCount; ++x)
 		{
+			const UINT primitiveID = x - 2;
+
 			const unsigned i2 = 0;
 			const unsigned i1 = x;
 			const unsigned i0 = x - 1;
 
+			// Skip degenerate triangles
+			if (i0 == i1 || i1 == i2 || i0 == i2)
+				continue;
+
+			if (ShouldCullEntireTriangle(processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2]) )
+				continue;
+
 			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 			{
 			case D3DCULL_CCW:
-				RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x - 2, i0, i1, i2);
+				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
 				break;
 			case D3DCULL_CW:
-				RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x - 2, i0, i2, i1);
+				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
 				break;
 			case D3DCULL_NONE:
-				RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, x - 2, i0, i1, i2);
-				RasterizeTriangleFromShader(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, x - 2 + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
+				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
 				break;
 			}
 		}

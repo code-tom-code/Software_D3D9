@@ -21,13 +21,12 @@ void IDirect3DVertexBuffer9Hook::CreateVertexBuffer(UINT _Length, const Debuggab
 #ifdef VERTEX_BUFFER_ALLOC_PAGE_NOACCESS
 	data = PageAllocWithNoAccessPage(InternalLength + magicDWORDLen);
 #else
-	data = malloc(InternalLength + magicDWORDLen);
+	data = (BYTE* const)malloc(InternalLength + magicDWORDLen);
 #endif
 	if (!data)
 	{
 		__debugbreak(); // Can't alloc our vertex buffer!
 	}
-	//data.resize(InternalLength + magicDWORDLen);
 
 #ifdef VERTEX_BUFFER_MAGIC_COOKIE
 	*(DWORD* const)&data[InternalLength] = 'VRTX';

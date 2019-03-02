@@ -725,10 +725,10 @@ static __forceinline const float saturate(const float inputFloat)
 
 // Texture sample functions (tex2D, tex2Dgrad, tex2Dlod):
 template <const unsigned char writeMask>
-void __cdecl tex2Dmip0(D3DXVECTOR4& outVal, const D3DXVECTOR4& texCoord, const sampler* const samplerPtr);
+void __fastcall tex2Dmip0(D3DXVECTOR4& outVal, const D3DXVECTOR4& texCoord, const sampler* const samplerPtr);
 
 template <const unsigned char writeMask>
-void __cdecl tex2Dlod(D3DXVECTOR4& outVal, const D3DXVECTOR4& texCoordAndLoD, const sampler* const samplerPtr);
+void __fastcall tex2Dlod(D3DXVECTOR4& outVal, const D3DXVECTOR4& texCoordAndLoD, const sampler* const samplerPtr);
 
 template <const unsigned char writeMask, const bool useTexCoordMipBias>
-void __cdecl tex2Dgrad(D3DXVECTOR4& outVal, const D3DXVECTOR4& texCoord, const D3DXVECTOR4& texDdx, const D3DXVECTOR4& texDdy, const sampler* const samplerPtr);
+void __fastcall tex2Dgrad(D3DXVECTOR4& outVal, const D3DXVECTOR4& texCoord, const D3DXVECTOR4& texDdx, const D3DXVECTOR4& texDdy, const sampler* const samplerPtr);

@@ -298,7 +298,7 @@ static const bool opcodeImplementedForJIT[D3DSHADER_INSTRUCTION_OPCODE_TYPE::D3D
 	false, //D3DSIO_TEXDP3       ,
     false, //D3DSIO_TEXM3x3      ,
     false, //D3DSIO_TEXDEPTH     ,
-    false, //D3DSIO_CMP          ,
+    true, //D3DSIO_CMP          ,
     false, //D3DSIO_BEM          ,
     true, //D3DSIO_DP2ADD       ,
     false, //D3DSIO_DSX          ,

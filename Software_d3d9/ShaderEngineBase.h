@@ -20,16 +20,16 @@ public:
 		shaderInfo = NULL;
 	}
 
-	typedef void (__cdecl * tex2DMip0Sig)(float4& outVal, const float4& texCoord, const sampler* const samplerPtr);
+	typedef void (__fastcall * tex2DMip0Sig)(float4& outVal, const float4& texCoord, const sampler* const samplerPtr);
 	tex2DMip0Sig tex2DMip0ptrs[15];
 
-	typedef void (__cdecl * tex2DLoDSig)(float4& outVal, const float4& texCoordAndLoD, const sampler* const samplerPtr);
+	typedef void (__fastcall * tex2DLoDSig)(float4& outVal, const float4& texCoordAndLoD, const sampler* const samplerPtr);
 	tex2DLoDSig tex2DLoDptrs[15];
 
-	typedef void (__cdecl * tex2DGradSig)(float4& outVal, const float4& texCoord, const float4& texDdx, const float4& texDdy, const sampler* const samplerPtr);
+	typedef void (__fastcall * tex2DGradSig)(float4& outVal, const float4& texCoord, const float4& texDdx, const float4& texDdy, const sampler* const samplerPtr);
 	tex2DGradSig tex2DGradPtrs[15];
 
-	typedef void (__cdecl * tex2DGradBiasSig)(float4& outVal, const float4& texCoord, const float4& texDdx, const float4& texDdy, const sampler* const samplerPtr);
+	typedef void (__fastcall * tex2DGradBiasSig)(float4& outVal, const float4& texCoord, const float4& texDdx, const float4& texDdy, const sampler* const samplerPtr);
 	tex2DGradBiasSig tex2DGradBiasPtrs[15];
 
 	void GlobalInitTex2DFunctionTable()

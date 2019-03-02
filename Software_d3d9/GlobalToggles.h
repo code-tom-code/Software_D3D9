@@ -45,17 +45,17 @@
 
 // Comment out to use a more efficient allocator for surface alloc. Leave uncommented for a safer way to make sure reads and writes don't go past the end of the surface
 #ifndef SURFACE_MAGIC_COOKIE
-	#define SURFACE_ALLOC_PAGE_NOACCESS 1
+	//#define SURFACE_ALLOC_PAGE_NOACCESS 1
 #endif
 
 // Comment out to use a more efficient allocator for vertex buffer alloc. Leave uncommented for a safer way to make sure reads and writes don't go past the end of the buffer
 #ifndef VERTEX_BUFFER_MAGIC_COOKIE
-	#define VERTEX_BUFFER_ALLOC_PAGE_NOACCESS 1
+	//#define VERTEX_BUFFER_ALLOC_PAGE_NOACCESS 1
 #endif
 
 // If defined, this will force vertex buffer data to be made read-only after Unlock() is called
 #ifdef VERTEX_BUFFER_ALLOC_PAGE_NOACCESS
-	#define VERTEX_BUFFER_ENFORCE_READONLY_WHILE_UNLOCKED 1
+	//#define VERTEX_BUFFER_ENFORCE_READONLY_WHILE_UNLOCKED 1
 #endif
 
 // If defined, this will wipe vertex buffers when D3DLOCK_DISCARD is specified during a Lock operation
@@ -65,12 +65,12 @@
 
 // Comment out to use a more efficient allocator for index buffer alloc. Leave uncommented for a safer way to make sure reads and writes don't go past the end of the buffer
 #ifndef INDEX_BUFFER_MAGIC_COOKIE
-	#define INDEX_BUFFER_ALLOC_PAGE_NOACCESS 1
+	//#define INDEX_BUFFER_ALLOC_PAGE_NOACCESS 1
 #endif
 
 // If defined, this will force index buffer data to be made read-only after Unlock() is called
 #ifdef INDEX_BUFFER_ALLOC_PAGE_NOACCESS
-	#define INDEX_BUFFER_ENFORCE_READONLY_WHILE_UNLOCKED 1
+	//#define INDEX_BUFFER_ENFORCE_READONLY_WHILE_UNLOCKED 1
 #endif
 
 // If defined, this will wipe index buffers when D3DLOCK_DISCARD is specified during a Lock operation
@@ -80,3 +80,6 @@
 
 // Uncomment this to enable holding the "END" key to skip draw calls (very useful in debug mode where draw calls can take a very long time to complete)
 #define ENABLE_END_TO_SKIP_DRAWS 1
+
+// Comment this out to allow the early Z testing optimization
+//#define DISALLOW_EARLY_Z_TESTING 1

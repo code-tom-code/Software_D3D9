@@ -998,9 +998,10 @@ public:
 
 	// void StoreVertexOutputElement(const DebuggableD3DVERTEXELEMENT9& element, unsigned char* const outputPtr, const D3DDECLUSAGE usage, const unsigned usageIndex) const;
 
-	template <const bool useIndexBuffer, typename indexFormat>
+	template <const bool useIndexBuffer, typename indexFormat, const bool rasterizerUsesEarlyZTest>
 	void DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIVETYPE PrimitiveType, INT BaseVertexIndex, UINT startIndex, UINT primCount) const;
 
+	template <const bool rasterizerUsesEarlyZTest>
 	void DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType, const UINT PrimitiveCount, const std::vector<VS_2_0_OutputRegisters>& processedVerts) const;
 
 	// Returns true for "should draw", or false for "should skip"
@@ -1044,7 +1045,11 @@ public:
 	// size of the largest set render-target:
 	void AutoResizeViewport(void);
 
+	// Returns true if the currently set pipeline can do early-Z testing, or false if it cannot (false if depth isn't enabled, or no depth buffer is bound, or the pixel shader outputs depth)
+	const bool CurrentPipelineCanEarlyZTest(void) const;
+
 	// Assumes pre-transformed vertices from a vertex declaration + raw vertex stream
+	template <const bool rasterizerUsesEarlyZTest>
 	void RasterizeTriangleFromStream(const DeclarationSemanticMapping& vertexDeclMapping, CONST D3DXVECTOR4* const v0, CONST D3DXVECTOR4* const v1, CONST D3DXVECTOR4* const v2, 
 		const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const;
 
@@ -1055,6 +1060,7 @@ public:
 	void RasterizePointFromStream(const DeclarationSemanticMapping& vertexDeclMapping, CONST BYTE* const v0) const;
 
 	// Assumes pre-transformed vertices from a processed vertex shader
+	template <const bool rasterizerUsesEarlyZTest>
 	void RasterizeTriangleFromShader(const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
 		const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const;
 
