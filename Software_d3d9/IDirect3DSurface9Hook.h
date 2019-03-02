@@ -202,7 +202,7 @@ public:
 	void DecompressSurfaceDXT1();
 	void DecompressSurfaceDXT3();
 	void DecompressSurfaceDXT5();
-	void DecompressSurface();
+	void DecompressSurfaceToAuxBuffer();
 
 	void DumpSurfaceToDisk(void) const;
 	static void InitDumpSurfaces(void);

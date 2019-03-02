@@ -21,13 +21,14 @@ static inline const bool IsCompressedFormat(const D3DFORMAT format)
 	}
 }
 
+#pragma pack(push)
+#pragma pack(1)
 struct DXT1Chunk
 {
 	unsigned short c0;
 	unsigned short c1;
 	unsigned char interpLookup4x4[4];
 };
-
 static_assert(sizeof(DXT1Chunk) == 8, "Error: Unexpected DXT1 chunk size!");
 
 struct DXT3Chunk
@@ -35,7 +36,6 @@ struct DXT3Chunk
 	unsigned char alphaValues[8];
 	DXT1Chunk Colors;
 };
-
 static_assert(sizeof(DXT3Chunk) == 16, "Error: Unexpected DXT3 chunk size!");
 
 struct DXT5Chunk
@@ -45,8 +45,9 @@ struct DXT5Chunk
 	unsigned char alphaInterpLookup4x4[6];
 	DXT1Chunk Colors;
 };
-
 static_assert(sizeof(DXT5Chunk) == 16, "Error: Unexpected DXT5 chunk size!");
+
+#pragma pack(pop)
 
 static inline const D3DCOLOR DXT565To888(const unsigned short color565)
 {
@@ -509,9 +510,9 @@ void IDirect3DSurface9Hook::DecompressSurfaceDXT1()
 				c3 = 0x00000000;
 			}
 
-			for (unsigned dy = 0; dy < 4; ++dy)
+			for (unsigned char dy = 0; dy < 4; ++dy)
 			{
-				for (unsigned dx = 0; dx < 4; ++dx)
+				for (unsigned char dx = 0; dx < 4; ++dx)
 				{
 					const unsigned char pixelByte = chunk.interpLookup4x4[dy];
 					unsigned char pixelBits;
@@ -677,7 +678,7 @@ void IDirect3DSurface9Hook::DecompressSurfaceDXT3()
 #endif
 			c2 = D3DCOLOR_XRGB(r2, g2, b2);
 
-			// c2 = (1/3)c0 + (2/3)c1
+			// c3 = (1/3)c0 + (2/3)c1
 			const unsigned r3 = (r0 + r1 + r1 + 1) / 3;
 			const unsigned g3 = (g0 + g1 + g1 + 1) / 3;
 			const unsigned b3 = (b0 + b1 + b1 + 1) / 3;
@@ -697,11 +698,11 @@ void IDirect3DSurface9Hook::DecompressSurfaceDXT3()
 #endif
 			c3 = D3DCOLOR_XRGB(r3, g3, b3);
 
-			for (unsigned dy = 0; dy < 4; ++dy)
+			for (unsigned char dy = 0; dy < 4; ++dy)
 			{
-				for (unsigned dx = 0; dx < 4; ++dx)
+				const unsigned char pixelByte = chunk.Colors.interpLookup4x4[dy];
+				for (unsigned char dx = 0; dx < 4; ++dx)
 				{
-					const unsigned char pixelByte = chunk.Colors.interpLookup4x4[dy];
 					unsigned char pixelBits;
 					switch (dx)
 					{
@@ -709,13 +710,13 @@ void IDirect3DSurface9Hook::DecompressSurfaceDXT3()
 						pixelBits = pixelByte & 0x3;
 						break;
 					case 1:
-						pixelBits = (pixelByte & (0x3 << 2) ) >> 2;
+						pixelBits = (pixelByte >> 2) & 0x3;
 						break;
 					case 2:
-						pixelBits = (pixelByte & (0x3 << 4) ) >> 4;
+						pixelBits = (pixelByte >> 4) & 0x3;
 						break;
 					case 3:
-						pixelBits = (pixelByte & (0x3 << 6) ) >> 6;
+						pixelBits = (pixelByte >> 6) & 0x3;
 						break;
 					default:
 #ifdef _DEBUG
@@ -765,51 +766,23 @@ void IDirect3DSurface9Hook::DecompressSurfaceDXT3()
 	}
 }
 
-static inline const DWORD DecompressDXT5PixelAlpha(const DXT5Chunk& chunk, const unsigned pixelIndex)
+static inline const DWORD DecompressDXT5PixelAlpha(const DXT5Chunk& chunk, const unsigned char pixelIndex)
 {
-	const unsigned char bitIndexStart = pixelIndex * 3;
-
+ 	// The end of this read will read 16 bits into the colors section of the buffer, this is fine (it's not like it'll cause a seg-fault, and we're not using that data anyway).
+	const unsigned char bitIndex = pixelIndex * 3; // Range [0...47]
 #ifdef _DEBUG
-	if (bitIndexStart > 47)
+	if (bitIndex > 47)
 	{
 		__debugbreak();
 	}
 #endif
 
-	unsigned char byteIndexStart = bitIndexStart / 8;
-	if (byteIndexStart == 5)
-		byteIndexStart = 4;
-
+	unsigned __int64 interpLookupNum = *(const unsigned __int64* const)&(chunk.alphaInterpLookup4x4);
+	interpLookupNum &= ( ( (const unsigned __int64)0x7) << bitIndex);
+	interpLookupNum >>= bitIndex;
+	const unsigned char shortBitIndex = (const unsigned char)interpLookupNum; // Range [0...7]
 #ifdef _DEBUG
-	if (byteIndexStart > 4)
-	{
-		__debugbreak();
-	}
-#endif
-
-	const unsigned short interpLookupNum = *(const unsigned short* const)&(chunk.alphaInterpLookup4x4[byteIndexStart]);
-	const unsigned char shortBitIndex = bitIndexStart - byteIndexStart * 8;
-
-#ifdef _DEBUG
-	if (shortBitIndex > 13)
-	{
-		__debugbreak();
-	}
-#endif
-
-	const unsigned short shortBitMask = 0x7 << shortBitIndex;
-
-#ifdef _DEBUG
-	if (__popcnt16(shortBitMask) != 3)
-	{
-		__debugbreak();
-	}
-#endif
-
-	const unsigned short alphaBits = (interpLookupNum & shortBitMask) >> shortBitIndex;
-
-#ifdef _DEBUG
-	if (alphaBits > 7)
+	if (shortBitIndex > 7)
 	{
 		__debugbreak();
 	}
@@ -821,7 +794,7 @@ static inline const DWORD DecompressDXT5PixelAlpha(const DXT5Chunk& chunk, const
 
 	if (a0 > a1)
 	{
-		switch (alphaBits)
+		switch (shortBitIndex)
 		{
 		case 0:
 			alpha = a0;
@@ -830,22 +803,22 @@ static inline const DWORD DecompressDXT5PixelAlpha(const DXT5Chunk& chunk, const
 			alpha = a1;
 			break;
 		case 2:
-			alpha = (a0 * 6 + a1) / 7;
+			alpha = (6 * a0 +     a1) / 7;
 			break;
 		case 3:
-			alpha = (a0 * 5 + a1 * 2) / 7;
+			alpha = (5 * a0 + 2 * a1) / 7;
 			break;
 		case 4:
-			alpha = (a0 * 4 + a1 * 3) / 7;
+			alpha = (4 * a0 + 3 * a1) / 7;
 			break;
 		case 5:
-			alpha = (a0 * 3 + a1 * 4) / 7;
+			alpha = (3 * a0 + 4 * a1) / 7;
 			break;
 		case 6:
-			alpha = (a0 * 2 + a1 * 5) / 7;
+			alpha = (2 * a0 + 5 * a1) / 7;
 			break;
 		case 7:
-			alpha = (a0 + a1 * 6) / 7;
+			alpha = (    a0 + 6 * a1) / 7;
 			break;
 		default:
 #ifdef _DEBUG
@@ -857,7 +830,7 @@ static inline const DWORD DecompressDXT5PixelAlpha(const DXT5Chunk& chunk, const
 	}
 	else
 	{
-		switch (alphaBits)
+		switch (shortBitIndex)
 		{
 		case 0:
 			alpha = a0;
@@ -866,16 +839,16 @@ static inline const DWORD DecompressDXT5PixelAlpha(const DXT5Chunk& chunk, const
 			alpha = a1;
 			break;
 		case 2:
-			alpha = (a0 * 4 + a1) / 5;
+			alpha = (4 * a0 +     a1) / 5;
 			break;
 		case 3:
-			alpha = (a0 * 3 + a1 * 2) / 5;
+			alpha = (3 * a0 + 2 * a1) / 5;
 			break;
 		case 4:
-			alpha = (a0 * 2 + a1 * 3) / 5;
+			alpha = (2 * a0 + 3 * a1) / 5;
 			break;
 		case 5:
-			alpha = (a0 + a1 * 4) / 5;
+			alpha = (    a0 + 4 * a1) / 5;
 			break;
 		case 6:
 			alpha = 0;
@@ -977,7 +950,7 @@ void IDirect3DSurface9Hook::DecompressSurfaceDXT5()
 #endif
 			c2 = D3DCOLOR_XRGB(r2, g2, b2);
 
-			// c2 = (1/3)c0 + (2/3)c1
+			// c3 = (1/3)c0 + (2/3)c1
 			const unsigned r3 = (r0 + r1 + r1 + 1) / 3;
 			const unsigned g3 = (g0 + g1 + g1 + 1) / 3;
 			const unsigned b3 = (b0 + b1 + b1 + 1) / 3;
@@ -997,11 +970,11 @@ void IDirect3DSurface9Hook::DecompressSurfaceDXT5()
 #endif
 			c3 = D3DCOLOR_XRGB(r3, g3, b3);
 
-			for (unsigned dy = 0; dy < 4; ++dy)
+			for (unsigned char dy = 0; dy < 4; ++dy)
 			{
-				for (unsigned dx = 0; dx < 4; ++dx)
+				const unsigned char pixelByte = chunk.Colors.interpLookup4x4[dy];
+				for (unsigned char dx = 0; dx < 4; ++dx)
 				{
-					const unsigned char pixelByte = chunk.Colors.interpLookup4x4[dy];
 					unsigned char pixelBits;
 					switch (dx)
 					{
@@ -1009,13 +982,13 @@ void IDirect3DSurface9Hook::DecompressSurfaceDXT5()
 						pixelBits = pixelByte & 0x3;
 						break;
 					case 1:
-						pixelBits = (pixelByte & (0x3 << 2) ) >> 2;
+						pixelBits = (pixelByte >> 2) & 0x3;
 						break;
 					case 2:
-						pixelBits = (pixelByte & (0x3 << 4) ) >> 4;
+						pixelBits = (pixelByte >> 4) & 0x3;
 						break;
 					case 3:
-						pixelBits = (pixelByte & (0x3 << 6) ) >> 6;
+						pixelBits = (pixelByte >> 6) & 0x3;
 						break;
 					default:
 #ifdef _DEBUG
@@ -1064,7 +1037,7 @@ void IDirect3DSurface9Hook::DecompressSurfaceDXT5()
 	}
 }
 
-void IDirect3DSurface9Hook::DecompressSurface()
+void IDirect3DSurface9Hook::DecompressSurfaceToAuxBuffer()
 {
 	switch (InternalFormat)
 	{
@@ -1107,7 +1080,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSurface9Hook::UnlockRect
 		DWORD* const magicDword = (DWORD* const)auxSurfaceBytesRaw + (auxSurfaceBytes.size() / sizeof(DWORD) - 1);
 		*magicDword = surfaceMagicBytes;
 #endif
-		DecompressSurface();
+		DecompressSurfaceToAuxBuffer();
 #ifdef SURFACE_MAGIC_COOKIE
 		if (*magicDword != surfaceMagicBytes)
 		{
