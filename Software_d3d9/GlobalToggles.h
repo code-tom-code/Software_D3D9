@@ -48,6 +48,11 @@
 	//#define SURFACE_ALLOC_PAGE_NOACCESS 1
 #endif
 
+// If defined, this will wipe surfaces when D3DLOCK_DISCARD is specified during a LockRect operation
+#ifdef _DEBUG
+	#define SURFACE_ENFORCE_DISCARD_ON_LOCK 1
+#endif
+
 // Comment out to use a more efficient allocator for vertex buffer alloc. Leave uncommented for a safer way to make sure reads and writes don't go past the end of the buffer
 #ifndef VERTEX_BUFFER_MAGIC_COOKIE
 	//#define VERTEX_BUFFER_ALLOC_PAGE_NOACCESS 1

@@ -349,6 +349,15 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSurface9Hook::LockRect(T
 	}
 	else
 	{
+#ifdef SURFACE_ENFORCE_DISCARD_ON_LOCK
+		if (Flags & D3DLOCK_DISCARD)
+		{
+			memset(surfaceBytesRaw, 0, surfaceBytesRawSize);
+			if (auxSurfaceBytesRaw)
+				memset(auxSurfaceBytesRaw, 0, auxSurfaceBytesRawSize);
+		}
+#endif
+
 		pLockedRect->pBits = surfaceBytesRaw;
 	}
 
