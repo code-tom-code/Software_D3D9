@@ -6,7 +6,7 @@ class IDirect3DVertexDeclaration9Hook : public IDirect3DVertexDeclaration9
 {
 public:
 	IDirect3DVertexDeclaration9Hook(LPDIRECT3DVERTEXDECLARATION9 _realObject, IDirect3DDevice9Hook* _parentDevice) : realObject(_realObject), parentDevice(_parentDevice), refCount(1),
-		inVertexSize(0), outVertexSize(0), foundPositionT0(NULL), skipVertexProcessing(false), vertDeclAutoCreatedFromFVF(0x00000000)
+		inVertexSize(0), outVertexSize(0), foundPositionT0(NULL), skipVertexProcessing(false), hasColor0(false), hasColor1(false), vertDeclAutoCreatedFromFVF(0x00000000)
 	{
 #ifdef _DEBUG
 		memcpy(&CreationCallStack, &realObject->CreationCallStack, (char*)&realObject - (char*)&CreationCallStack);
@@ -86,6 +86,16 @@ public:
 
 	UINT GetStream0Float4PositionTOffset(void) const;
 
+	inline const bool GetHasCOLOR0(void) const
+	{
+		return hasColor0;
+	}
+
+	inline const bool GetHasCOLOR1(void) const
+	{
+		return hasColor1;
+	}
+
 protected:
 	LPDIRECT3DVERTEXDECLARATION9 realObject;
 	IDirect3DDevice9Hook* parentDevice;
@@ -96,6 +106,10 @@ protected:
 
 	// This is the case if someone passes in an element with POSITIONT in it
 	bool skipVertexProcessing;
+
+	// These two bools determine if the COLOR0 and COLOR1 semantics are present for this vertex decl
+	bool hasColor0;
+	bool hasColor1;
 
 	DWORD vertDeclAutoCreatedFromFVF;
 

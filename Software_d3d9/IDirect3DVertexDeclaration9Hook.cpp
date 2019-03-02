@@ -43,6 +43,19 @@ void IDirect3DVertexDeclaration9Hook::CreateVertexDeclaration(const DebuggableD3
 		}
 	}
 
+	// Compute hasColor0 and hasColor1:
+	for (unsigned x = 0; x < numElements; ++x)
+	{
+		const DebuggableD3DVERTEXELEMENT9& thisElement = elements[x];
+		if (thisElement.Usage == D3DDECLUSAGE_COLOR)
+		{
+			if (thisElement.UsageIndex == 0)
+				hasColor0 = true;
+			else if (thisElement.UsageIndex == 1)
+				hasColor1 = true;
+		}
+	}
+
 	UINT currentOffset = 0;
 
 	DebuggableD3DVERTEXELEMENT9 newElement = elements[0];

@@ -6199,16 +6199,7 @@ const bool DeviceState::CurrentStateHasInputVertexColor0(void) const
 		return (currentFVF & D3DFVF_DIFFUSE) ? true : false; // Diffuse color is always COLOR0
 	case targetVertexDecl:
 		if (currentVertexDecl)
-		{
-			const std::vector<DebuggableD3DVERTEXELEMENT9>& elements = currentVertexDecl->GetElementsInternal();
-			const unsigned numElements = elements.size();
-			for (unsigned x = 0; x < numElements; ++x)
-			{
-				const DebuggableD3DVERTEXELEMENT9& thisElement = elements[x];
-				if (thisElement.Usage == D3DDECLUSAGE_COLOR && thisElement.UsageIndex == 0) // Diffuse color is always COLOR0
-					return true;
-			}
-		}
+			return currentVertexDecl->GetHasCOLOR0();
 		return false;
 	}
 }
@@ -6228,16 +6219,7 @@ const bool DeviceState::CurrentStateHasInputVertexColor1(void) const
 		return (currentFVF & D3DFVF_SPECULAR) ? true : false; // Specular color is always COLOR1
 	case targetVertexDecl:
 		if (currentVertexDecl)
-		{
-			const std::vector<DebuggableD3DVERTEXELEMENT9>& elements = currentVertexDecl->GetElementsInternal();
-			const unsigned numElements = elements.size();
-			for (unsigned x = 0; x < numElements; ++x)
-			{
-				const DebuggableD3DVERTEXELEMENT9& thisElement = elements[x];
-				if (thisElement.Usage == D3DDECLUSAGE_COLOR && thisElement.UsageIndex == 1) // Specular color is always COLOR1
-					return true;
-			}
-		}
+			return currentVertexDecl->GetHasCOLOR1();
 		return false;
 	}
 }
