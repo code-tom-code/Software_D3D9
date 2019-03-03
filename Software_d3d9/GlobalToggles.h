@@ -41,6 +41,12 @@
 // Comment this line out to disable multithread shading
 #define MULTITHREAD_SHADING 1
 
+// Comment these out to disable shader execution profiling
+#ifndef MULTITHREAD_SHADING
+	#define PROFILE_AVERAGE_VERTEX_SHADE_TIMES 1
+	#define PROFILE_AVERAGE_PIXEL_SHADE_TIMES 1
+#endif
+
 // Comment out to disable
 //#define INDEX_BUFFER_MAGIC_COOKIE 1
 

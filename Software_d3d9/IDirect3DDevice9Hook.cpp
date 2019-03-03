@@ -40,6 +40,16 @@ static const D3DXVECTOR4 vertShaderInputRegisterDefault(0.0f, 0.0f, 0.0f, 1.0f);
 static const D3DXVECTOR4 staticColorWhiteOpaque(1.0f, 1.0f, 1.0f, 1.0f);
 static const D3DXVECTOR4 staticColorBlackTranslucent(0.0f, 0.0f, 0.0f, 0.0f);
 
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+	static __int64 totalVertexShadeTicks = 0;
+	static __int64 numVertexShadeTasks = 0;
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
+#ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+	static __int64 totalPixelShadeTicks = 0;
+	static __int64 numPixelShadeTasks = 0;
+#endif // #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+
 extern HINSTANCE hLThisDLL;
 
 #ifdef MULTITHREAD_SHADING
@@ -894,6 +904,36 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Present(THI
 		}
 
 		lastPresentTime = currentPresentTime;
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+		{
+			char buffer[128] = {0};
+			const long double avgTimeSpentVertexShading_us = (totalVertexShadeTicks / (const long double)numVertexShadeTasks) / ldFreq * 1000000.0;
+#pragma warning(push)
+#pragma warning(disable:4996)
+			sprintf(buffer, "%03.05gus average vertex shade time for %I64u vertices\n", avgTimeSpentVertexShading_us, numVertexShadeTasks);
+#pragma warning(pop)
+			OutputDebugStringA(buffer);
+
+			totalVertexShadeTicks = 0;
+			numVertexShadeTasks = 0;
+		}
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
+#ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+		{
+			char buffer[128] = {0};
+			const long double avgTimeSpentPixelShading_us = (totalPixelShadeTicks / (const long double)numPixelShadeTasks) / ldFreq * 1000000.0;
+#pragma warning(push)
+#pragma warning(disable:4996)
+			sprintf(buffer, "%03.05gus average pixel shade time for %I64u pixels\n", avgTimeSpentPixelShading_us, numPixelShadeTasks);
+#pragma warning(pop)
+			OutputDebugStringA(buffer);
+
+			totalPixelShadeTicks = 0;
+			numPixelShadeTasks = 0;
+		}
+#endif // #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 	}
 
 	frameStats.Clear();
@@ -2941,10 +2981,25 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 					newJob.vertexIndex = index;
 					vertJobsToShade.push_back(newJob);
 #else
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+					LARGE_INTEGER vertexShadeStartTime;
+					QueryPerformanceCounter(&vertexShadeStartTime);
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
 					if (anyUserClipPlanesEnabled)
 						ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
 					else
 						ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+					LARGE_INTEGER vertexShadeEndTime;
+					QueryPerformanceCounter(&vertexShadeEndTime);
+
+					totalVertexShadeTicks += (vertexShadeEndTime.QuadPart - vertexShadeStartTime.QuadPart);
+					++numVertexShadeTasks;
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
 #endif
 					alreadyShadedVerts[index] = x;
 				}
@@ -2971,9 +3026,9 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 #ifdef MULTITHREAD_SHADING
 					// Do fix-ups after the loop, but only shade vertices once
 					outputBufferPtr++;
-#else
+#else // #ifdef MULTITHREAD_SHADING
 					*outputBufferPtr++ = outputVerts[alreadyShadedVerts[index] ];
-#endif
+#endif // #ifdef MULTITHREAD_SHADING
 					++frameStats.numVertsReused;
 				}
 				else
@@ -2983,12 +3038,26 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 					newJob.outputRegs = outputBufferPtr++;
 					newJob.vertexIndex = index;
 					vertJobsToShade.push_back(newJob);
-#else
+#else // #ifdef MULTITHREAD_SHADING
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+					LARGE_INTEGER vertexShadeStartTime;
+					QueryPerformanceCounter(&vertexShadeStartTime);
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
 					if (anyUserClipPlanesEnabled)
 						ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
 					else
 						ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
-#endif
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+					LARGE_INTEGER vertexShadeEndTime;
+					QueryPerformanceCounter(&vertexShadeEndTime);
+
+					totalVertexShadeTicks += (vertexShadeEndTime.QuadPart - vertexShadeStartTime.QuadPart);
+					++numVertexShadeTasks;
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
+#endif // #ifdef MULTITHREAD_SHADING
 					alreadyShadedVerts[index] = x;
 				}
 			}
@@ -3007,10 +3076,25 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 			newJob.vertexIndex = x + BaseVertexIndex;
 			vertJobsToShade.push_back(newJob);
 #else
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+					LARGE_INTEGER vertexShadeStartTime;
+					QueryPerformanceCounter(&vertexShadeStartTime);
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
 			if (anyUserClipPlanesEnabled)
 				ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, x + BaseVertexIndex);
 			else
 				ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, x + BaseVertexIndex);
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+					LARGE_INTEGER vertexShadeEndTime;
+					QueryPerformanceCounter(&vertexShadeEndTime);
+
+					totalVertexShadeTicks += (vertexShadeEndTime.QuadPart - vertexShadeStartTime.QuadPart);
+					++numVertexShadeTasks;
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
 #endif
 		}
 	}
@@ -3285,6 +3369,14 @@ void IDirect3DDevice9Hook::RecomputeCachedStreamEndsForUP(const BYTE* const stre
 // Returns true for "should draw", or false for "should skip"
 const bool IDirect3DDevice9Hook::TotalDrawCallSkipTest(void) const
 {
+#ifdef ENABLE_END_TO_SKIP_DRAWS
+	if ( (GetAsyncKeyState(VK_END) & 0x8000) )
+	{
+		// Skip this draw call if END is held down
+		return false;
+	}
+#endif
+
 	bool DepthWriteEnabled = false;
 	if (currentState.currentDepthStencil != NULL)
 		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable)
@@ -5422,13 +5514,27 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_p
 				}
 #ifdef MULTITHREAD_SHADING
 				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
-#else
+#else // #ifdef MULTITHREAD_SHADING
+
+#ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+				LARGE_INTEGER pixelStartTime;
+				QueryPerformanceCounter(&pixelStartTime);
+#endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 				ShadePixelFromShader(&deviceMainPShaderEngine, vs_psMapping, x, y, 
 					D3DXVECTOR3( (currentBarycentric0 - topleftEdgeBias0) * barycentricNormalizeFactor, 
 						(currentBarycentric1 - topleftEdgeBias1) * barycentricNormalizeFactor, 
 						(currentBarycentric2 - topleftEdgeBias2) * barycentricNormalizeFactor), 
 					currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, v0, v1, v2);
-#endif
+
+#ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+				LARGE_INTEGER pixelEndTime;
+				QueryPerformanceCounter(&pixelEndTime);
+
+				totalPixelShadeTicks += (pixelEndTime.QuadPart - pixelStartTime.QuadPart);
+				++numPixelShadeTasks;
+#endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+
+#endif // #ifdef MULTITHREAD_SHADING
 			}
 
 			currentBarycentric0 += barycentricXDelta1;
@@ -5475,14 +5581,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimiti
 
 	if (!TotalDrawCallSkipTest() )
 		return S_OK;
-
-#ifdef ENABLE_END_TO_SKIP_DRAWS
-	if ( (GetAsyncKeyState(VK_END) & 0x8000) )
-	{
-		// Skip rendering if END is held down
-		return S_OK;
-	}
-#endif
 
 	const unsigned numInputVerts = GetNumVertsUsed(PrimitiveType, PrimitiveCount);
 
@@ -5553,14 +5651,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 
 	if (!TotalDrawCallSkipTest() )
 		return S_OK;
-
-#ifdef ENABLE_END_TO_SKIP_DRAWS
-	if ( (GetAsyncKeyState(VK_END) & 0x8000) )
-	{
-		// Skip rendering if END is held down
-		return S_OK;
-	}
-#endif
 
 	const unsigned short shortVertexStreamZeroStride = (const unsigned short)VertexStreamZeroStride;
 
@@ -5635,14 +5725,6 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 	if (primCount == 0)
 	{
 		DbgBreakPrint("Error: Can't render with 0 primitives!");
-	}
-#endif
-
-#ifdef ENABLE_END_TO_SKIP_DRAWS
-	if ( (GetAsyncKeyState(VK_END) & 0x8000) )
-	{
-		// Skip rendering if END is held down
-		return;
 	}
 #endif
 
@@ -5805,14 +5887,6 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 	if (PrimitiveCount == 0)
 	{
 		DbgBreakPrint("Error: Can't render with 0 primitives!");
-	}
-#endif
-
-#ifdef ENABLE_END_TO_SKIP_DRAWS
-	if ( (GetAsyncKeyState(VK_END) & 0x8000) )
-	{
-		// Skip rendering if END is held down
-		return;
 	}
 #endif
 
