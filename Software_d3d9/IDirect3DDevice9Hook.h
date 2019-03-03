@@ -8,9 +8,6 @@
 #include <map>
 #include <intrin.h>
 
-// Comment this line out to disable multithread shading
-#define MULTITHREAD_SHADING 1
-
 // 16 is the maximum number of vertex input streams supported by D3D9
 #define MAX_D3D9_STREAMS 16u
 

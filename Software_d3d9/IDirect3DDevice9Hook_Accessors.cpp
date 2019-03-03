@@ -1619,11 +1619,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexSh
 		DbgBreakPrint("Error: Vertex shader is not hooked");
 	}
 #endif
-	HRESULT ret = d3d9dev->SetVertexShader(pShader);
-
-	if (FAILED(ret) )
-		return ret;
-
 	if (currentState.currentVertexShader != NULL)
 	{
 		// currentState.currentVertexShader->Release();
@@ -1639,7 +1634,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexSh
 		}
 	}
 
-	return ret;
+	return S_OK;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetVertexShader(THIS_ IDirect3DVertexShader9** ppShader)
@@ -2022,10 +2017,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetPixelSha
 		DbgBreakPrint("Error: Pixel shader is not hooked");
 	}
 #endif
-	HRESULT ret = d3d9dev->SetPixelShader(pShader);
-
-	if (FAILED(ret) )
-		return ret;
 
 	if (currentState.currentPixelShader != NULL)
 	{
@@ -2042,7 +2033,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetPixelSha
 		}
 	}
 
-	return ret;
+	return S_OK;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetPixelShader(THIS_ IDirect3DPixelShader9** ppShader)

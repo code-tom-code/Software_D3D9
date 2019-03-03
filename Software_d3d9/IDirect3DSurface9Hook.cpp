@@ -3,9 +3,6 @@
 #include "GlobalToggles.h"
 #include "IDirect3DSurface9Hook.h"
 
-// Uncomment this to enable "fully correct" gamma correction calculations
-//#define USE_CHEAP_GAMMA_APPROXIMATION 1
-
 static inline const bool IsCompressedFormat(const D3DFORMAT format)
 {
 	switch (format)

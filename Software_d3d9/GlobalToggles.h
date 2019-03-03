@@ -20,6 +20,9 @@
 // Comment out to disable
 // #define COMPUTE_SURFACE_HASHES_FOR_DEBUGGING 1
 
+// Commment this out to enable "fully correct" gamma correction calculations
+#define USE_CHEAP_GAMMA_APPROXIMATION 1
+
 // Comment out to disable
 #ifdef _DEBUG
 // #define DEBUG_VERTEX_OUT_POSITIONS 1
@@ -27,6 +30,9 @@
 
 // If this is not defined, all shaders will run in solo threads rather than warps (usually of at least 2x2 pixels or vertices)
 #define RUN_SHADERS_IN_WARPS 1
+
+// Comment this line out to disable multithread shading
+#define MULTITHREAD_SHADING 1
 
 // Comment out to disable
 //#define INDEX_BUFFER_MAGIC_COOKIE 1

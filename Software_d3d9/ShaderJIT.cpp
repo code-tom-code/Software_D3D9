@@ -2,42 +2,39 @@
 
 #include "ShaderJIT.h"
 #include "IDirect3DDevice9Hook.h"
+#include "resource.h"
+
+extern HINSTANCE hLThisDLL;
 
 #pragma warning(push)
 #pragma warning(disable:4996)
 
 void LoadPrefixFileInternal(std::vector<char>& cppfile)
 {
-	// TODO: Don't hardcode this path, it won't work on other people's computers as-is
-	HANDLE hFile = CreateFileA("C:\\Users\\Tom\\Documents\\Visual Studio 2013\\Projects\\Software_d3d9\\trunk\\Software_d3d9\\ShaderJIT_PrefixFile.cpp", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile == INVALID_HANDLE_VALUE)
+#pragma warning(push)
+#pragma warning(disable:4302) // warning C4302: 'type cast': truncation from 'LPSTR' to 'WORD'
+	HRSRC cppResource = FindResourceA(hLThisDLL, MAKEINTRESOURCEA(IDR_CPP1), "CPP");
+#pragma warning(pop)
+	if (cppResource)
 	{
-		DbgBreakPrint("Error: Can't load prefix file!");
+		HGLOBAL loadedResource = LoadResource(hLThisDLL, cppResource);
+		if (loadedResource)
+		{
+			const unsigned resourceSize = SizeofResource(hLThisDLL, cppResource);
+			if (resourceSize > 0)
+			{
+				const void* const resourceBytes = LockResource(loadedResource);
+				if (resourceBytes)
+				{
+					cppfile.resize(resourceSize);
+					memcpy(&cppfile.front(), resourceBytes, resourceSize);
+					return;
+				}
+			}
+		}
 	}
 
-	const unsigned numBytes = GetFileSize(hFile, NULL);
-	if (numBytes < 16)
-	{
-		DbgBreakPrint("Error: Invalid file size for prefix file!");
-	}
-
-	cppfile.resize(numBytes);
-
-	DWORD numBytesRead = 0;
-	if (!ReadFile(hFile, &(cppfile.front() ), numBytes, &numBytesRead, NULL) )
-	{
-		DbgBreakPrint("Error: Failed to ReadFile for prefix file!");
-	}
-
-	if (numBytes != numBytesRead)
-	{
-		DbgBreakPrint("Error: Read incorrect number of bytes for prefix file!");
-	}
-
-	if (!CloseHandle(hFile) )
-	{
-		DbgBreakPrint("Error in CloseHandle");;
-	}
+	__debugbreak(); // Should never be here!
 }
 
 // Not multithread-safe!

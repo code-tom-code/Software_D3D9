@@ -7,8 +7,11 @@
 #include "GlobalToggles.h"
 #include <vector> // for std::vector
 #include <map> // for std::map
+#include "resource.h"
 
 // Note: There's some good tidbits of information on this page: https://docs.microsoft.com/en-us/windows-hardware/drivers/display/converting-the-direct3d-fixed-function-state
+
+extern HINSTANCE hLThisDLL;
 
 #ifndef NO_CACHING_FIXED_FUNCTION_SHADERS
 
@@ -284,10 +287,29 @@ static inline void BuildVertexShader(const DeviceState& state, IDirect3DDevice9H
 #else
 	flags |= D3DXSHADER_OPTIMIZATION_LEVEL3;
 #endif
-	// TODO: Don't hardcode this path, it won't work on other people's computers as-is
-	HRESULT hr = D3DXCompileShaderFromFileA("C:\\Users\\Tom\\Documents\\Visual Studio 2013\\Projects\\Software_d3d9\\trunk\\Software_d3d9\\FixedFunctionVertexShader.hlsl", defines.empty() ? NULL : &defines.front(), NULL,
-		"main", "vs_3_0", flags, &outBytecode, &errorMessages, NULL);
+	#pragma warning(push)
 
+	HRESULT hr = E_FAIL;
+
+#pragma warning(disable:4302) // warning C4302: 'type cast': truncation from 'LPSTR' to 'WORD'
+	HRSRC hlslResource = FindResourceA(hLThisDLL, MAKEINTRESOURCEA(IDR_HLSL1), "HLSL");
+#pragma warning(pop)
+	if (hlslResource)
+	{
+		HGLOBAL loadedResource = LoadResource(hLThisDLL, hlslResource);
+		if (loadedResource)
+		{
+			const unsigned resourceSize = SizeofResource(hLThisDLL, hlslResource);
+			if (resourceSize > 0)
+			{
+				const void* const resourceBytes = LockResource(loadedResource);
+				if (resourceBytes)
+				{
+					hr = D3DXCompileShader( (const char* const)resourceBytes, resourceSize, defines.empty() ? NULL : &defines.front(), NULL, "main", "vs_3_0", flags, &outBytecode, &errorMessages, NULL);
+				}
+			}
+		}
+	}
 	if (FAILED(hr) )
 	{
 		const char* const errorMessage = errorMessages ? ( (const char* const)errorMessages->GetBufferPointer() ) : NULL;
@@ -415,9 +437,29 @@ static inline void BuildPixelShader(const DeviceState& state, IDirect3DDevice9Ho
 #else
 	flags |= D3DXSHADER_OPTIMIZATION_LEVEL3;
 #endif
-	// TODO: Don't hardcode this path, it won't work on other people's computers as-is
-	HRESULT hr = D3DXCompileShaderFromFileA("C:\\Users\\Tom\\Documents\\Visual Studio 2013\\Projects\\Software_d3d9\\trunk\\Software_d3d9\\FixedFunctionPixelShader.hlsl", defines.empty() ? NULL : &defines.front(), NULL,
-		"main", "ps_3_0", flags, &outBytecode, &errorMessages, NULL);
+
+	HRESULT hr = E_FAIL;
+
+#pragma warning(push)
+#pragma warning(disable:4302) // warning C4302: 'type cast': truncation from 'LPSTR' to 'WORD'
+	HRSRC hlslResource = FindResourceA(hLThisDLL, MAKEINTRESOURCEA(IDR_HLSL2), "HLSL");
+#pragma warning(pop)
+	if (hlslResource)
+	{
+		HGLOBAL loadedResource = LoadResource(hLThisDLL, hlslResource);
+		if (loadedResource)
+		{
+			const unsigned resourceSize = SizeofResource(hLThisDLL, hlslResource);
+			if (resourceSize > 0)
+			{
+				const void* const resourceBytes = LockResource(loadedResource);
+				if (resourceBytes)
+				{
+					hr = D3DXCompileShader( (const char* const)resourceBytes, resourceSize, defines.empty() ? NULL : &defines.front(), NULL, "main", "ps_3_0", flags, &outBytecode, &errorMessages, NULL);
+				}
+			}
+		}
+	}
 
 	if (FAILED(hr) )
 	{

@@ -1269,10 +1269,65 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Clear(THIS_
 		return ret;
 	}
 #endif
-
-	if (Count == 0 && pRects == NULL)
+	bool rectFillsWholeRenderTarget = false;
+	if (Count > 0 && pRects != NULL && (Flags & D3DCLEAR_TARGET) )
 	{
-		if (Flags & D3DCLEAR_TARGET)
+		unsigned char rectFillsRenderTargets = 0;
+		for (unsigned x = 0; x < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++x)
+		{
+			IDirect3DSurface9Hook* const currentRT = currentState.currentRenderTargets[x];
+			if (currentRT)
+			{
+				const int surfWidth = (const int)currentRT->GetInternalWidth();
+				const int surfHeight = (const int)currentRT->GetInternalHeight();
+
+				// Look for any one rect that encompasses the entirety of the target surface
+				for (unsigned y = 0; y < Count; ++y)
+				{
+					const D3DRECT& thisRect = pRects[y];
+
+					if (thisRect.x1 <= 0 && thisRect.y1 <= 0 &&
+						thisRect.x2 >= surfWidth && thisRect.y2 >= surfHeight)
+					{
+						++rectFillsRenderTargets;
+						break;
+					}
+				}
+			}
+			else
+				++rectFillsRenderTargets;
+		}
+
+		if (rectFillsRenderTargets == D3D_MAX_SIMULTANEOUS_RENDERTARGETS)
+			rectFillsWholeRenderTarget = true;
+	}
+
+	bool rectFillsWholeDepthStencil = false;
+	if (Count > 0 && pRects != NULL && (Flags & (D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL) ) )
+	{
+		if (currentState.currentDepthStencil)
+		{
+			const int dsWidth = currentState.currentDepthStencil->GetInternalWidth();
+			const int dsHeight = currentState.currentDepthStencil->GetInternalHeight();
+			// Look for any one rect that encompasses the entirety of the target depthstencil buffer
+			for (unsigned y = 0; y < Count; ++y)
+			{
+				const D3DRECT& thisRect = pRects[y];
+
+				if (thisRect.x1 <= 0 && thisRect.y1 <= 0 &&
+					thisRect.x2 >= dsWidth && thisRect.y2 >= dsHeight)
+				{
+					rectFillsWholeDepthStencil = true;
+					break;
+				}
+			}
+		}
+	}
+
+	if (Flags & D3DCLEAR_TARGET)
+	{
+		// Quick and simple fill the whole surface!
+		if (Count == 0 || pRects == NULL || rectFillsWholeRenderTarget)
 		{
 			for (unsigned x = 0; x < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++x)
 			{
@@ -1283,23 +1338,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Clear(THIS_
 				}
 			}
 		}
-
-		// For now, handle separate depth-stencil:
-		if (currentState.currentDepthStencil)
-		{
-			if (Flags & D3DCLEAR_ZBUFFER)
-			{
-				currentState.currentDepthStencil->InternalDepthFill(Z);
-			}
-			if (Flags & D3DCLEAR_STENCIL)
-			{
-				currentState.currentDepthStencil->InternalStencilFill(Stencil);
-			}
-		}
-	}
-	else
-	{
-		if (Flags & D3DCLEAR_TARGET)
+		else
 		{
 			for (unsigned x = 0; x < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++x)
 			{
@@ -1314,11 +1353,21 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Clear(THIS_
 				}
 			}
 		}
+	}
 
-		// For now, handle separate depth-stencil:
-		if (currentState.currentDepthStencil)
+	if (Flags & D3DCLEAR_ZBUFFER)
+	{
+		// Quick and simple fill the whole depth buffer!
+		if (Count == 0 || pRects == NULL || rectFillsWholeDepthStencil)
 		{
-			if (Flags & D3DCLEAR_ZBUFFER)
+			if (currentState.currentDepthStencil)
+			{
+				currentState.currentDepthStencil->InternalDepthFill(Z);
+			}
+		}
+		else
+		{
+			if (currentState.currentDepthStencil)
 			{
 				for (unsigned y = 0; y < Count; ++y)
 				{
@@ -1326,7 +1375,22 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Clear(THIS_
 					currentState.currentDepthStencil->InternalDepthFill(Z, clearRect);
 				}
 			}
-			if (Flags & D3DCLEAR_STENCIL)
+		}
+	}
+
+	if (Flags & D3DCLEAR_STENCIL)
+	{
+		// Quick and simple fill the whole stencil buffer!
+		if (Count == 0 || pRects == NULL || rectFillsWholeDepthStencil)
+		{
+			if (currentState.currentDepthStencil)
+			{
+				currentState.currentDepthStencil->InternalStencilFill(Stencil);
+			}
+		}
+		else
+		{
+			if (currentState.currentDepthStencil)
 			{
 				for (unsigned y = 0; y < Count; ++y)
 				{
@@ -1335,7 +1399,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Clear(THIS_
 				}
 			}
 		}
-	}
+	}	
 
 	return S_OK;
 }
@@ -2824,6 +2888,8 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 
 	vertJobsToShade.clear();
 
+	const bool anyUserClipPlanesEnabled = currentDrawCallData.vertexData.userClipPlanesEnabled;
+
 	if (useIndexBuffer)
 	{
 		alreadyShadedVerts.clear();
@@ -2859,7 +2925,10 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 					newJob.vertexIndex = index;
 					vertJobsToShade.push_back(newJob);
 #else
-					ProcessVertexToBuffer<useVertexBuffer>(decl, mapping, &deviceMainVShaderEngine, outputBufferPtr++, index, vertStreamBytes, vertStreamStride);
+					if (anyUserClipPlanesEnabled)
+						ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
+					else
+						ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
 #endif
 					alreadyShadedVerts[index] = x;
 				}
@@ -2899,7 +2968,10 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 					newJob.vertexIndex = index;
 					vertJobsToShade.push_back(newJob);
 #else
-					ProcessVertexToBuffer<useVertexBuffer>(decl, mapping, &deviceMainVShaderEngine, outputBufferPtr++, index, vertStreamBytes, vertStreamStride);
+					if (anyUserClipPlanesEnabled)
+						ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
+					else
+						ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
 #endif
 					alreadyShadedVerts[index] = x;
 				}
@@ -2919,7 +2991,10 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 			newJob.vertexIndex = x + BaseVertexIndex;
 			vertJobsToShade.push_back(newJob);
 #else
-			ProcessVertexToBuffer<useVertexBuffer>(decl, mapping, &deviceMainVShaderEngine, outputBufferPtr++, x + BaseVertexIndex, vertStreamBytes, vertStreamStride);
+			if (anyUserClipPlanesEnabled)
+				ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, x + BaseVertexIndex);
+			else
+				ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, x + BaseVertexIndex);
 #endif
 		}
 	}
@@ -5093,7 +5168,11 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromStream(const DeclarationSemantic
 #ifdef MULTITHREAD_SHADING
 				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
 #else
-				ShadePixelFromStream(&deviceMainPShaderEngine, vertexDeclMapping, x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, barycentricNormalizeFactor, v0, v1, v2);
+				ShadePixelFromStream(&deviceMainPShaderEngine, vertexDeclMapping, x, y, 
+					D3DXVECTOR3( (currentBarycentric0 - topleftEdgeBias0) * barycentricNormalizeFactor, 
+						(currentBarycentric1 - topleftEdgeBias1) * barycentricNormalizeFactor, 
+						(currentBarycentric2 - topleftEdgeBias2) * barycentricNormalizeFactor), 
+					currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2);
 #endif
 			}
 
@@ -5292,7 +5371,11 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_p
 #ifdef MULTITHREAD_SHADING
 				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
 #else
-				ShadePixelFromShader(&deviceMainPShaderEngine, vs_psMapping, x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, barycentricNormalizeFactor, v0, v1, v2);
+				ShadePixelFromShader(&deviceMainPShaderEngine, vs_psMapping, x, y, 
+					D3DXVECTOR3( (currentBarycentric0 - topleftEdgeBias0) * barycentricNormalizeFactor, 
+						(currentBarycentric1 - topleftEdgeBias1) * barycentricNormalizeFactor, 
+						(currentBarycentric2 - topleftEdgeBias2) * barycentricNormalizeFactor), 
+					currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, v0, v1, v2);
 #endif
 			}
 
