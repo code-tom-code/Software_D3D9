@@ -1566,8 +1566,12 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetFVF(THIS
 	const DWORD oldFVF_DWORD = currentState.currentFVF.rawFVF_DWORD;
 	currentState.currentFVF.rawFVF_DWORD = dbgFVF.rawFVF_DWORD;
 
-	if (dbgFVF.rawFVF_DWORD != 0x00000000 && oldFVF_DWORD != dbgFVF.rawFVF_DWORD)
+	if (dbgFVF.rawFVF_DWORD != 0x00000000)
 	{
+		// Skip setting the same FVF/decl twice
+		if (currentState.declTarget == DeviceState::targetFVF && oldFVF_DWORD == dbgFVF.rawFVF_DWORD)
+			return ret;
+
 		currentState.declTarget = DeviceState::targetFVF;
 
 		// D3D9 does some weird stuff under the hood if you call SetFVF with a valid FVF-code. It needs to:
