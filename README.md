@@ -88,7 +88,7 @@ See also the list of [contributors](https://github.com/code-tom-code/Software_D3
 
 ## License
 
-TODO: Pick a good license for this open-source project.
+This project is licensed under the zLib/LibPNG License - see the [LICENSE.txt](LICENSE.txt) file for details
 
 ## Acknowledgments
 
