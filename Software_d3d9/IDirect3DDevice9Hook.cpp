@@ -715,7 +715,7 @@ RenderStates::RenderStates() : cachedAlphaRefFloat(0.0f)
 	renderStatesUnion.states[D3DRS_COLORWRITEENABLE1                  ] = renderStatesUnion.states[D3DRS_COLORWRITEENABLE];
 	renderStatesUnion.states[D3DRS_COLORWRITEENABLE2                  ] = renderStatesUnion.states[D3DRS_COLORWRITEENABLE];
 	renderStatesUnion.states[D3DRS_COLORWRITEENABLE3                  ] = renderStatesUnion.states[D3DRS_COLORWRITEENABLE];
-	renderStatesUnion.states[D3DRS_BLENDFACTOR                        ] = 0xFFFFFFFF;
+	renderStatesUnion.states[D3DRS_BLENDFACTOR                        ] = D3DCOLOR_ARGB(0xFF, 0xFF, 0xFF, 0xFF);
 	renderStatesUnion.states[D3DRS_SRGBWRITEENABLE                    ] = FALSE;
 	renderStatesUnion.states[D3DRS_DEPTHBIAS                          ] = dwordZeroF;
 	renderStatesUnion.states[D3DRS_WRAP8                              ] = renderStatesUnion.states[D3DRS_WRAP0];
@@ -730,6 +730,11 @@ RenderStates::RenderStates() : cachedAlphaRefFloat(0.0f)
 	renderStatesUnion.states[D3DRS_SRCBLENDALPHA                      ] = D3DBLEND_ONE;
 	renderStatesUnion.states[D3DRS_DESTBLENDALPHA                     ] = D3DBLEND_ZERO;
 	renderStatesUnion.states[D3DRS_BLENDOPALPHA                       ] = D3DBLENDOP_ADD;
+
+	cachedAlphaRefFloat = 0.0f;
+	cachedAmbient = D3DXVECTOR4(0.0f, 0.0f, 0.0f, 0.0f);
+	ColorDWORDToFloat4(renderStatesUnion.states[D3DRS_BLENDFACTOR], cachedBlendFactor);
+	cachedInvBlendFactor = D3DXVECTOR4(1.0f, 1.0f, 1.0f, 1.0f) - cachedBlendFactor;
 }
 
 /*** IUnknown methods ***/
@@ -3611,6 +3616,8 @@ void IDirect3DDevice9Hook::LoadSrcBlend(D3DXVECTOR4& srcBlend, const D3DBLEND bl
 	default:
 #ifdef _DEBUG
 		DbgBreakPrint("Error: Invalid D3DBLEND type passed to blending unit");
+#else
+		__assume(0);
 #endif
 	case D3DBLEND_ONE            :
 		if (writeMask & 0x1)
@@ -3625,10 +3632,14 @@ void IDirect3DDevice9Hook::LoadSrcBlend(D3DXVECTOR4& srcBlend, const D3DBLEND bl
 	case D3DBLEND_INVSRCCOLOR2   :
 #ifdef _DEBUG
 		DbgBreakPrint("Error: D3DBLEND_INVSRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+		__assume(0);
 #endif
 	case D3DBLEND_SRCCOLOR2      :
 #ifdef _DEBUG
 		DbgBreakPrint("Error: D3DBLEND_SRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+		__assume(0);
 #endif
 	case D3DBLEND_SRCCOLOR       :
 		if (writeMask & 0x1)
@@ -3728,21 +3739,24 @@ void IDirect3DDevice9Hook::LoadSrcBlend(D3DXVECTOR4& srcBlend, const D3DBLEND bl
 	}
 		break;
 	case D3DBLEND_BLENDFACTOR    :
-		ColorDWORDToFloat4<writeMask>(currentState.currentRenderStates.renderStatesUnion.namedStates.blendFactor, srcBlend);
+		if (writeMask & 0x1)
+			srcBlend.x = currentState.currentRenderStates.cachedBlendFactor.x;
+		if (writeMask & 0x2)
+			srcBlend.y = currentState.currentRenderStates.cachedBlendFactor.y;
+		if (writeMask & 0x4)
+			srcBlend.z = currentState.currentRenderStates.cachedBlendFactor.z;
+		if (writeMask & 0x8)
+			srcBlend.w = currentState.currentRenderStates.cachedBlendFactor.w;
 		break;
 	case D3DBLEND_INVBLENDFACTOR :
-	{
-		D3DXVECTOR4 temp;
-		ColorDWORDToFloat4<writeMask>(currentState.currentRenderStates.renderStatesUnion.namedStates.blendFactor, temp);
 		if (writeMask & 0x1)
-			srcBlend.x = 1.0f - temp.x;
+			srcBlend.x = currentState.currentRenderStates.cachedInvBlendFactor.x;
 		if (writeMask & 0x2)
-			srcBlend.y = 1.0f - temp.y;
+			srcBlend.y = currentState.currentRenderStates.cachedInvBlendFactor.y;
 		if (writeMask & 0x4)
-			srcBlend.z = 1.0f - temp.z;
+			srcBlend.z = currentState.currentRenderStates.cachedInvBlendFactor.z;
 		if (writeMask & 0x8)
-			srcBlend.w = 1.0f - temp.w;
-	}
+			srcBlend.w = currentState.currentRenderStates.cachedInvBlendFactor.w;
 		break;
 	}
 }
@@ -3765,6 +3779,8 @@ void IDirect3DDevice9Hook::LoadDstBlend(D3DXVECTOR4& dstBlend, const D3DBLEND bl
 	default:
 #ifdef _DEBUG
 		DbgBreakPrint("Error: Invalid D3DBLEND passed to blending unit");
+#else
+		__assume(0);
 #endif
 	case D3DBLEND_ONE            :
 		if (writeMask & 0x1)
@@ -3841,10 +3857,14 @@ void IDirect3DDevice9Hook::LoadDstBlend(D3DXVECTOR4& dstBlend, const D3DBLEND bl
 	case D3DBLEND_INVSRCCOLOR2   :
 #ifdef _DEBUG
 		DbgBreakPrint("Error: D3DBLEND_INVSRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+		__assume(0);
 #endif
 	case D3DBLEND_SRCCOLOR2      :
 #ifdef _DEBUG
 		DbgBreakPrint("Error: D3DBLEND_SRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+		__assume(0);
 #endif
 	case D3DBLEND_DESTCOLOR      :
 		if (writeMask & 0x1)
@@ -3882,21 +3902,24 @@ void IDirect3DDevice9Hook::LoadDstBlend(D3DXVECTOR4& dstBlend, const D3DBLEND bl
 	}
 		break;
 	case D3DBLEND_BLENDFACTOR    :
-		ColorDWORDToFloat4<writeMask>(currentState.currentRenderStates.renderStatesUnion.namedStates.blendFactor, dstBlend);
+		if (writeMask & 0x1)
+			dstBlend.x = currentState.currentRenderStates.cachedBlendFactor.x;
+		if (writeMask & 0x2)
+			dstBlend.y = currentState.currentRenderStates.cachedBlendFactor.y;
+		if (writeMask & 0x4)
+			dstBlend.z = currentState.currentRenderStates.cachedBlendFactor.z;
+		if (writeMask & 0x8)
+			dstBlend.w = currentState.currentRenderStates.cachedBlendFactor.w;
 		break;
 	case D3DBLEND_INVBLENDFACTOR :
-	{
-		D3DXVECTOR4 temp;
-		ColorDWORDToFloat4<writeMask>(currentState.currentRenderStates.renderStatesUnion.namedStates.blendFactor, temp);
 		if (writeMask & 0x1)
-			dstBlend.x = 1.0f - temp.x;
+			dstBlend.x = currentState.currentRenderStates.cachedInvBlendFactor.x;
 		if (writeMask & 0x2)
-			dstBlend.y = 1.0f - temp.y;
+			dstBlend.y = currentState.currentRenderStates.cachedInvBlendFactor.y;
 		if (writeMask & 0x4)
-			dstBlend.z = 1.0f - temp.z;
+			dstBlend.z = currentState.currentRenderStates.cachedInvBlendFactor.z;
 		if (writeMask & 0x8)
-			dstBlend.w = 1.0f - temp.w;
-	}
+			dstBlend.w = currentState.currentRenderStates.cachedInvBlendFactor.w;
 		break;
 	}
 }
@@ -3925,11 +3948,14 @@ void IDirect3DDevice9Hook::AlphaBlend(D3DXVECTOR4& outVec, const D3DBLENDOP blen
 		mul(combinedSrc.w, srcBlend.w, srcColor.w);
 		mul(combinedDst.w, dstBlend.w, dstColor.w);
 	}
+
 	switch (blendOp)
 	{
 	default:
 #ifdef _DEBUG
 		DbgBreakPrint("Error: Invalid D3DBLENDOP passed to alpha blending unit");
+#else
+		__assume(0);
 #endif
 	case D3DBLENDOP_ADD        :
 		if (writeMask & 0x1)
@@ -5123,20 +5149,23 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromStream(const DeclarationSemantic
 	const int barycentricYDelta2 = i0.x - i2.x;
 
 	// Correct for top-left rule. Source: https://fgiesen.wordpress.com/2013/02/08/triangle-rasterization-in-practice/
-	const int topleftEdgeBias0 = isTopLeftEdge(i1, i2) ? 0 : -1;
-	const int topleftEdgeBias1 = isTopLeftEdge(i2, i0) ? 0 : -1;
-	const int topleftEdgeBias2 = isTopLeftEdge(i0, i1) ? 0 : -1;
+	const char topleftEdgeBias0 = isTopLeftEdge(i1, i2) ? 0 : -1;
+	const char topleftEdgeBias1 = isTopLeftEdge(i2, i0) ? 0 : -1;
+	const char topleftEdgeBias2 = isTopLeftEdge(i0, i1) ? 0 : -1;
 
 	int row0 = computeEdgeSidedness(i1.x, i1.y, i2.x, i2.y, xMin, yMin) + topleftEdgeBias0;
 	int row1 = computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin) + topleftEdgeBias1;
 	int row2 = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin) + topleftEdgeBias2;
 
 	float earlyZTestDepthValue;
+	const IDirect3DSurface9Hook* depthStencil;
 	if (rasterizerUsesEarlyZTest)
 	{
 		// TODO: Don't assume less-than test for Z CMPFUNC
 		earlyZTestDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
 		earlyZTestDepthValue = earlyZTestDepthValue < pos2.z ? earlyZTestDepthValue : pos2.z;
+
+		depthStencil = currentState.currentDepthStencil;
 	}
 
 	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData(v0, v1, v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
@@ -5154,7 +5183,8 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromStream(const DeclarationSemantic
 			{
 				if (rasterizerUsesEarlyZTest)
 				{
-					const float compareDepth = currentState.currentDepthStencil->GetDepth(x, y);
+					// TODO: Use GetDepthRaw() instead to save a bunch of float-divides per lookup
+					const float compareDepth = depthStencil->GetDepth(x, y);
 
 					// TODO: Don't assume less-than test for Z CMPFUNC
 					if (compareDepth < earlyZTestDepthValue)
@@ -5326,20 +5356,23 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_p
 	const int barycentricYDelta2 = i0.x - i2.x;
 
 	// Correct for top-left rule. Source: https://fgiesen.wordpress.com/2013/02/08/triangle-rasterization-in-practice/
-	const int topleftEdgeBias0 = isTopLeftEdge(i1, i2) ? 0 : -1;
-	const int topleftEdgeBias1 = isTopLeftEdge(i2, i0) ? 0 : -1;
-	const int topleftEdgeBias2 = isTopLeftEdge(i0, i1) ? 0 : -1;
+	const char topleftEdgeBias0 = isTopLeftEdge(i1, i2) ? 0 : -1;
+	const char topleftEdgeBias1 = isTopLeftEdge(i2, i0) ? 0 : -1;
+	const char topleftEdgeBias2 = isTopLeftEdge(i0, i1) ? 0 : -1;
 
 	int row0 = computeEdgeSidedness(i1.x, i1.y, i2.x, i2.y, xMin, yMin) + topleftEdgeBias0;
 	int row1 = computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin) + topleftEdgeBias1;
 	int row2 = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin) + topleftEdgeBias2;
 
 	float earlyZTestDepthValue;
+	const IDirect3DSurface9Hook* depthStencil;
 	if (rasterizerUsesEarlyZTest)
 	{
 		// TODO: Don't assume less-than test for Z CMPFUNC
 		earlyZTestDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
 		earlyZTestDepthValue = earlyZTestDepthValue < pos2.z ? earlyZTestDepthValue : pos2.z;
+
+		depthStencil = currentState.currentDepthStencil;
 	}
 
 	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData(&v0, &v1, &v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
@@ -5357,7 +5390,8 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_p
 			{
 				if (rasterizerUsesEarlyZTest)
 				{
-					const float compareDepth = currentState.currentDepthStencil->GetDepth(x, y);
+					// TODO: Use GetDepthRaw() instead to save a bunch of float-divides per lookup
+					const float compareDepth = depthStencil->GetDepth(x, y);
 
 					// TODO: Don't assume less-than test for Z CMPFUNC
 					if (compareDepth < earlyZTestDepthValue)

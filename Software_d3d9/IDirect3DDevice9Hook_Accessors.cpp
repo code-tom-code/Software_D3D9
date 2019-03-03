@@ -1007,6 +1007,11 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetRenderSt
 		currentState.currentRenderStates.cachedAlphaRefFloat = currentState.currentRenderStates.renderStatesUnion.namedStates.alphaRef / 255.0f;
 	else if (State == D3DRS_AMBIENT)
 		ColorDWORDToFloat4<0xF>(currentState.currentRenderStates.renderStatesUnion.namedStates.ambient, currentState.currentRenderStates.cachedAmbient);
+	else if (State == D3DRS_BLENDFACTOR)
+	{
+		ColorDWORDToFloat4(currentState.currentRenderStates.renderStatesUnion.states[D3DRS_BLENDFACTOR], currentState.currentRenderStates.cachedBlendFactor);
+		currentState.currentRenderStates.cachedInvBlendFactor = D3DXVECTOR4(1.0f, 1.0f, 1.0f, 1.0f) - currentState.currentRenderStates.cachedBlendFactor;
+	}
 
 	return ret;
 }

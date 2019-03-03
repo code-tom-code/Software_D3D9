@@ -2237,6 +2237,8 @@ void IDirect3DSurface9Hook::GetPixelVec(const unsigned x, const unsigned y, D3DX
 	default:
 #ifdef _DEBUG
 		__debugbreak(); // TODO: Add support for more surface types!
+#else
+		__assume(0);
 #endif
 	case D3DFMT_X8R8G8B8:
 	{
@@ -2319,6 +2321,8 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 	default:
 #ifdef _DEBUG
 		__debugbreak(); // TODO: Add support for more surface types!
+#else
+		__assume(0);
 #endif
 	case D3DFMT_X8R8G8B8:
 	{
@@ -2687,6 +2691,8 @@ void IDirect3DSurface9Hook::SetPixelVec(const unsigned x, const unsigned y, cons
 	default:
 #ifdef _DEBUG
 		__debugbreak(); // TODO: Add more surface formats
+#else
+		__assume(0);
 #endif
 	case D3DFMT_X8R8G8B8:
 	{

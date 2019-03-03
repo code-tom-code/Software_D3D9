@@ -486,6 +486,8 @@ struct RenderStates
 	// Cache some derived values from SetRenderState() for more efficient runtime usage:
 	float cachedAlphaRefFloat;
 	D3DXVECTOR4 cachedAmbient;
+	D3DXVECTOR4 cachedBlendFactor;
+	D3DXVECTOR4 cachedInvBlendFactor;
 };
 
 __declspec(align(16) ) struct Transforms
@@ -1237,14 +1239,24 @@ inline void ColorDWORDToFloat4(const D3DCOLOR inColor, D3DXVECTOR4& outColor)
 	const __m128 colorfloat4 = _mm_cvtepi32_ps(coloruint4);
 	const __m128 normalizedColorFloat4 = _mm_mul_ps(colorfloat4, ColorDWORDToFloat4Divisor);
 
-	if (writeMask & 0x1)
-		outColor.x = normalizedColorFloat4.m128_f32[2];
-	if (writeMask & 0x2)
-		outColor.y = normalizedColorFloat4.m128_f32[1];
-	if (writeMask & 0x4)
-		outColor.z = normalizedColorFloat4.m128_f32[0];
-	if (writeMask & 0x8)
-		outColor.w = normalizedColorFloat4.m128_f32[3];
+	// Swizzle from RGBA -> ARGB
+	const __m128 swizzledColorFloat4 = _mm_shuffle_ps(normalizedColorFloat4, normalizedColorFloat4, _MM_SHUFFLE(3, 0, 1, 2) );
+
+	if (writeMask == 0xF)
+	{
+		*( (__m128* const)&outColor) = swizzledColorFloat4;
+	}
+	else
+	{
+		if (writeMask & 0x1)
+			outColor.x = swizzledColorFloat4.m128_f32[0];
+		if (writeMask & 0x2)
+			outColor.y = swizzledColorFloat4.m128_f32[1];
+		if (writeMask & 0x4)
+			outColor.z = swizzledColorFloat4.m128_f32[2];
+		if (writeMask & 0x8)
+			outColor.w = swizzledColorFloat4.m128_f32[3];
+	}
 }
 
 template <const unsigned char writeMask = 0xF>
@@ -1281,33 +1293,52 @@ inline void ColorDWORDToFloat4_4(const D3DCOLOR** const inColor4, D3DXVECTOR4* c
 		_mm_mul_ps(colorfloat4[3], ColorDWORDToFloat4Divisor)
 	};
 
-	if (writeMask & 0x1)
+	// Swizzle from RGBA -> ARGB
+	const __m128 swizzledColorFloat4[4] =
 	{
-		outColor4[0]->x = normalizedColorFloat4[0].m128_f32[2];
-		outColor4[1]->x = normalizedColorFloat4[1].m128_f32[2];
-		outColor4[2]->x = normalizedColorFloat4[2].m128_f32[2];
-		outColor4[3]->x = normalizedColorFloat4[3].m128_f32[2];
+		_mm_shuffle_ps(normalizedColorFloat4[0], normalizedColorFloat4[0], _MM_SHUFFLE(3, 0, 1, 2) ),
+		_mm_shuffle_ps(normalizedColorFloat4[1], normalizedColorFloat4[1], _MM_SHUFFLE(3, 0, 1, 2) ),
+		_mm_shuffle_ps(normalizedColorFloat4[2], normalizedColorFloat4[2], _MM_SHUFFLE(3, 0, 1, 2) ),
+		_mm_shuffle_ps(normalizedColorFloat4[3], normalizedColorFloat4[3], _MM_SHUFFLE(3, 0, 1, 2) )
+	};
+
+	if (writeMask == 0xF)
+	{
+		*(__m128* const)outColor4[0] = swizzledColorFloat4[0];
+		*(__m128* const)outColor4[1] = swizzledColorFloat4[1];
+		*(__m128* const)outColor4[2] = swizzledColorFloat4[2];
+		*(__m128* const)outColor4[3] = swizzledColorFloat4[3];
 	}
-	if (writeMask & 0x2)
+	else
 	{
-		outColor4[0]->y = normalizedColorFloat4[0].m128_f32[1];
-		outColor4[1]->y = normalizedColorFloat4[1].m128_f32[1];
-		outColor4[2]->y = normalizedColorFloat4[2].m128_f32[1];
-		outColor4[3]->y = normalizedColorFloat4[3].m128_f32[1];
-	}
-	if (writeMask & 0x4)
-	{
-		outColor4[0]->z = normalizedColorFloat4[0].m128_f32[0];
-		outColor4[1]->z = normalizedColorFloat4[1].m128_f32[0];
-		outColor4[2]->z = normalizedColorFloat4[2].m128_f32[0];
-		outColor4[3]->z = normalizedColorFloat4[3].m128_f32[0];
-	}
-	if (writeMask & 0x8)
-	{
-		outColor4[0]->w = normalizedColorFloat4[0].m128_f32[3];
-		outColor4[1]->w = normalizedColorFloat4[1].m128_f32[3];
-		outColor4[2]->w = normalizedColorFloat4[2].m128_f32[3];
-		outColor4[3]->w = normalizedColorFloat4[3].m128_f32[3];
+		if (writeMask & 0x1)
+		{
+			outColor4[0]->x = swizzledColorFloat4[0].m128_f32[0];
+			outColor4[1]->x = swizzledColorFloat4[1].m128_f32[0];
+			outColor4[2]->x = swizzledColorFloat4[2].m128_f32[0];
+			outColor4[3]->x = swizzledColorFloat4[3].m128_f32[0];
+		}
+		if (writeMask & 0x2)
+		{
+			outColor4[0]->y = swizzledColorFloat4[0].m128_f32[1];
+			outColor4[1]->y = swizzledColorFloat4[1].m128_f32[1];
+			outColor4[2]->y = swizzledColorFloat4[2].m128_f32[1];
+			outColor4[3]->y = swizzledColorFloat4[3].m128_f32[1];
+		}
+		if (writeMask & 0x4)
+		{
+			outColor4[0]->z = swizzledColorFloat4[0].m128_f32[2];
+			outColor4[1]->z = swizzledColorFloat4[1].m128_f32[2];
+			outColor4[2]->z = swizzledColorFloat4[2].m128_f32[2];
+			outColor4[3]->z = swizzledColorFloat4[3].m128_f32[2];
+		}
+		if (writeMask & 0x8)
+		{
+			outColor4[0]->w = swizzledColorFloat4[0].m128_f32[3];
+			outColor4[1]->w = swizzledColorFloat4[1].m128_f32[3];
+			outColor4[2]->w = swizzledColorFloat4[2].m128_f32[3];
+			outColor4[3]->w = swizzledColorFloat4[3].m128_f32[3];
+		}
 	}
 }
 
@@ -1345,33 +1376,52 @@ inline void ColorDWORDToFloat4_4(const D3DCOLOR (&inColor4)[4], D3DXVECTOR4 (&ou
 		_mm_mul_ps(colorfloat4[3], ColorDWORDToFloat4Divisor)
 	};
 
-	if (writeMask & 0x1)
+	// Swizzle from RGBA -> ARGB
+	const __m128 swizzledColorFloat4[4] =
 	{
-		outColor4[0].x = normalizedColorFloat4[0].m128_f32[2];
-		outColor4[1].x = normalizedColorFloat4[1].m128_f32[2];
-		outColor4[2].x = normalizedColorFloat4[2].m128_f32[2];
-		outColor4[3].x = normalizedColorFloat4[3].m128_f32[2];
+		_mm_shuffle_ps(normalizedColorFloat4[0], normalizedColorFloat4[0], _MM_SHUFFLE(3, 0, 1, 2) ),
+		_mm_shuffle_ps(normalizedColorFloat4[1], normalizedColorFloat4[1], _MM_SHUFFLE(3, 0, 1, 2) ),
+		_mm_shuffle_ps(normalizedColorFloat4[2], normalizedColorFloat4[2], _MM_SHUFFLE(3, 0, 1, 2) ),
+		_mm_shuffle_ps(normalizedColorFloat4[3], normalizedColorFloat4[3], _MM_SHUFFLE(3, 0, 1, 2) )
+	};
+
+	if (writeMask == 0xF)
+	{
+		*( (__m128* const)&(outColor4[0]) ) = swizzledColorFloat4[0];
+		*( (__m128* const)&(outColor4[1]) ) = swizzledColorFloat4[1];
+		*( (__m128* const)&(outColor4[2]) ) = swizzledColorFloat4[2];
+		*( (__m128* const)&(outColor4[3]) ) = swizzledColorFloat4[3];
 	}
-	if (writeMask & 0x2)
+	else
 	{
-		outColor4[0].y = normalizedColorFloat4[0].m128_f32[1];
-		outColor4[1].y = normalizedColorFloat4[1].m128_f32[1];
-		outColor4[2].y = normalizedColorFloat4[2].m128_f32[1];
-		outColor4[3].y = normalizedColorFloat4[3].m128_f32[1];
-	}
-	if (writeMask & 0x4)
-	{
-		outColor4[0].z = normalizedColorFloat4[0].m128_f32[0];
-		outColor4[1].z = normalizedColorFloat4[1].m128_f32[0];
-		outColor4[2].z = normalizedColorFloat4[2].m128_f32[0];
-		outColor4[3].z = normalizedColorFloat4[3].m128_f32[0];
-	}
-	if (writeMask & 0x8)
-	{
-		outColor4[0].w = normalizedColorFloat4[0].m128_f32[3];
-		outColor4[1].w = normalizedColorFloat4[1].m128_f32[3];
-		outColor4[2].w = normalizedColorFloat4[2].m128_f32[3];
-		outColor4[3].w = normalizedColorFloat4[3].m128_f32[3];
+		if (writeMask & 0x1)
+		{
+			outColor4[0].x = swizzledColorFloat4[0].m128_f32[0];
+			outColor4[1].x = swizzledColorFloat4[1].m128_f32[0];
+			outColor4[2].x = swizzledColorFloat4[2].m128_f32[0];
+			outColor4[3].x = swizzledColorFloat4[3].m128_f32[0];
+		}
+		if (writeMask & 0x2)
+		{
+			outColor4[0].y = swizzledColorFloat4[0].m128_f32[1];
+			outColor4[1].y = swizzledColorFloat4[1].m128_f32[1];
+			outColor4[2].y = swizzledColorFloat4[2].m128_f32[1];
+			outColor4[3].y = swizzledColorFloat4[3].m128_f32[1];
+		}
+		if (writeMask & 0x4)
+		{
+			outColor4[0].z = swizzledColorFloat4[0].m128_f32[2];
+			outColor4[1].z = swizzledColorFloat4[1].m128_f32[2];
+			outColor4[2].z = swizzledColorFloat4[2].m128_f32[2];
+			outColor4[3].z = swizzledColorFloat4[3].m128_f32[2];
+		}
+		if (writeMask & 0x8)
+		{
+			outColor4[0].w = swizzledColorFloat4[0].m128_f32[3];
+			outColor4[1].w = swizzledColorFloat4[1].m128_f32[3];
+			outColor4[2].w = swizzledColorFloat4[2].m128_f32[3];
+			outColor4[3].w = swizzledColorFloat4[3].m128_f32[3];
+		}
 	}
 }
 
@@ -1389,86 +1439,60 @@ inline const D3DCOLOR Float4ToD3DCOLOR(const D3DXVECTOR4& color)
 template <const unsigned char writeMask = 0xF>
 inline const D3DCOLOR Float4ToD3DCOLORClamp(const D3DXVECTOR4& color)
 {
+	const __m128 float4color = *(const __m128* const)&color;
+	
+	const __m128 float4colorClamped = _mm_min_ps(float4color, saturateMax);
+	const __m128 float4colorExpanded = _mm_mul_ps(float4colorClamped, scaleMax);
+
+	const __m128i dword4color = _mm_cvtps_epi32(float4colorExpanded);
+
 	unsigned r, g, b, a;
 	if (writeMask & 0x1)
-	{
-		r = (const unsigned)(color.x * 255.0f);
-		if (r > 255)
-		{
-			r = 255;
-		}
-	}
+		r = dword4color.m128i_u32[0];
 	else
 		r = 0;
 	if (writeMask & 0x2)
-	{
-		g = (const unsigned)(color.y * 255.0f);
-		if (g > 255)
-		{
-			g = 255;
-		}
-	}
+		g = dword4color.m128i_u32[1];
 	else
 		g = 0;
 	if (writeMask & 0x4)
-	{
-		b = (const unsigned)(color.z * 255.0f);
-		if (b > 255)
-		{
-			b = 255;
-		}
-	}
+		b = dword4color.m128i_u32[2];
 	else
 		b = 0;
 	if (writeMask & 0x8)
-	{
-		a = (const unsigned)(color.w * 255.0f);
-		if (a > 255)
-		{
-			a = 255;
-		}
-	}
+		a = dword4color.m128i_u32[3];
 	else
 		a = 0;
 	const D3DCOLOR ldrColor = D3DCOLOR_ARGB(a, r, g, b);
 	return ldrColor;
 }
 
+static const __m128 saturateMax = { 1.0f, 1.0f, 1.0f, 1.0f };
+static const __m128 scaleMax = { 255.0f, 255.0f, 255.0f, 255.0f };
 template <const unsigned char writeMask = 0xF>
 inline const D3DCOLOR Float4ToX8R8G8B8Clamp(const D3DXVECTOR4& color)
 {
+	const __m128 float4color = *(const __m128* const)&color;
+	
+	const __m128 float4colorClamped = _mm_min_ps(float4color, saturateMax);
+	const __m128 float4colorExpanded = _mm_mul_ps(float4colorClamped, scaleMax);
+
+	const __m128i dword4color = _mm_cvtps_epi32(float4colorExpanded);
+
 	unsigned r, g, b;
 	if (writeMask & 0x1)
-	{
-		r = (const unsigned)(color.x * 255.0f);
-		if (r > 255)
-		{
-			r = 255;
-		}
-	}
+		r = dword4color.m128i_u32[0];
 	else
 		r = 0;
 	if (writeMask & 0x2)
-	{
-		g = (const unsigned)(color.y * 255.0f);
-		if (g > 255)
-		{
-			g = 255;
-		}
-	}
+		g = dword4color.m128i_u32[1];
 	else
 		g = 0;
 	if (writeMask & 0x4)
-	{
-		b = (const unsigned)(color.z * 255.0f);
-		if (b > 255)
-		{
-			b = 255;
-		}
-	}
+		b = dword4color.m128i_u32[2];
 	else
 		b = 0;
-	const D3DCOLOR ldrColor = D3DCOLOR_ARGB(0, r, g, b);
+	const D3DCOLOR ldrColor = D3DCOLOR_ARGB(0xFF, r, g, b);
 	return ldrColor;
 }
 
