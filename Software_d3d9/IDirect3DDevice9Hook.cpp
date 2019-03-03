@@ -3361,18 +3361,23 @@ const bool IDirect3DDevice9Hook::TotalDrawCallSkipTest(void) const
 	return true;
 }
 
-// Returns true if the currently set pipeline can do early-Z testing, or false if it cannot (false if depth isn't enabled, or no depth buffer is bound, or the pixel shader outputs depth)
+// Returns true if the currently set pipeline can do early-Z testing, or false if it cannot (false if depth isn't enabled, or no depth buffer is bound, or a weird Z-test is set up, or the pixel shader outputs depth)
 const bool IDirect3DDevice9Hook::CurrentPipelineCanEarlyZTest(void) const
 {
 #ifndef DISALLOW_EARLY_Z_TESTING
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.zEnable != D3DZB_FALSE)
 	{
-		if (currentState.currentDepthStencil != NULL)
+		// Currently only less and lessequal are supported. In the future, greater and greaterequal can also be supported
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc == D3DCMP_LESS || 
+			currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc == D3DCMP_LESSEQUAL)
 		{
-			if (currentState.currentPixelShader == NULL)
-				return true;
-			else
-				return !currentState.currentPixelShader->GetShaderInfo().psWritesDepth;
+			if (currentState.currentDepthStencil != NULL)
+			{
+				if (currentState.currentPixelShader == NULL)
+					return true;
+				else
+					return !currentState.currentPixelShader->GetShaderInfo().psWritesDepth;
+			}
 		}
 	}
 #endif // #ifndef DISALLOW_EARLY_Z_TESTING
@@ -5168,15 +5173,17 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromStream(const DeclarationSemantic
 	int row1 = computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin) + topleftEdgeBias1;
 	int row2 = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin) + topleftEdgeBias2;
 
-	float earlyZTestDepthValue;
+	unsigned earlyZTestDepthValue;
 	const IDirect3DSurface9Hook* depthStencil;
 	if (rasterizerUsesEarlyZTest)
 	{
-		// TODO: Don't assume less-than test for Z CMPFUNC
-		earlyZTestDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
-		earlyZTestDepthValue = earlyZTestDepthValue < pos2.z ? earlyZTestDepthValue : pos2.z;
-
 		depthStencil = currentState.currentDepthStencil;
+
+		// TODO: Don't assume less-than test for Z CMPFUNC
+		float minDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
+		minDepthValue = minDepthValue < pos2.z ? minDepthValue : pos2.z;
+
+		earlyZTestDepthValue = depthStencil->GetRawDepthValueFromFloatDepth(minDepthValue);
 	}
 
 	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData(v0, v1, v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
@@ -5194,11 +5201,10 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromStream(const DeclarationSemantic
 			{
 				if (rasterizerUsesEarlyZTest)
 				{
-					// TODO: Use GetDepthRaw() instead to save a bunch of float-divides per lookup
-					const float compareDepth = depthStencil->GetDepth(x, y);
+					const unsigned compareRawDepth = depthStencil->GetRawDepth(x, y);
 
 					// TODO: Don't assume less-than test for Z CMPFUNC
-					if (compareDepth < earlyZTestDepthValue)
+					if (compareRawDepth < earlyZTestDepthValue)
 					{
 						currentBarycentric0 += barycentricXDelta1;
 						currentBarycentric1 += barycentricXDelta2;
@@ -5375,15 +5381,17 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_p
 	int row1 = computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin) + topleftEdgeBias1;
 	int row2 = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin) + topleftEdgeBias2;
 
-	float earlyZTestDepthValue;
+	unsigned earlyZTestDepthValue;
 	const IDirect3DSurface9Hook* depthStencil;
 	if (rasterizerUsesEarlyZTest)
 	{
-		// TODO: Don't assume less-than test for Z CMPFUNC
-		earlyZTestDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
-		earlyZTestDepthValue = earlyZTestDepthValue < pos2.z ? earlyZTestDepthValue : pos2.z;
-
 		depthStencil = currentState.currentDepthStencil;
+
+		// TODO: Don't assume less-than test for Z CMPFUNC
+		float minDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
+		minDepthValue = minDepthValue < pos2.z ? minDepthValue : pos2.z;
+
+		earlyZTestDepthValue = depthStencil->GetRawDepthValueFromFloatDepth(minDepthValue);
 	}
 
 	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData(&v0, &v1, &v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
@@ -5401,8 +5409,7 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(const VStoPSMapping& vs_p
 			{
 				if (rasterizerUsesEarlyZTest)
 				{
-					// TODO: Use GetDepthRaw() instead to save a bunch of float-divides per lookup
-					const float compareDepth = depthStencil->GetDepth(x, y);
+					const unsigned compareDepth = depthStencil->GetRawDepth(x, y);
 
 					// TODO: Don't assume less-than test for Z CMPFUNC
 					if (compareDepth < earlyZTestDepthValue)

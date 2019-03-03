@@ -190,6 +190,8 @@ public:
 
 	const float GetDepth(const unsigned x, const unsigned y) const;
 
+	const unsigned GetRawDepthValueFromFloatDepth(const float floatDepth) const;
+
 	const unsigned GetRawDepth(const unsigned x, const unsigned y) const;
 
 	// Stencil functions:

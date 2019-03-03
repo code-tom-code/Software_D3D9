@@ -2505,6 +2505,34 @@ const float IDirect3DSurface9Hook::GetDepth(const unsigned x, const unsigned y) 
 	return 0.0f;
 }
 
+const unsigned IDirect3DSurface9Hook::GetRawDepthValueFromFloatDepth(const float floatDepth) const
+{
+	switch (InternalFormat)
+	{
+	case D3DFMT_D15S1:
+		return floatDepth * 32767.0f;
+	case D3DFMT_D16:
+	case D3DFMT_D16_LOCKABLE:
+		return floatDepth * 65535.0f;
+	case D3DFMT_D24FS8:
+	case D3DFMT_D24S8:
+	case D3DFMT_D24X4S4:
+	case D3DFMT_D24X8:
+		return floatDepth * 16777215.0f;
+	case D3DFMT_D32:
+	case D3DFMT_D32_LOCKABLE:
+	case MAKEFOURCC('I', 'N', 'T', 'Z'):
+		return floatDepth * 4294967295.0f;
+	case D3DFMT_D32F_LOCKABLE:
+		return *(const unsigned* const)&floatDepth;
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // Error: Can't call GetDepth() on non-depth formats!
+#endif
+		return 0;
+	}
+}
+
 const unsigned IDirect3DSurface9Hook::GetRawDepth(const unsigned x, const unsigned y) const
 {
 	switch (InternalFormat)
