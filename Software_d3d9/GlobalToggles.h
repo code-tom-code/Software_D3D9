@@ -31,6 +31,13 @@
 // If this is not defined, all shaders will run in solo threads rather than warps (usually of at least 2x2 pixels or vertices)
 #define RUN_SHADERS_IN_WARPS 1
 
+// Defines for different kinds of parallel libraries
+#define PARALLELLIB_CONCRT 1
+#define PARALLELLIB_TBB 2
+
+// Use this define to set which parallel library to use (ConcRT or TBB are currently supported):
+#define PARALLEL_LIBRARY PARALLELLIB_CONCRT
+
 // Comment this line out to disable multithread shading
 #define MULTITHREAD_SHADING 1
 

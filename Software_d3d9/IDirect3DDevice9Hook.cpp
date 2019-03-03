@@ -16,9 +16,13 @@
 #include "resource.h"
 
 #ifdef MULTITHREAD_SHADING
-	#include <concrt.h>
-	#include <ppltasks.h>
-	#include <ppl.h>
+	#if PARALLEL_LIBRARY == PARALLELLIB_CONCRT
+		#include <concrt.h>
+		#include <ppltasks.h>
+		#include <ppl.h>
+	#elif PARALLEL_LIBRARY == PARALLELLIB_TBB
+		#include <include/tbb/parallel_for.h>
+	#endif
 #endif
 
 // Rasterizer constants:
@@ -322,10 +326,17 @@ static inline void SynchronizeThreads()
 	}
 	else
 	{
+#if PARALLEL_LIBRARY == PARALLELLIB_CONCRT
 		concurrency::parallel_for( (const long)0, cacheNumJobs, [](const int jobID)
 		{
 			WorkUntilNoMoreWork(allWorkItems + jobID);
 		});
+#elif PARALLEL_LIBRARY == PARALLELLIB_TBB
+		tbb::parallel_for( (const long)0, cacheNumJobs, [](const int jobID)
+		{
+			WorkUntilNoMoreWork(allWorkItems + jobID);
+		});
+#endif
 	}
 
 	//CloseThreadpoolCleanupGroupMembers(mainThreadpoolCleanupGroup, FALSE, NULL);
