@@ -599,6 +599,13 @@ template void IDirect3DTexture9Hook::SampleTextureLoD4<13>(float (&x4)[4], float
 template void IDirect3DTexture9Hook::SampleTextureLoD4<14>(float (&x4)[4], float (&y4)[4], float (&mip4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
 template void IDirect3DTexture9Hook::SampleTextureLoD4<15>(float (&x4)[4], float (&y4)[4], float (&mip4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
 
+union borderColorUsageUnion
+{
+	unsigned char usingBorderColorChannel[4];
+	unsigned anyUsingBorderColor;
+};
+static_assert(sizeof(borderColorUsageUnion) == sizeof(unsigned), "Error! Unexpected union size!");
+
 template <const unsigned char writeMask>
 void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], float (&mip4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const
 {
@@ -611,13 +618,8 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 		return;
 	}
 
-	bool usingBorderColor4[4] =
-	{
-		false,
-		false,
-		false,
-		false
-	};
+	borderColorUsageUnion usingBorderColor4;
+	usingBorderColor4.anyUsingBorderColor = 0x00000000;
 
 	switch (samplerState.stateUnion.namedStates.addressU)
 	{
@@ -697,26 +699,26 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 		if (x4[0] < 0.0f || x4[0] > 1.0f)
 		{
 			ColorDWORDToFloat4(samplerState.stateUnion.namedStates.borderColor, outColor4[0]);
-			usingBorderColor4[0] = true;
+			usingBorderColor4.usingBorderColorChannel[0] = 0xFF;
 		}
 		if (x4[1] < 0.0f || x4[1] > 1.0f)
 		{
 			ColorDWORDToFloat4(samplerState.stateUnion.namedStates.borderColor, outColor4[1]);
-			usingBorderColor4[1] = true;
+			usingBorderColor4.usingBorderColorChannel[1] = 0xFF;
 		}
 		if (x4[2] < 0.0f || x4[2] > 1.0f)
 		{
 			ColorDWORDToFloat4(samplerState.stateUnion.namedStates.borderColor, outColor4[2]);
-			usingBorderColor4[2] = true;
+			usingBorderColor4.usingBorderColorChannel[2] = 0xFF;
 		}
 		if (x4[3] < 0.0f || x4[3] > 1.0f)
 		{
 			ColorDWORDToFloat4(samplerState.stateUnion.namedStates.borderColor, outColor4[3]);
-			usingBorderColor4[3] = true;
+			usingBorderColor4.usingBorderColorChannel[3] = 0xFF;
 		}
 
 		// Early out in cases where the whole pixel-quad has texcoords outside the border region:
-		if (usingBorderColor4[0] && usingBorderColor4[1] && usingBorderColor4[2] && usingBorderColor4[3])
+		if (usingBorderColor4.anyUsingBorderColor == 0xFFFFFFFF)
 			return;
 		break;
 	case D3DTADDRESS_MIRRORONCE:
@@ -811,29 +813,29 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 			y4[3] = 0.0f;
 		break;
 	case D3DTADDRESS_BORDER    :
-		if (!usingBorderColor4[0] && (y4[0] < 0.0f || y4[0] > 1.0f) )
+		if (!usingBorderColor4.usingBorderColorChannel[0] && (y4[0] < 0.0f || y4[0] > 1.0f) )
 		{
 			ColorDWORDToFloat4(samplerState.stateUnion.namedStates.borderColor, outColor4[0]);
-			usingBorderColor4[0] = true;
+			usingBorderColor4.usingBorderColorChannel[0] = 0xFF;
 		}
-		if (!usingBorderColor4[1] && (y4[1] < 0.0f || y4[1] > 1.0f) )
+		if (!usingBorderColor4.usingBorderColorChannel[1] && (y4[1] < 0.0f || y4[1] > 1.0f) )
 		{
 			ColorDWORDToFloat4(samplerState.stateUnion.namedStates.borderColor, outColor4[1]);
-			usingBorderColor4[1] = true;
+			usingBorderColor4.usingBorderColorChannel[1] = 0xFF;
 		}
-		if (!usingBorderColor4[2] && (y4[2] < 0.0f || y4[2] > 1.0f) )
+		if (!usingBorderColor4.usingBorderColorChannel[2] && (y4[2] < 0.0f || y4[2] > 1.0f) )
 		{
 			ColorDWORDToFloat4(samplerState.stateUnion.namedStates.borderColor, outColor4[2]);
-			usingBorderColor4[2] = true;
+			usingBorderColor4.usingBorderColorChannel[2] = 0xFF;
 		}
-		if (!usingBorderColor4[3] && (y4[3] < 0.0f || y4[3] > 1.0f) )
+		if (!usingBorderColor4.usingBorderColorChannel[3] && (y4[3] < 0.0f || y4[3] > 1.0f) )
 		{
 			ColorDWORDToFloat4(samplerState.stateUnion.namedStates.borderColor, outColor4[3]);
-			usingBorderColor4[3] = true;
+			usingBorderColor4.usingBorderColorChannel[3] = 0xFF;
 		}
 
 		// Early out in cases where the whole pixel-quad has texcoords outside the border region:
-		if (usingBorderColor4[0] && usingBorderColor4[1] && usingBorderColor4[2] && usingBorderColor4[3])
+		if (usingBorderColor4.anyUsingBorderColor == 0xFFFFFFFF)
 			return;
 		break;
 	case D3DTADDRESS_MIRRORONCE:
@@ -897,15 +899,21 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 #endif
 	case D3DTEXF_NONE           : // Mip-mapping is disabled, always read level 0 of the surface
 	{
-		// TODO: Make a SampleSurface4 function
-		if (!usingBorderColor4[0])
-			surfaceLevel0->SampleSurface<writeMask>(x4[0], y4[0], samplerState, outColor4[0]);
-		if (!usingBorderColor4[1])
-			surfaceLevel0->SampleSurface<writeMask>(x4[1], y4[1], samplerState, outColor4[1]);
-		if (!usingBorderColor4[2])
-			surfaceLevel0->SampleSurface<writeMask>(x4[2], y4[2], samplerState, outColor4[2]);
-		if (!usingBorderColor4[3])
-			surfaceLevel0->SampleSurface<writeMask>(x4[3], y4[3], samplerState, outColor4[3]);
+		if (usingBorderColor4.anyUsingBorderColor == 0x00000000)
+		{
+			surfaceLevel0->SampleSurface4<writeMask>(x4, y4, samplerState, outColor4);
+		}
+		else
+		{
+			if (!usingBorderColor4.usingBorderColorChannel[0])
+				surfaceLevel0->SampleSurface<writeMask>(x4[0], y4[0], samplerState, outColor4[0]);
+			if (!usingBorderColor4.usingBorderColorChannel[1])
+				surfaceLevel0->SampleSurface<writeMask>(x4[1], y4[1], samplerState, outColor4[1]);
+			if (!usingBorderColor4.usingBorderColorChannel[2])
+				surfaceLevel0->SampleSurface<writeMask>(x4[2], y4[2], samplerState, outColor4[2]);
+			if (!usingBorderColor4.usingBorderColorChannel[3])
+				surfaceLevel0->SampleSurface<writeMask>(x4[3], y4[3], samplerState, outColor4[3]);
+		}
 	}
 		break;
 	case D3DTEXF_POINT          :
@@ -927,15 +935,24 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 		if (mipLevel4[3] > maxMip)
 			mipLevel4[3] = maxMip;
 
-		// TODO: Make a SampleSurface4 function
-		if (!usingBorderColor4[0])
-			surfaces[mipLevel4[0] ]->SampleSurface<writeMask>(x4[0], y4[0], samplerState, outColor4[0]);
-		if (!usingBorderColor4[1])
-			surfaces[mipLevel4[1] ]->SampleSurface<writeMask>(x4[1], y4[1], samplerState, outColor4[1]);
-		if (!usingBorderColor4[2])
-			surfaces[mipLevel4[2] ]->SampleSurface<writeMask>(x4[2], y4[2], samplerState, outColor4[2]);
-		if (!usingBorderColor4[3])
-			surfaces[mipLevel4[3] ]->SampleSurface<writeMask>(x4[3], y4[3], samplerState, outColor4[3]);
+		if ( (usingBorderColor4.anyUsingBorderColor == 0x00000000) &&
+			(mipLevel4[0] == mipLevel4[1]) &&
+			(mipLevel4[2] == mipLevel4[3]) &&
+			(mipLevel4[0] == mipLevel4[2]) )
+		{
+			surfaces[mipLevel4[0] ]->SampleSurface4<writeMask>(x4, y4, samplerState, outColor4);
+		}
+		else
+		{
+			if (!usingBorderColor4.usingBorderColorChannel[0])
+				surfaces[mipLevel4[0] ]->SampleSurface<writeMask>(x4[0], y4[0], samplerState, outColor4[0]);
+			if (!usingBorderColor4.usingBorderColorChannel[1])
+				surfaces[mipLevel4[1] ]->SampleSurface<writeMask>(x4[1], y4[1], samplerState, outColor4[1]);
+			if (!usingBorderColor4.usingBorderColorChannel[2])
+				surfaces[mipLevel4[2] ]->SampleSurface<writeMask>(x4[2], y4[2], samplerState, outColor4[2]);
+			if (!usingBorderColor4.usingBorderColorChannel[3])
+				surfaces[mipLevel4[3] ]->SampleSurface<writeMask>(x4[3], y4[3], samplerState, outColor4[3]);
+		}
 	}
 		break;
 	case D3DTEXF_ANISOTROPIC    :
@@ -966,8 +983,48 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 		const int maxMip = (const int)surfaceCountMinusOne;
 		const int maxMipLevelLow = maxMip - 1;
 
-		// TODO: Make a SampleSurface4 function
-		if (!usingBorderColor4[0])
+		// See if we can use a unified miplevel for our sample4, or if we have to do four individual samples to different miplevel surfaces:
+		if (usingBorderColor4.anyUsingBorderColor == 0x00000000)
+		{
+			// Well this is going to be tough to vectorize...
+			if ( (mipLerp4[0] == mipLerp4[1]) &&
+				(mipLerp4[2] == mipLerp4[3]) &&
+				(mipLerp4[0] == mipLerp4[2]) &&
+				(mipLerp4[0] == 0.0f) &&
+				(mipLevelLow4[0] == mipLevelLow4[1]) &&
+				(mipLevelLow4[2] == mipLevelLow4[3]) &&
+				(mipLevelLow4[0] == mipLevelLow4[2]) )
+			{
+				surfaces[mipLevelLow4[0] ]->SampleSurface4<writeMask>(x4, y4, samplerState, outColor4);
+				return;
+			}
+			else if (mipLevelLow4[0] >= maxMipLevelLow &&
+				mipLevelLow4[1] >= maxMipLevelLow && 
+				mipLevelLow4[2] >= maxMipLevelLow && 
+				mipLevelLow4[3] >= maxMipLevelLow)
+			{
+				surfaces[maxMip]->SampleSurface4<writeMask>(x4, y4, samplerState, outColor4);
+				return;
+			}
+			else if (mipLevelLow4[0] == mipLevelLow4[1] &&
+					 mipLevelLow4[2] == mipLevelLow4[3] &&
+					 mipLevelLow4[0] == mipLevelLow4[2])
+			{
+				D3DXVECTOR4 lowColor4[4];
+				surfaces[mipLevelLow4[0] ]->SampleSurface4<writeMask>(x4, y4, samplerState, lowColor4);
+				D3DXVECTOR4 highColor4[4];
+				surfaces[mipLevelLow4[0] + 1]->SampleSurface4<writeMask>(x4, y4, samplerState, highColor4);
+
+				lrp<writeMask>(outColor4[0], lowColor4[0], highColor4[0], mipLerp4[0]);
+				lrp<writeMask>(outColor4[1], lowColor4[1], highColor4[1], mipLerp4[1]);
+				lrp<writeMask>(outColor4[2], lowColor4[2], highColor4[2], mipLerp4[2]);
+				lrp<writeMask>(outColor4[3], lowColor4[3], highColor4[3], mipLerp4[3]);
+				return;
+			}
+		}
+
+		// Sad times, we have no choice but to do separate samples from different mip-level surfaces:
+		if (!usingBorderColor4.usingBorderColorChannel[0])
 		{
 			if (mipLerp4[0] == 0.0f)
 				surfaces[mipLevelLow4[0] ]->SampleSurface<writeMask>(x4[0], y4[0], samplerState, outColor4[0]);
@@ -982,7 +1039,7 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 			}
 		}
 
-		if (!usingBorderColor4[1])
+		if (!usingBorderColor4.usingBorderColorChannel[1])
 		{
 			if (mipLerp4[1] == 0.0f)
 				surfaces[mipLevelLow4[1] ]->SampleSurface<writeMask>(x4[1], y4[1], samplerState, outColor4[1]);
@@ -997,7 +1054,7 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 			}
 		}
 
-		if (!usingBorderColor4[2])
+		if (!usingBorderColor4.usingBorderColorChannel[2])
 		{
 			if (mipLerp4[2] == 0.0f)
 				surfaces[mipLevelLow4[2] ]->SampleSurface<writeMask>(x4[2], y4[2], samplerState, outColor4[2]);
@@ -1012,7 +1069,7 @@ void IDirect3DTexture9Hook::SampleTextureLoD4(float (&x4)[4], float (&y4)[4], fl
 			}
 		}
 
-		if (!usingBorderColor4[3])
+		if (!usingBorderColor4.usingBorderColorChannel[3])
 		{
 			if (mipLerp4[3] == 0.0f)
 				surfaces[mipLevelLow4[3] ]->SampleSurface<writeMask>(x4[3], y4[3], samplerState, outColor4[3]);

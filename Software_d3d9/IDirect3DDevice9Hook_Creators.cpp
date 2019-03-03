@@ -191,14 +191,16 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::CreateVerte
 		return ret;
 
 	IDirect3DVertexDeclaration9Hook* hook = new IDirect3DVertexDeclaration9Hook(*ppDecl, this);
-	hook->CreateVertexDeclaration( (const DebuggableD3DVERTEXELEMENT9* const)pVertexElements, 0x00000000);
+	debuggableFVF noFVF;
+	noFVF.rawFVF_DWORD = 0x00000000;
+	hook->CreateVertexDeclaration( (const DebuggableD3DVERTEXELEMENT9* const)pVertexElements, noFVF);
 	*ppDecl = hook;
 
 	return ret;
 }
 
 // This is not an official D3D9 function, even though it looks like one. It is only used internally.
-COM_DECLSPEC_NOTHROW HRESULT IDirect3DDevice9Hook::CreateVertexDeclarationFromFVF(THIS_ CONST D3DVERTEXELEMENT9* pVertexElements, IDirect3DVertexDeclaration9** ppDecl, const DWORD FVF)
+COM_DECLSPEC_NOTHROW HRESULT IDirect3DDevice9Hook::CreateVertexDeclarationFromFVF(THIS_ CONST D3DVERTEXELEMENT9* pVertexElements, IDirect3DVertexDeclaration9** ppDecl, const debuggableFVF FVF)
 {
 	HRESULT ret = d3d9dev->CreateVertexDeclaration(pVertexElements, ppDecl);
 	if (FAILED(ret) )
@@ -228,10 +230,10 @@ static const unsigned texCoordSizeLookup[4] =
 };
 
 // This is not an official D3D9 function, even though it looks like one. It is only used internally.
-IDirect3DVertexDeclaration9Hook* IDirect3DDevice9Hook::CreateVertexDeclFromFVFCode(const DWORD FVF)
+IDirect3DVertexDeclaration9Hook* IDirect3DDevice9Hook::CreateVertexDeclFromFVFCode(const debuggableFVF FVF)
 {
 #ifndef NO_CACHING_FVF_VERT_DECLS
-	const std::map<DWORD, IDirect3DVertexDeclaration9Hook*>::const_iterator it = FVFToVertDeclCache->find(FVF);
+	const std::map<DWORD, IDirect3DVertexDeclaration9Hook*>::const_iterator it = FVFToVertDeclCache->find(FVF.rawFVF_DWORD);
 	if (it != FVFToVertDeclCache->end() )
 	{
 		IDirect3DVertexDeclaration9Hook* const fvfVertDecl = it->second;
@@ -244,7 +246,7 @@ IDirect3DVertexDeclaration9Hook* IDirect3DDevice9Hook::CreateVertexDeclFromFVFCo
 
 	unsigned currentElementIndex = 0;
 	unsigned short totalVertexSizeBytes = 0;
-	switch (FVF & D3DFVF_POSITION_MASK)
+	switch (FVF.rawFVF_DWORD & D3DFVF_POSITION_MASK)
 	{
 	case D3DFVF_XYZ:
 		elements[currentElementIndex++] = {0, totalVertexSizeBytes, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0};
@@ -268,31 +270,31 @@ IDirect3DVertexDeclaration9Hook* IDirect3DDevice9Hook::CreateVertexDeclFromFVFCo
 		break;
 	}
 
-	if (FVF & D3DFVF_NORMAL)
+	if (FVF.rawFVF_DWORD & D3DFVF_NORMAL)
 	{
 		elements[currentElementIndex++] = {0, totalVertexSizeBytes, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0};
 		totalVertexSizeBytes += sizeof(D3DXVECTOR3);
 	}
 
-	if (FVF & D3DFVF_PSIZE)
+	if (FVF.rawFVF_DWORD & D3DFVF_PSIZE)
 	{
 		elements[currentElementIndex++] = {0, totalVertexSizeBytes, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_PSIZE, 0};
 		totalVertexSizeBytes += sizeof(float);
 	}
 
-	if (FVF & D3DFVF_DIFFUSE)
+	if (FVF.rawFVF_DWORD & D3DFVF_DIFFUSE)
 	{
 		elements[currentElementIndex++] = {0, totalVertexSizeBytes, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0};
 		totalVertexSizeBytes += sizeof(D3DCOLOR);
 	}
 
-	if (FVF & D3DFVF_SPECULAR)
+	if (FVF.rawFVF_DWORD & D3DFVF_SPECULAR)
 	{
 		elements[currentElementIndex++] = {0, totalVertexSizeBytes, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 1};
 		totalVertexSizeBytes += sizeof(D3DCOLOR);
 	}
 
-	const unsigned numTexCoords = ( (FVF & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT);
+	const unsigned numTexCoords = ( (FVF.rawFVF_DWORD & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT);
 #ifdef _DEBUG
 	if (numTexCoords > D3DDP_MAXTEXCOORD)
 	{
@@ -304,7 +306,7 @@ IDirect3DVertexDeclaration9Hook* IDirect3DDevice9Hook::CreateVertexDeclFromFVFCo
 	{
 		const unsigned texCoordTypeShift = (16 + x * 2);
 		const unsigned texCoordTypeMask = 0x3 << texCoordTypeShift;
-		const unsigned texCoordType = (FVF & texCoordTypeMask) >> texCoordTypeShift;
+		const unsigned texCoordType = (FVF.rawFVF_DWORD & texCoordTypeMask) >> texCoordTypeShift;
 		const D3DDECLTYPE texCoordTypeFormat = texCoordTypeLookup[texCoordType];
 		const unsigned texCoordTypeSize = texCoordSizeLookup[texCoordType];
 		elements[currentElementIndex++] = {0, totalVertexSizeBytes, (const BYTE)texCoordTypeFormat, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, x};
@@ -321,7 +323,7 @@ IDirect3DVertexDeclaration9Hook* IDirect3DDevice9Hook::CreateVertexDeclFromFVFCo
 
 #ifndef NO_CACHING_FVF_VERT_DECLS
 	fvfVertexDecl->AddRef();
-	FVFToVertDeclCache->insert(std::make_pair(FVF, fvfVertexDecl) );
+	FVFToVertDeclCache->insert(std::make_pair(FVF.rawFVF_DWORD, fvfVertexDecl) );
 #endif // NO_CACHING_FVF_VERT_DECLS
 
 	if (FAILED(SetVertexDeclaration(fvfVertexDecl) ) )

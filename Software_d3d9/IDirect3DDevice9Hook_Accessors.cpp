@@ -1556,14 +1556,17 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetVertexDe
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetFVF(THIS_ DWORD FVF)
 {
-	HRESULT ret = d3d9dev->SetFVF(FVF);
+	debuggableFVF dbgFVF;
+	dbgFVF.rawFVF_DWORD = FVF;
+
+	HRESULT ret = d3d9dev->SetFVF(dbgFVF.rawFVF_DWORD);
 	if (FAILED(ret) )
 		return ret;
 
-	const DWORD lastFVF = currentState.currentFVF;
-	currentState.currentFVF = FVF;
+	const DWORD oldFVF_DWORD = currentState.currentFVF.rawFVF_DWORD;
+	currentState.currentFVF.rawFVF_DWORD = dbgFVF.rawFVF_DWORD;
 
-	if (FVF != 0 && lastFVF != FVF)
+	if (dbgFVF.rawFVF_DWORD != 0x00000000 && oldFVF_DWORD != dbgFVF.rawFVF_DWORD)
 	{
 		currentState.declTarget = DeviceState::targetFVF;
 
@@ -1571,7 +1574,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetFVF(THIS
 		// 1) Release any existing set vertex declarations
 		// 2) Create a new implicit vertex declaration (retrievable only via GetVertexDeclaration() )
 		// 3) Assign that new implicit vertex declaration
-		CreateVertexDeclFromFVFCode(FVF);
+		CreateVertexDeclFromFVFCode(dbgFVF);
 	}
 
 	return ret;
@@ -1579,17 +1582,26 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetFVF(THIS
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetFVF(THIS_ DWORD* pFVF)
 {
-	DWORD realFVF = 0;
-	HRESULT ret = d3d9dev->GetFVF(&realFVF);
-	if (FAILED(ret) )
-		return ret;
+	if (!pFVF)
+		return D3DERR_INVALIDCALL;
+
+	*pFVF = currentState.currentFVF.rawFVF_DWORD;
+
 #ifdef _DEBUG
-	if (realFVF != currentState.currentFVF)
+	debuggableFVF dbgFVF;
+	dbgFVF.rawFVF_DWORD = 0x00000000;
+	HRESULT ret = d3d9dev->GetFVF(&dbgFVF.rawFVF_DWORD);
+	if (FAILED(ret) )
+	{
+		__debugbreak(); // We missed an error case!
+	}
+	if (dbgFVF.rawFVF_DWORD != currentState.currentFVF.rawFVF_DWORD)
 	{
 		DbgBreakPrint("Error: Internal FVF doesn't match FVF");
 	}
-#endif
 	return ret;
+#endif
+	return S_OK;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexShader(THIS_ IDirect3DVertexShader9* pShader)

@@ -2135,6 +2135,32 @@ static inline void GammaCorrectSample(D3DXVECTOR4& outColor)
 		outColor.z = powf(outColor.z, gamma2_2);
 }
 
+template <const unsigned char writeMask>
+static inline void GammaCorrectSample4(D3DXVECTOR4 (&outColor4)[4])
+{
+	if (writeMask & 0x1)
+	{
+		outColor4[0].x = powf(outColor4[0].x, gamma2_2);
+		outColor4[1].x = powf(outColor4[1].x, gamma2_2);
+		outColor4[2].x = powf(outColor4[2].x, gamma2_2);
+		outColor4[3].x = powf(outColor4[3].x, gamma2_2);
+	}
+	if (writeMask & 0x2)
+	{
+		outColor4[0].y = powf(outColor4[0].y, gamma2_2);
+		outColor4[1].y = powf(outColor4[1].y, gamma2_2);
+		outColor4[2].y = powf(outColor4[2].y, gamma2_2);
+		outColor4[3].y = powf(outColor4[3].y, gamma2_2);
+	}
+	if (writeMask & 0x4)
+	{
+		outColor4[0].z = powf(outColor4[0].z, gamma2_2);
+		outColor4[1].z = powf(outColor4[1].z, gamma2_2);
+		outColor4[2].z = powf(outColor4[2].z, gamma2_2);
+		outColor4[3].z = powf(outColor4[3].z, gamma2_2);
+	}
+}
+
 #else
 
 static const float gamma2_4 = 2.4f;
@@ -2166,6 +2192,44 @@ static inline void GammaCorrectSample(D3DXVECTOR4& outColor)
 	}
 }
 
+template <const unsigned char writeMask>
+static inline void GammaCorrectSample4(D3DXVECTOR4 (&outColor4)[4])
+{
+	if (writeMask & 0x1)
+	{
+		if (outColor4[0].x > 0.04045) outColor4[0].x = powf( (outColor4[0].x + 0.055f) * inv1055, gamma2_4);
+		else outColor4[0].x = outColor4[0].x * inv1292;
+		if (outColor4[1].x > 0.04045) outColor4[1].x = powf( (outColor4[1].x + 0.055f) * inv1055, gamma2_4);
+		else outColor4[1].x = outColor4[1].x * inv1292;
+		if (outColor4[2].x > 0.04045) outColor4[2].x = powf( (outColor4[2].x + 0.055f) * inv1055, gamma2_4);
+		else outColor4[2].x = outColor4[2].x * inv1292;
+		if (outColor4[3].x > 0.04045) outColor4[3].x = powf( (outColor4[3].x + 0.055f) * inv1055, gamma2_4);
+		else outColor4[3].x = outColor4[3].x * inv1292;
+	}
+	if (writeMask & 0x2)
+	{
+		if (outColor4[0].y > 0.04045) outColor4[0].y = powf( (outColor4[0].y + 0.055f) * inv1055, gamma2_4);
+		else outColor4[0].y = outColor4[0].y * inv1292;
+		if (outColor4[1].y > 0.04045) outColor4[1].y = powf( (outColor4[1].y + 0.055f) * inv1055, gamma2_4);
+		else outColor4[1].y = outColor4[1].y * inv1292;
+		if (outColor4[2].y > 0.04045) outColor4[2].y = powf( (outColor4[2].y + 0.055f) * inv1055, gamma2_4);
+		else outColor4[2].y = outColor4[2].y * inv1292;
+		if (outColor4[3].y > 0.04045) outColor4[3].y = powf( (outColor4[3].y + 0.055f) * inv1055, gamma2_4);
+		else outColor4[3].y = outColor4[3].y * inv1292;
+	}
+	if (writeMask & 0x4)
+	{
+		if (outColor4[0].z > 0.04045) outColor4[0].z = powf( (outColor4[0].z + 0.055f) * inv1055, gamma2_4);
+		else outColor4[0].z = outColor4[0].z * inv1292;
+		if (outColor4[1].z > 0.04045) outColor4[1].z = powf( (outColor4[1].z + 0.055f) * inv1055, gamma2_4);
+		else outColor4[1].z = outColor4[1].z * inv1292;
+		if (outColor4[2].z > 0.04045) outColor4[2].z = powf( (outColor4[2].z + 0.055f) * inv1055, gamma2_4);
+		else outColor4[2].z = outColor4[2].z * inv1292;
+		if (outColor4[3].z > 0.04045) outColor4[3].z = powf( (outColor4[3].z + 0.055f) * inv1055, gamma2_4);
+		else outColor4[3].z = outColor4[3].z * inv1292;
+	}
+}
+
 #endif
 
 template <const unsigned char writeMask, const bool sRGBSurface>
@@ -2178,12 +2242,20 @@ void IDirect3DSurface9Hook::GetPixelVec(const unsigned x, const unsigned y, D3DX
 		__debugbreak(); // TODO: Add support for more surface types!
 #endif
 	case D3DFMT_X8R8G8B8:
+	{
+		const D3DCOLOR ldrColor = GetPixel(x, y);
+		ColorDWORDToFloat4<writeMask & 0x7>(ldrColor, outColor);
+		outColor.w = 1.0f;
+		if (sRGBSurface)
+			GammaCorrectSample<writeMask & 0x7>(outColor);
+	}
+		break;
 	case D3DFMT_A8R8G8B8:
 	{
 		const D3DCOLOR ldrColor = GetPixel(x, y);
 		ColorDWORDToFloat4<writeMask>(ldrColor, outColor);
 		if (sRGBSurface)
-			GammaCorrectSample<writeMask>(outColor);
+			GammaCorrectSample<writeMask & 0x7>(outColor);
 	}
 		break;
 	case D3DFMT_A16B16G16R16:
@@ -2192,7 +2264,7 @@ void IDirect3DSurface9Hook::GetPixelVec(const unsigned x, const unsigned y, D3DX
 		const A16B16G16R16& pixel = pixels[y * InternalWidth + x];
 		ColorA16B16G16R16ToFloat4<writeMask>(pixel, outColor);
 		if (sRGBSurface)
-			GammaCorrectSample<writeMask>(outColor);
+			GammaCorrectSample<writeMask & 0x7>(outColor);
 	}
 		break;
 	case D3DFMT_A16B16G16R16F:
@@ -2222,7 +2294,7 @@ void IDirect3DSurface9Hook::GetPixelVec(const unsigned x, const unsigned y, D3DX
 		const unsigned char pixel = pixels[y * InternalWidth + x];
 		L8ToFloat4<writeMask>(pixel, outColor);
 		if (sRGBSurface)
-			GammaCorrectSample<writeMask>(outColor);
+			GammaCorrectSample<writeMask & 0x7>(outColor);
 	}
 	break;
 	case D3DFMT_DXT1:
@@ -2235,7 +2307,144 @@ void IDirect3DSurface9Hook::GetPixelVec(const unsigned x, const unsigned y, D3DX
 		const D3DCOLOR ldrColor = rawPixels[y * InternalWidth + x];
 		ColorDWORDToFloat4<writeMask>(ldrColor, outColor);
 		if (sRGBSurface)
-			GammaCorrectSample<writeMask>(outColor);
+			GammaCorrectSample<writeMask & 0x7>(outColor);
+	}
+		break;
+
+	}
+}
+
+template <const unsigned char writeMask, const bool sRGBSurface>
+void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned (&y4)[4], D3DXVECTOR4 (&outColor4)[4]) const
+{
+	switch (InternalFormat)
+	{
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // TODO: Add support for more surface types!
+#endif
+	case D3DFMT_X8R8G8B8:
+	{
+		const D3DCOLOR* const pixels = (const D3DCOLOR* const)surfaceBytesRaw;
+		const D3DCOLOR ldrColor4[4] =
+		{
+			pixels[y4[0] * InternalWidth + x4[0] ],
+			pixels[y4[1] * InternalWidth + x4[1] ],
+			pixels[y4[2] * InternalWidth + x4[2] ],
+			pixels[y4[3] * InternalWidth + x4[3] ]
+		};
+		ColorDWORDToFloat4_4<writeMask & 0x7>(ldrColor4, outColor4);
+		outColor4[0].w = outColor4[1].w = outColor4[2].w = outColor4[3].w = 1.0f;
+		if (sRGBSurface)
+			GammaCorrectSample4<writeMask & 0x7>(outColor4);
+	}
+		break;
+	case D3DFMT_A8R8G8B8:
+	{
+		const D3DCOLOR* const pixels = (const D3DCOLOR* const)surfaceBytesRaw;
+		const D3DCOLOR ldrColor4[4] =
+		{
+			pixels[y4[0] * InternalWidth + x4[0] ],
+			pixels[y4[1] * InternalWidth + x4[1] ],
+			pixels[y4[2] * InternalWidth + x4[2] ],
+			pixels[y4[3] * InternalWidth + x4[3] ]
+		};
+		ColorDWORDToFloat4_4<writeMask>(ldrColor4, outColor4);
+		if (sRGBSurface)
+			GammaCorrectSample4<writeMask & 0x7>(outColor4);
+	}
+		break;
+	case D3DFMT_A16B16G16R16:
+	{
+		const A16B16G16R16* const pixels = (const A16B16G16R16* const)surfaceBytesRaw;
+		const A16B16G16R16 pixel4[4] = 
+		{
+			pixels[y4[0] * InternalWidth + x4[0] ],
+			pixels[y4[1] * InternalWidth + x4[1] ],
+			pixels[y4[2] * InternalWidth + x4[2] ],
+			pixels[y4[3] * InternalWidth + x4[3] ]
+		};
+
+		ColorA16B16G16R16ToFloat4_4<writeMask>(pixel4, outColor4);
+		if (sRGBSurface)
+			GammaCorrectSample4<writeMask & 0x7>(outColor4);
+	}
+		break;
+	case D3DFMT_A16B16G16R16F:
+	{
+		const A16B16G16R16F* const pixels = (const A16B16G16R16F* const)surfaceBytesRaw;
+		const A16B16G16R16F* const pixel4[4] = 
+		{
+			&pixels[y4[0] * InternalWidth + x4[0] ],
+			&pixels[y4[1] * InternalWidth + x4[1] ],
+			&pixels[y4[2] * InternalWidth + x4[2] ],
+			&pixels[y4[3] * InternalWidth + x4[3] ]
+		};
+
+		ColorA16B16G16R16FToFloat4_4<writeMask>(pixel4, outColor4);
+	}
+	break;
+	case D3DFMT_A32B32G32R32F:
+	{
+		const A32B32G32R32F* const pixels = (const A32B32G32R32F* const)surfaceBytesRaw;
+		const A32B32G32R32F* const pixel4[4] = 
+		{
+			&pixels[y4[0] * InternalWidth + x4[0] ],
+			&pixels[y4[1] * InternalWidth + x4[1] ],
+			&pixels[y4[2] * InternalWidth + x4[2] ],
+			&pixels[y4[3] * InternalWidth + x4[3] ]
+		};
+
+		ColorA32B32G32R32FToFloat4_4<writeMask>(pixel4, outColor4);
+	}
+		break;
+	case D3DFMT_R16F:
+	{
+		const D3DXFLOAT16* const pixels = (const D3DXFLOAT16* const)surfaceBytesRaw;
+		const D3DXFLOAT16 pixel4[4] = 
+		{
+			pixels[y4[0] * InternalWidth + x4[0] ],
+			pixels[y4[1] * InternalWidth + x4[1] ],
+			pixels[y4[2] * InternalWidth + x4[2] ],
+			pixels[y4[3] * InternalWidth + x4[3] ]
+		};
+
+		ColorR16FToFloat4_4<writeMask>(pixel4, outColor4);
+	}
+		break;
+	case D3DFMT_L8:
+	{
+		const unsigned char* const pixels = (const unsigned char* const)surfaceBytesRaw;
+		const unsigned char pixel4[4] = 
+		{
+			pixels[y4[0] * InternalWidth + x4[0] ],
+			pixels[y4[1] * InternalWidth + x4[1] ],
+			pixels[y4[2] * InternalWidth + x4[2] ],
+			pixels[y4[3] * InternalWidth + x4[3] ]
+		};
+
+		L8ToFloat4_4<writeMask>(pixel4, outColor4);
+		if (sRGBSurface)
+			GammaCorrectSample4<writeMask & 0x7>(outColor4);
+	}
+	break;
+	case D3DFMT_DXT1:
+	case D3DFMT_DXT2:
+	case D3DFMT_DXT3:
+	case D3DFMT_DXT4:
+	case D3DFMT_DXT5:
+	{
+		const D3DCOLOR* const rawPixels = (const D3DCOLOR* const)auxSurfaceBytesRaw;
+		const D3DCOLOR ldrColor4[4] = 
+		{
+			rawPixels[y4[0] * InternalWidth + x4[0] ],
+			rawPixels[y4[1] * InternalWidth + x4[1] ],
+			rawPixels[y4[2] * InternalWidth + x4[2] ],
+			rawPixels[y4[3] * InternalWidth + x4[3] ]
+		};
+		ColorDWORDToFloat4_4<writeMask>(ldrColor4, outColor4);
+		if (sRGBSurface)
+			GammaCorrectSample4<writeMask & 0x7>(outColor4);
 	}
 		break;
 
@@ -2621,41 +2830,8 @@ void IDirect3DSurface9Hook::UpdateSurfaceInternal(const IDirect3DSurface9Hook* c
 #endif
 }
 
-template void IDirect3DSurface9Hook::SampleSurface<0, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<1, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<2, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<3, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<4, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<5, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<6, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<7, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<8, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<9, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<10, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<11, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<12, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<13, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<14, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<15, false>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<0, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<1, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<2, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<3, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<4, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<5, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<6, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<7, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<8, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<9, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<10, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<11, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<12, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<13, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<14, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::SampleSurface<15, true>(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
-
 template <const unsigned char writeMask, const bool sRGBSurface>
-void IDirect3DSurface9Hook::SampleSurface(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const
+void IDirect3DSurface9Hook::SampleSurfaceInternal(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const
 {
 	// Keep the simple case simple
 	if (is1x1surface)
@@ -2689,6 +2865,8 @@ void IDirect3DSurface9Hook::SampleSurface(const float x, const float y, const D3
 	default:
 #ifdef _DEBUG
 		__debugbreak();
+#else
+		__assume(0);
 #endif
 	case D3DTEXF_ANISOTROPIC    : // It is legal for anisotropic filtering to fall back to using linear filtering if the device doesn't support anisotropic
 	case D3DTEXF_PYRAMIDALQUAD  :
@@ -2696,32 +2874,42 @@ void IDirect3DSurface9Hook::SampleSurface(const float x, const float y, const D3
 	case D3DTEXF_CONVOLUTIONMONO:
 	case D3DTEXF_LINEAR         :
 	{
-		D3DXVECTOR4 topleft, topright, botleft, botright;
-
 		const int cuTopleft = (const int)u;
 		const int cvTopleft = (const int)v;
-		GetPixelVec<writeMask, sRGBSurface>(cuTopleft, cvTopleft, topleft);
-
 		unsigned cuTopright = cuTopleft + 1;
 		if (cuTopright > WidthM1)
 			cuTopright = WidthM1;
 		const unsigned cvTopright = cvTopleft;
-		GetPixelVec<writeMask, sRGBSurface>(cuTopright, cvTopright, topright);
-
 		const unsigned cuBotleft = cuTopleft;
 		unsigned cvBotleft = cvTopleft + 1;
 		if (cvBotleft > HeightM1)
 			cvBotleft = HeightM1;
-		GetPixelVec<writeMask, sRGBSurface>(cuBotleft, cvBotleft, botleft);
-
 		const unsigned cuBotright = cuTopright;
 		const unsigned cvBotright = cvBotleft;
-		GetPixelVec<writeMask, sRGBSurface>(cuBotright, cvBotright, botright);
+
+		const unsigned cu4[4] =
+		{
+			(const unsigned)cuTopleft,
+			cuTopright,
+			cuBotleft,
+			cuBotright
+		};
+
+		const unsigned cv4[4] =
+		{
+			(const unsigned)cvTopleft,
+			cvTopright,
+			cvBotleft,
+			cvBotright
+		};
+
+		D3DXVECTOR4 bilinearSamples[4];
+		GetPixelVec4<writeMask, sRGBSurface>(cu4, cv4, bilinearSamples);
 
 		D3DXVECTOR4 topHorizLerp, botHorizLerp;
 		const float xLerp = u - cuTopleft;
-		lrp<writeMask>(topHorizLerp, topleft, topright, xLerp);
-		lrp<writeMask>(botHorizLerp, botleft, botright, xLerp);
+		lrp<writeMask>(topHorizLerp, bilinearSamples[0], bilinearSamples[1], xLerp);
+		lrp<writeMask>(botHorizLerp, bilinearSamples[2], bilinearSamples[3], xLerp);
 		const float yLerp = v - cvTopleft;
 		lrp<writeMask>(outColor, topHorizLerp, botHorizLerp, yLerp);
 
@@ -2736,6 +2924,209 @@ void IDirect3DSurface9Hook::SampleSurface(const float x, const float y, const D3
 	case D3DTEXF_NONE           :
 	case D3DTEXF_POINT          :
 		GetPixelVec<writeMask, sRGBSurface>( (const int)u, (const int)v, outColor);
+		break;
+	}
+}
+
+template <const unsigned char writeMask, const bool sRGBSurface>
+void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const float (&y4)[4], const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4 (&outColor4)[4]) const
+{
+	// Keep the simple case simple
+	if (is1x1surface)
+	{
+		D3DXVECTOR4 broadcastPixel;
+		GetPixelVec<writeMask, sRGBSurface>(0, 0, broadcastPixel);
+
+		outColor4[0] = broadcastPixel;
+		outColor4[1] = broadcastPixel;
+		outColor4[2] = broadcastPixel;
+		outColor4[3] = broadcastPixel;
+		return;
+	}
+
+#ifdef _DEBUG
+	if (x4[0] > 1.0f || x4[0] < 0.0f)
+		__debugbreak();
+	if (x4[1] > 1.0f || x4[1] < 0.0f)
+		__debugbreak();
+	if (x4[2] > 1.0f || x4[2] < 0.0f)
+		__debugbreak();
+	if (x4[3] > 1.0f || x4[3] < 0.0f)
+		__debugbreak();
+	if (y4[0] > 1.0f || y4[0] < 0.0f)
+		__debugbreak();
+	if (y4[1] > 1.0f || y4[1] < 0.0f)
+		__debugbreak();
+	if (y4[2] > 1.0f || y4[2] < 0.0f)
+		__debugbreak();
+	if (y4[3] > 1.0f || y4[3] < 0.0f)
+		__debugbreak();
+#endif
+	float u4[4] =
+	{
+		x4[0] * InternalWidth,
+		x4[1] * InternalWidth,
+		x4[2] * InternalWidth,
+		x4[3] * InternalWidth
+	};
+
+	float v4[4] =
+	{
+		y4[0] * InternalHeight,
+		y4[1] * InternalHeight,
+		y4[2] * InternalHeight,
+		y4[3] * InternalHeight
+	};
+
+	const unsigned WidthM1 = InternalWidthM1;
+	const unsigned HeightM1 = InternalHeightM1;
+
+	const float maxU = InternalWidthM1F;
+	const float maxV = InternalHeightM1F;
+
+	if (u4[0] > maxU) u4[0] = maxU;
+	if (u4[1] > maxU) u4[1] = maxU;
+	if (u4[2] > maxU) u4[2] = maxU;
+	if (u4[3] > maxU) u4[3] = maxU;
+
+	if (v4[0] > maxV) v4[0] = maxV;
+	if (v4[1] > maxV) v4[1] = maxV;
+	if (v4[2] > maxV) v4[2] = maxV;
+	if (v4[3] > maxV) v4[3] = maxV;
+
+	switch (texf)
+	{
+	default:
+#ifdef _DEBUG
+		__debugbreak();
+#else
+		__assume(0);
+#endif
+	case D3DTEXF_ANISOTROPIC    : // It is legal for anisotropic filtering to fall back to using linear filtering if the device doesn't support anisotropic
+	case D3DTEXF_PYRAMIDALQUAD  :
+	case D3DTEXF_GAUSSIANQUAD   :
+	case D3DTEXF_CONVOLUTIONMONO:
+	case D3DTEXF_LINEAR         :
+	{
+		// D3DXVECTOR4 topleft, topright, botleft, botright;
+		D3DXVECTOR4 topleft4[4];
+
+		const unsigned cuTopleft4[4] =
+		{
+			(const unsigned)u4[0],
+			(const unsigned)u4[1],
+			(const unsigned)u4[2],
+			(const unsigned)u4[3]
+		};
+
+		const unsigned cvTopleft4[4] =
+		{
+			(const unsigned)v4[0],
+			(const unsigned)v4[1],
+			(const unsigned)v4[2],
+			(const unsigned)v4[3]
+		};
+
+		GetPixelVec4<writeMask, sRGBSurface>(cuTopleft4, cvTopleft4, topleft4);
+
+		unsigned cuTopright4[4] =
+		{
+			(const unsigned)(cuTopleft4[0] + 1),
+			(const unsigned)(cuTopleft4[1] + 1),
+			(const unsigned)(cuTopleft4[2] + 1),
+			(const unsigned)(cuTopleft4[3] + 1)
+		};
+
+		if (cuTopright4[0] > WidthM1) cuTopright4[0] = WidthM1;
+		if (cuTopright4[1] > WidthM1) cuTopright4[1] = WidthM1;
+		if (cuTopright4[2] > WidthM1) cuTopright4[2] = WidthM1;
+		if (cuTopright4[3] > WidthM1) cuTopright4[3] = WidthM1;
+
+		D3DXVECTOR4 topright4[4];
+		GetPixelVec4<writeMask, sRGBSurface>(cuTopright4, cvTopleft4, topright4);
+
+		unsigned cvBotleft4[4] =
+		{
+			(const unsigned)(cvTopleft4[0] + 1),
+			(const unsigned)(cvTopleft4[1] + 1),
+			(const unsigned)(cvTopleft4[2] + 1),
+			(const unsigned)(cvTopleft4[3] + 1)
+		};
+
+		if (cvBotleft4[0] > HeightM1) cvBotleft4[0] = HeightM1;
+		if (cvBotleft4[1] > HeightM1) cvBotleft4[1] = HeightM1;
+		if (cvBotleft4[2] > HeightM1) cvBotleft4[2] = HeightM1;
+		if (cvBotleft4[3] > HeightM1) cvBotleft4[3] = HeightM1;
+
+		D3DXVECTOR4 botleft4[4];
+		GetPixelVec4<writeMask, sRGBSurface>(cuTopleft4, cvBotleft4, botleft4);
+
+		D3DXVECTOR4 botright4[4];
+		GetPixelVec4<writeMask, sRGBSurface>(cuTopright4, cvBotleft4, botright4);
+
+		D3DXVECTOR4 topHorizLerp4[4];
+		const float xLerp4[4] =
+		{
+			u4[0] - cuTopleft4[0],
+			u4[1] - cuTopleft4[1],
+			u4[2] - cuTopleft4[2],
+			u4[3] - cuTopleft4[3]
+		};
+
+		lrp<writeMask>(topHorizLerp4[0], topleft4[0], topright4[0], xLerp4[0]);
+		lrp<writeMask>(topHorizLerp4[1], topleft4[1], topright4[1], xLerp4[1]);
+		lrp<writeMask>(topHorizLerp4[2], topleft4[2], topright4[2], xLerp4[2]);
+		lrp<writeMask>(topHorizLerp4[3], topleft4[3], topright4[3], xLerp4[3]);
+
+		D3DXVECTOR4 botHorizLerp4[4];
+		lrp<writeMask>(botHorizLerp4[0], botleft4[0], botright4[0], xLerp4[0]);
+		lrp<writeMask>(botHorizLerp4[1], botleft4[1], botright4[1], xLerp4[1]);
+		lrp<writeMask>(botHorizLerp4[2], botleft4[2], botright4[2], xLerp4[2]);
+		lrp<writeMask>(botHorizLerp4[3], botleft4[3], botright4[3], xLerp4[3]);
+
+		const float yLerp4[4] =
+		{
+			v4[0] - cvTopleft4[0],
+			v4[1] - cvTopleft4[1],
+			v4[2] - cvTopleft4[2],
+			v4[3] - cvTopleft4[3]
+		};
+		lrp<writeMask>(outColor4[0], topHorizLerp4[0], botHorizLerp4[0], yLerp4[0]);
+		lrp<writeMask>(outColor4[1], topHorizLerp4[1], botHorizLerp4[1], yLerp4[1]);
+		lrp<writeMask>(outColor4[2], topHorizLerp4[2], botHorizLerp4[2], yLerp4[2]);
+		lrp<writeMask>(outColor4[3], topHorizLerp4[3], botHorizLerp4[3], yLerp4[3]);
+
+#ifdef _DEBUG
+		if (xLerp4[0] > 1.0f || xLerp4[0] < 0.0f) __debugbreak();
+		if (xLerp4[1] > 1.0f || xLerp4[1] < 0.0f) __debugbreak();
+		if (xLerp4[2] > 1.0f || xLerp4[2] < 0.0f) __debugbreak();
+		if (xLerp4[3] > 1.0f || xLerp4[3] < 0.0f) __debugbreak();
+		if (yLerp4[0] > 1.0f || yLerp4[0] < 0.0f) __debugbreak();
+		if (yLerp4[1] > 1.0f || yLerp4[1] < 0.0f) __debugbreak();
+		if (yLerp4[2] > 1.0f || yLerp4[2] < 0.0f) __debugbreak();
+		if (yLerp4[3] > 1.0f || yLerp4[3] < 0.0f) __debugbreak();
+#endif
+	}
+		break;
+	case D3DTEXF_NONE           :
+	case D3DTEXF_POINT          :
+	{
+		const unsigned u4i[4] =
+		{
+			(const unsigned)u4[0],
+			(const unsigned)u4[1],
+			(const unsigned)u4[2],
+			(const unsigned)u4[3]
+		};
+		const unsigned v4i[4] =
+		{
+			(const unsigned)v4[0],
+			(const unsigned)v4[1],
+			(const unsigned)v4[2],
+			(const unsigned)v4[3]
+		};
+		GetPixelVec4<writeMask, sRGBSurface>(u4i, v4i, outColor4);
+	}
 		break;
 	}
 }
@@ -2762,9 +3153,35 @@ void IDirect3DSurface9Hook::SampleSurface(const float x, const float y, const Sa
 {
 	// TODO: Appropriately use magfilter and minfilter here, instead of always using the magfilter
 	if (samplerState.stateUnion.namedStates.sRGBTexture)
-		SampleSurface<writeMask, true>(x, y, samplerState.stateUnion.namedStates.magFilter, outColor);
+		SampleSurfaceInternal<writeMask, true>(x, y, samplerState.stateUnion.namedStates.magFilter, outColor);
 	else
-		SampleSurface<writeMask, false>(x, y, samplerState.stateUnion.namedStates.magFilter, outColor);
+		SampleSurfaceInternal<writeMask, false>(x, y, samplerState.stateUnion.namedStates.magFilter, outColor);
+}
+
+template void IDirect3DSurface9Hook::SampleSurface4<0>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<1>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<2>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<3>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<4>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<5>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<6>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<7>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<8>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<9>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<10>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<11>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<12>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<13>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<14>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::SampleSurface4<15>(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
+template <const unsigned char writeMask>
+void IDirect3DSurface9Hook::SampleSurface4(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const
+{
+	// TODO: Appropriately use magfilter and minfilter here, instead of always using the magfilter
+	if (samplerState.stateUnion.namedStates.sRGBTexture)
+		SampleSurfaceInternal4<writeMask, true>(x4, y4, samplerState.stateUnion.namedStates.magFilter, outColor4);
+	else
+		SampleSurfaceInternal4<writeMask, false>(x4, y4, samplerState.stateUnion.namedStates.magFilter, outColor4);
 }
 
 #define DUMP_SURF_DIR "TexDump"

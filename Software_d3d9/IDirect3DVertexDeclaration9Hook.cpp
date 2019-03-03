@@ -12,7 +12,7 @@ static inline const bool operator!=(const DebuggableD3DVERTEXELEMENT9& lhs, cons
 	return !(lhs == rhs);
 }
 
-void IDirect3DVertexDeclaration9Hook::CreateVertexDeclaration(const DebuggableD3DVERTEXELEMENT9* const pVertexElements, const DWORD _vertDeclAutoCreatedFromFVF)
+void IDirect3DVertexDeclaration9Hook::CreateVertexDeclaration(const DebuggableD3DVERTEXELEMENT9* const pVertexElements, const debuggableFVF _vertDeclAutoCreatedFromFVF)
 {
 	if (!pVertexElements)
 	{

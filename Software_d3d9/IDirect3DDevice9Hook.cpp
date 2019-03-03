@@ -5954,7 +5954,7 @@ const bool IDirect3DDevice9Hook::SkipVertexProcessing(void) const
 {
 	if (IsUsingFVF() )
 	{
-		return currentState.currentFVF & D3DFVF_XYZRHW ? true : false;
+		return currentState.currentFVF.namedFVF.positionTypeLow == dbgD3DFVF_XYZRHW;
 	}
 	else
 	{
@@ -6196,7 +6196,7 @@ const bool DeviceState::CurrentStateHasInputVertexColor0(void) const
 		__assume(0);
 #endif
 	case targetFVF:
-		return (currentFVF & D3DFVF_DIFFUSE) ? true : false; // Diffuse color is always COLOR0
+		return currentFVF.namedFVF.hasDiffuse; // Diffuse color is always COLOR0
 	case targetVertexDecl:
 		if (currentVertexDecl)
 			return currentVertexDecl->GetHasCOLOR0();
@@ -6216,7 +6216,7 @@ const bool DeviceState::CurrentStateHasInputVertexColor1(void) const
 		__assume(0);
 #endif
 	case targetFVF:
-		return (currentFVF & D3DFVF_SPECULAR) ? true : false; // Specular color is always COLOR1
+		return currentFVF.namedFVF.hasSpecular; // Specular color is always COLOR1
 	case targetVertexDecl:
 		if (currentVertexDecl)
 			return currentVertexDecl->GetHasCOLOR1();

@@ -429,3 +429,128 @@ enum debuggableSourceModifierType : unsigned char
     SM_AbsNegate = (D3DSPSM_ABSNEG >> D3DSP_SRCMOD_SHIFT), // -abs()
     SM_Not = (D3DSPSM_NOT >> D3DSP_SRCMOD_SHIFT), // for predicate register: "!p0"
 };
+
+#define D3DFVF_TEXTUREFORMAT2U 0u         // Two floating point values
+#define D3DFVF_TEXTUREFORMAT1U 3u         // One floating point value
+#define D3DFVF_TEXTUREFORMAT3U 1u         // Three floating point values
+#define D3DFVF_TEXTUREFORMAT4U 2u         // Four floating point values
+
+// Using U for Unsigned here, otherwise the compiler chokes on D3DFVF_TEXCOORDSIZE4(7) and D3DFVF_TEXCOORDSIZE1(7) as the sign bit gets accessed and then the number can't be converted to a DWORD properly
+#define D3DFVF_TEXCOORDSIZE3U(CoordIndex) (D3DFVF_TEXTUREFORMAT3U << (CoordIndex * 2u + 16u))
+#define D3DFVF_TEXCOORDSIZE4U(CoordIndex) (D3DFVF_TEXTUREFORMAT4U << (CoordIndex * 2u + 16u))
+#define D3DFVF_TEXCOORDSIZE1U(CoordIndex) (D3DFVF_TEXTUREFORMAT1U << (CoordIndex * 2u + 16u))
+
+enum debuggableFVF_textureFormat : unsigned char
+{
+	textureFormatFloat2 = D3DFVF_TEXTUREFORMAT2U, // float2 (default)
+	textureFormatFloat1 = D3DFVF_TEXTUREFORMAT1U, // float
+	textureFormatFloat3 = D3DFVF_TEXTUREFORMAT3U, // float3
+	textureFormatFloat4 = D3DFVF_TEXTUREFORMAT4U // float4
+};
+
+enum debuggableFVF_positionTypeLow : unsigned char
+{
+	dbgD3DFVF_NoPosition = 0x000, // This is most commonly used when this FVF is all 0x00000000, like when initializing a non-FVF vertex buffer intended for use with a vertex declaration instead
+	dbgD3DFVF_RESERVED0 = D3DFVF_RESERVED0, // 0x001
+	dbgD3DFVF_XYZ = D3DFVF_XYZ, // 0x002
+	dbgD3DFVF_XYZRHW = D3DFVF_XYZRHW, // 0x004
+	dbgD3DFVF_XYZB1 = D3DFVF_XYZB1, // 0x006
+	dbgD3DFVF_XYZB2 = D3DFVF_XYZB2, // 0x008
+	dbgD3DFVF_XYZB3 = D3DFVF_XYZB3, // 0x00a
+	dbgD3DFVF_XYZB4 = D3DFVF_XYZB4, // 0x00c
+	dbgD3DFVF_XYZB5 = D3DFVF_XYZB5 // 0x00e
+};
+
+enum debuggableFVF_enum : DWORD
+{
+	dD3DFVF_RESERVED0 = D3DFVF_RESERVED0, // 0x001
+	dD3DFVF_XYZ = D3DFVF_XYZ, // 0x002
+	dD3DFVF_XYZRHW = D3DFVF_XYZRHW, // 0x004
+	dD3DFVF_XYZB1 = D3DFVF_XYZB1, // 0x006
+	dD3DFVF_XYZB2 = D3DFVF_XYZB2, // 0x008
+	dD3DFVF_XYZB3 = D3DFVF_XYZB3, // 0x00a
+	dD3DFVF_XYZB4 = D3DFVF_XYZB4, // 0x00c
+	dD3DFVF_XYZB5 = D3DFVF_XYZB5, // 0x00e
+	dD3DFVF_XYZW = D3DFVF_XYZW, // 0x4002
+	
+	dD3DFVF_NORMAL = D3DFVF_NORMAL, // 0x010
+	dD3DFVF_PSIZE = D3DFVF_PSIZE, // 0x020
+	dD3DFVF_DIFFUSE = D3DFVF_DIFFUSE, // 0x040
+	dD3DFVF_SPECULAR = D3DFVF_SPECULAR, // 0x080
+	
+	dD3DFVF_TEX1 = D3DFVF_TEX1, // 0x100
+	dD3DFVF_TEX2 = D3DFVF_TEX2, // 0x200
+	dD3DFVF_TEX3 = D3DFVF_TEX3, // 0x300
+	dD3DFVF_TEX4 = D3DFVF_TEX4, // 0x400
+	dD3DFVF_TEX5 = D3DFVF_TEX5, // 0x500
+	dD3DFVF_TEX6 = D3DFVF_TEX6, // 0x600
+	dD3DFVF_TEX7 = D3DFVF_TEX7, // 0x700
+	dD3DFVF_TEX8 = D3DFVF_TEX8, // 0x800
+	
+	dD3DFVF_LASTBETA_UBYTE4 = D3DFVF_LASTBETA_UBYTE4, // 0x1000
+	dD3DFVF_LASTBETA_D3DCOLOR = D3DFVF_LASTBETA_D3DCOLOR, // 0x8000
+	
+	dD3DFVF_RESERVED2 = D3DFVF_RESERVED2, // 0x6000
+
+	dTEXCOORDSIZE3_TEX1 = D3DFVF_TEXCOORDSIZE3U(0),
+	dTEXCOORDSIZE4_TEX1 = D3DFVF_TEXCOORDSIZE4U(0),
+	dTEXCOORDSIZE1_TEX1 = D3DFVF_TEXCOORDSIZE1U(0),
+
+	dTEXCOORDSIZE3_TEX2 = D3DFVF_TEXCOORDSIZE3U(1),
+	dTEXCOORDSIZE4_TEX2 = D3DFVF_TEXCOORDSIZE4U(1),
+	dTEXCOORDSIZE1_TEX2 = D3DFVF_TEXCOORDSIZE1U(1),
+
+	dTEXCOORDSIZE3_TEX3 = D3DFVF_TEXCOORDSIZE3U(2),
+	dTEXCOORDSIZE4_TEX3 = D3DFVF_TEXCOORDSIZE4U(2),
+	dTEXCOORDSIZE1_TEX3 = D3DFVF_TEXCOORDSIZE1U(2),
+
+	dTEXCOORDSIZE3_TEX4 = D3DFVF_TEXCOORDSIZE3U(3),
+	dTEXCOORDSIZE4_TEX4 = D3DFVF_TEXCOORDSIZE4U(3),
+	dTEXCOORDSIZE1_TEX4 = D3DFVF_TEXCOORDSIZE1U(3),
+
+	dTEXCOORDSIZE3_TEX5 = D3DFVF_TEXCOORDSIZE3U(4),
+	dTEXCOORDSIZE4_TEX5 = D3DFVF_TEXCOORDSIZE4U(4),
+	dTEXCOORDSIZE1_TEX5 = D3DFVF_TEXCOORDSIZE1U(4),
+
+	dTEXCOORDSIZE3_TEX6 = D3DFVF_TEXCOORDSIZE3U(5),
+	dTEXCOORDSIZE4_TEX6 = D3DFVF_TEXCOORDSIZE4U(5),
+	dTEXCOORDSIZE1_TEX6 = D3DFVF_TEXCOORDSIZE1U(5),
+
+	dTEXCOORDSIZE3_TEX7 = D3DFVF_TEXCOORDSIZE3U(6),
+	dTEXCOORDSIZE4_TEX7 = D3DFVF_TEXCOORDSIZE4U(6),
+	dTEXCOORDSIZE1_TEX7 = D3DFVF_TEXCOORDSIZE1U(6),
+
+	dTEXCOORDSIZE3_TEX8 = D3DFVF_TEXCOORDSIZE3U(7),
+	dTEXCOORDSIZE4_TEX8 = D3DFVF_TEXCOORDSIZE4U(7),
+	dTEXCOORDSIZE1_TEX8 = D3DFVF_TEXCOORDSIZE1U(7)
+};
+
+union debuggableFVF
+{
+	struct _namedFVF
+	{
+		debuggableFVF_positionTypeLow positionTypeLow : 4; // This is the XYZ + matrix palette blending
+		bool hasNormal : 1; // D3DFVF_NORMAL // This is the NORMAL0 semantic (float3)
+		bool hasPSize : 1; // D3DFVF_PSIZE // This is the PSIZE0 semantic (float)
+		bool hasDiffuse : 1; // D3DFVF_DIFFUSE // This is the COLOR0 semantic (D3DCOLOR)
+		bool hasSpecular : 1; // D3DFVF_SPECULAR // This is the COLOR1 semantic (D3DCOLOR)
+		unsigned char numTexcoordElementsPresent : 4; // Valid values for this are from 0 (meaning no texcoords present) thru 8 (meaning 8 sets of texcoords present)
+		bool lastBeta_UBYTE4 : 1; // D3DFVF_LASTBETA_UBYTE4
+		unsigned char : 1; // RESERVED2 // 0x6000
+		bool positionTypeContainsUntransformedW : 1; // D3DFVF_XYZW // 0x4002
+		bool lastBeta_D3DCOLOR : 1; // D3DFVF_LASTBETA_D3DCOLOR
+		debuggableFVF_textureFormat texCoord0type : 2; // TEX1 type
+		debuggableFVF_textureFormat texCoord1type : 2; // TEX2 type
+		debuggableFVF_textureFormat texCoord2type : 2; // TEX3 type
+		debuggableFVF_textureFormat texCoord3type : 2; // TEX4 type
+		debuggableFVF_textureFormat texCoord4type : 2; // TEX5 type
+		debuggableFVF_textureFormat texCoord5type : 2; // TEX6 type
+		debuggableFVF_textureFormat texCoord6type : 2; // TEX7 type
+		debuggableFVF_textureFormat texCoord7type : 2; // TEX8 type
+	} namedFVF;
+
+	debuggableFVF_enum typedFVF;
+
+	DWORD rawFVF_DWORD;
+};
+static_assert(sizeof(debuggableFVF) == sizeof(DWORD), "Error! Unexpected struct size!");

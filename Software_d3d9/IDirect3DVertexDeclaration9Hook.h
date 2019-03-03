@@ -6,8 +6,9 @@ class IDirect3DVertexDeclaration9Hook : public IDirect3DVertexDeclaration9
 {
 public:
 	IDirect3DVertexDeclaration9Hook(LPDIRECT3DVERTEXDECLARATION9 _realObject, IDirect3DDevice9Hook* _parentDevice) : realObject(_realObject), parentDevice(_parentDevice), refCount(1),
-		inVertexSize(0), outVertexSize(0), foundPositionT0(NULL), skipVertexProcessing(false), hasColor0(false), hasColor1(false), vertDeclAutoCreatedFromFVF(0x00000000)
+		inVertexSize(0), outVertexSize(0), foundPositionT0(NULL), skipVertexProcessing(false), hasColor0(false), hasColor1(false)
 	{
+		vertDeclAutoCreatedFromFVF.rawFVF_DWORD = 0x00000000;
 #ifdef _DEBUG
 		memcpy(&CreationCallStack, &realObject->CreationCallStack, (char*)&realObject - (char*)&CreationCallStack);
 #endif
@@ -63,7 +64,7 @@ public:
     virtual COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE GetDevice(THIS_ IDirect3DDevice9** ppDevice) override;
     virtual COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE GetDeclaration(THIS_ D3DVERTEXELEMENT9* pElement,UINT* pNumElements) override;
 
-	void CreateVertexDeclaration(const DebuggableD3DVERTEXELEMENT9* const pVertexElements, const DWORD _vertDeclAutoCreatedFromFVF);
+	void CreateVertexDeclaration(const DebuggableD3DVERTEXELEMENT9* const pVertexElements, const debuggableFVF _vertDeclAutoCreatedFromFVF);
 
 	inline const UINT GetVertexSize(void) const
 	{
@@ -111,7 +112,7 @@ protected:
 	bool hasColor0;
 	bool hasColor1;
 
-	DWORD vertDeclAutoCreatedFromFVF;
+	debuggableFVF vertDeclAutoCreatedFromFVF;
 
 	unsigned inVertexSize;
 	unsigned outVertexSize;

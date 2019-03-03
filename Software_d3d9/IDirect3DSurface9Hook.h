@@ -182,6 +182,9 @@ public:
 	template <const unsigned char writeMask, const bool sRGBSurface>
 	void GetPixelVec(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 
+	template <const unsigned char writeMask, const bool sRGBSurface>
+	void GetPixelVec4(const unsigned (&x4)[4], const unsigned (&y4)[4], D3DXVECTOR4 (&outColor4)[4]) const;
+
 	// Depth functions:
 	void SetDepth(const unsigned x, const unsigned y, const float depth);
 
@@ -198,8 +201,8 @@ public:
 	template <const unsigned char writeMask>
 	void SampleSurface(const float x, const float y, const SamplerState& samplerState, D3DXVECTOR4& outColor) const;
 
-	template <const unsigned char writeMask, const bool sRGBSurface>
-	void SampleSurface(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
+	template <const unsigned char writeMask>
+	void SampleSurface4(const float (&x4)[4], const float (&y4)[4], const SamplerState& samplerState, D3DXVECTOR4 (&outColor4)[4]) const;
 
 	void DecompressSurfaceDXT1();
 	void DecompressSurfaceDXT3();
@@ -252,6 +255,12 @@ public:
 #endif
 
 protected:
+	template <const unsigned char writeMask, const bool sRGBSurface>
+	void SampleSurfaceInternal(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
+
+	template <const unsigned char writeMask, const bool sRGBSurface>
+	void SampleSurfaceInternal4(const float (&x4)[4], const float (&y4)[4], const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4 (&outColor4)[4]) const;
+
 	LPDIRECT3DSURFACE9 realObject;
 	IDirect3DDevice9Hook* parentDevice;
 	unsigned __int64 refCount;

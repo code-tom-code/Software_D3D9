@@ -626,8 +626,10 @@ struct scissorRectStruct
 
 struct DeviceState
 {
-	DeviceState() : currentIndexBuffer(NULL), currentVertexShader(NULL), currentPixelShader(NULL), currentVertexDecl(NULL), currentFVF(0), declTarget(targetFVF), currentSwvpEnabled(FALSE), currentDepthStencil(NULL)
+	DeviceState() : currentIndexBuffer(NULL), currentVertexShader(NULL), currentPixelShader(NULL), currentVertexDecl(NULL), declTarget(targetFVF), currentSwvpEnabled(FALSE), currentDepthStencil(NULL)
 	{
+		currentFVF.rawFVF_DWORD = 0x00000000;
+
 		memset(&currentRenderTargets, 0, sizeof(currentRenderTargets) );
 		memset(&currentTextures, 0, sizeof(currentTextures) );
 		memset(&currentCubeTextures, 0, sizeof(currentTextures) );
@@ -681,7 +683,8 @@ struct DeviceState
 
 		declTarget = targetFVF;
 		currentVertexDecl = NULL;
-		currentFVF = 0x00000000;
+
+		currentFVF.rawFVF_DWORD = 0x00000000;
 	}
 
 	IDirect3DIndexBuffer9Hook* currentIndexBuffer;
@@ -732,7 +735,7 @@ struct DeviceState
 		targetVertexDecl
 	} declTarget; // Are we currently in FVF-mode or in vertex-decl mode?
 	IDirect3DVertexDeclaration9Hook* currentVertexDecl;
-	DWORD currentFVF;
+	debuggableFVF currentFVF;
 
 	// Returns true if the current vertex FVF or decl has a COLOR0 component, or false otherwise
 	const bool CurrentStateHasInputVertexColor0(void) const;
@@ -976,7 +979,7 @@ public:
     virtual COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE CreateQuery(THIS_ D3DQUERYTYPE Type, IDirect3DQuery9** ppQuery) override;
 
 	// This is not an official D3D9 function, even though it looks like one. It is only used internally.
-	COM_DECLSPEC_NOTHROW HRESULT CreateVertexDeclarationFromFVF(THIS_ CONST D3DVERTEXELEMENT9* pVertexElements, IDirect3DVertexDeclaration9** ppDecl, const DWORD FVF);
+	COM_DECLSPEC_NOTHROW HRESULT CreateVertexDeclarationFromFVF(THIS_ CONST D3DVERTEXELEMENT9* pVertexElements, IDirect3DVertexDeclaration9** ppDecl, const debuggableFVF FVF);
 
 	// If indexBuffer is NULL, then synthesize an index buffer (0, 1, 2, 3, 4, etc...)
 	template <const bool useVertexBuffer, const bool useIndexBuffer>
@@ -1163,7 +1166,7 @@ public:
 	static void ModifyPresentParameters(D3DPRESENT_PARAMETERS& inOutStruct);
 
 	// This is not an official D3D9 function, even though it looks like one. It is only used internally.
-	IDirect3DVertexDeclaration9Hook* CreateVertexDeclFromFVFCode(const DWORD FVF);
+	IDirect3DVertexDeclaration9Hook* CreateVertexDeclFromFVFCode(const debuggableFVF FVF);
 
 	mutable DeviceFrameStats frameStats;
 
@@ -1237,7 +1240,6 @@ inline void ColorDWORDToFloat4(const D3DCOLOR inColor, D3DXVECTOR4& outColor)
 	const __m128 colorfloat4 = _mm_cvtepi32_ps(coloruint4);
 	const __m128 normalizedColorFloat4 = _mm_mul_ps(colorfloat4, ColorDWORDToFloat4Divisor);
 
-	// TODO: Check and make sure that this swizzle is correctly returning data in RGBA order:
 	if (writeMask & 0x1)
 		outColor.x = normalizedColorFloat4.m128_f32[2];
 	if (writeMask & 0x2)
@@ -1282,7 +1284,6 @@ inline void ColorDWORDToFloat4_4(const D3DCOLOR** const inColor4, D3DXVECTOR4* c
 		_mm_mul_ps(colorfloat4[3], ColorDWORDToFloat4Divisor)
 	};
 
-	// TODO: Check and make sure that this swizzle is correctly returning data in RGBA order:
 	if (writeMask & 0x1)
 	{
 		outColor4[0]->x = normalizedColorFloat4[0].m128_f32[2];
@@ -1310,6 +1311,70 @@ inline void ColorDWORDToFloat4_4(const D3DCOLOR** const inColor4, D3DXVECTOR4* c
 		outColor4[1]->w = normalizedColorFloat4[1].m128_f32[3];
 		outColor4[2]->w = normalizedColorFloat4[2].m128_f32[3];
 		outColor4[3]->w = normalizedColorFloat4[3].m128_f32[3];
+	}
+}
+
+template <const unsigned char writeMask = 0xF>
+inline void ColorDWORDToFloat4_4(const D3DCOLOR (&inColor4)[4], D3DXVECTOR4 (&outColor4)[4])
+{
+	// I'm not sure what the intrinsic for this should be, so let's let the compiler figure that out...
+	__m128i colorbyte4[4];
+	colorbyte4[0].m128i_u32[0] = colorbyte4[0].m128i_u32[1] = colorbyte4[0].m128i_u32[2] = colorbyte4[0].m128i_u32[3] = inColor4[0];
+	colorbyte4[1].m128i_u32[0] = colorbyte4[1].m128i_u32[1] = colorbyte4[1].m128i_u32[2] = colorbyte4[1].m128i_u32[3] = inColor4[1];
+	colorbyte4[2].m128i_u32[0] = colorbyte4[2].m128i_u32[1] = colorbyte4[2].m128i_u32[2] = colorbyte4[2].m128i_u32[3] = inColor4[2];
+	colorbyte4[3].m128i_u32[0] = colorbyte4[3].m128i_u32[1] = colorbyte4[3].m128i_u32[2] = colorbyte4[3].m128i_u32[3] = inColor4[3];
+
+	const __m128i coloruint4[4] = 
+	{
+		_mm_cvtepu8_epi32(colorbyte4[0]),
+		_mm_cvtepu8_epi32(colorbyte4[1]),
+		_mm_cvtepu8_epi32(colorbyte4[2]),
+		_mm_cvtepu8_epi32(colorbyte4[3])
+	};
+
+	const __m128 colorfloat4[4] = 
+	{
+		_mm_cvtepi32_ps(coloruint4[0]),
+		_mm_cvtepi32_ps(coloruint4[1]),
+		_mm_cvtepi32_ps(coloruint4[2]),
+		_mm_cvtepi32_ps(coloruint4[3])
+	};
+
+	const __m128 normalizedColorFloat4[4] = 
+	{
+		_mm_mul_ps(colorfloat4[0], ColorDWORDToFloat4Divisor),
+		_mm_mul_ps(colorfloat4[1], ColorDWORDToFloat4Divisor),
+		_mm_mul_ps(colorfloat4[2], ColorDWORDToFloat4Divisor),
+		_mm_mul_ps(colorfloat4[3], ColorDWORDToFloat4Divisor)
+	};
+
+	if (writeMask & 0x1)
+	{
+		outColor4[0].x = normalizedColorFloat4[0].m128_f32[2];
+		outColor4[1].x = normalizedColorFloat4[1].m128_f32[2];
+		outColor4[2].x = normalizedColorFloat4[2].m128_f32[2];
+		outColor4[3].x = normalizedColorFloat4[3].m128_f32[2];
+	}
+	if (writeMask & 0x2)
+	{
+		outColor4[0].y = normalizedColorFloat4[0].m128_f32[1];
+		outColor4[1].y = normalizedColorFloat4[1].m128_f32[1];
+		outColor4[2].y = normalizedColorFloat4[2].m128_f32[1];
+		outColor4[3].y = normalizedColorFloat4[3].m128_f32[1];
+	}
+	if (writeMask & 0x4)
+	{
+		outColor4[0].z = normalizedColorFloat4[0].m128_f32[0];
+		outColor4[1].z = normalizedColorFloat4[1].m128_f32[0];
+		outColor4[2].z = normalizedColorFloat4[2].m128_f32[0];
+		outColor4[3].z = normalizedColorFloat4[3].m128_f32[0];
+	}
+	if (writeMask & 0x8)
+	{
+		outColor4[0].w = normalizedColorFloat4[0].m128_f32[3];
+		outColor4[1].w = normalizedColorFloat4[1].m128_f32[3];
+		outColor4[2].w = normalizedColorFloat4[2].m128_f32[3];
+		outColor4[3].w = normalizedColorFloat4[3].m128_f32[3];
 	}
 }
 
@@ -1503,6 +1568,81 @@ inline void ColorA16B16G16R16ToFloat4(const A16B16G16R16& color, D3DXVECTOR4& ou
 }
 
 template <const unsigned char writeMask = 0xF>
+inline void ColorA16B16G16R16ToFloat4_4(const A16B16G16R16 (&color4)[4], D3DXVECTOR4 (&outColor4)[4])
+{
+	__m128i colorushort4_4[4];
+	colorushort4_4[0].m128i_u16[0] = color4[0].r;
+	colorushort4_4[0].m128i_u16[1] = color4[0].g;
+	colorushort4_4[0].m128i_u16[2] = color4[0].b;
+	colorushort4_4[0].m128i_u16[3] = color4[0].a;
+	colorushort4_4[1].m128i_u16[0] = color4[1].r;
+	colorushort4_4[1].m128i_u16[1] = color4[1].g;
+	colorushort4_4[1].m128i_u16[2] = color4[1].b;
+	colorushort4_4[1].m128i_u16[3] = color4[1].a;
+	colorushort4_4[2].m128i_u16[0] = color4[2].r;
+	colorushort4_4[2].m128i_u16[1] = color4[2].g;
+	colorushort4_4[2].m128i_u16[2] = color4[2].b;
+	colorushort4_4[2].m128i_u16[3] = color4[2].a;
+	colorushort4_4[3].m128i_u16[0] = color4[3].r;
+	colorushort4_4[3].m128i_u16[1] = color4[3].g;
+	colorushort4_4[3].m128i_u16[2] = color4[3].b;
+	colorushort4_4[3].m128i_u16[3] = color4[3].a;
+
+	const __m128i coloruint4_4[4] = 
+	{
+		_mm_cvtepu16_epi32(colorushort4_4[0]),
+		_mm_cvtepu16_epi32(colorushort4_4[1]),
+		_mm_cvtepu16_epi32(colorushort4_4[2]),
+		_mm_cvtepu16_epi32(colorushort4_4[3])
+	};
+
+	const __m128 colorfloat4_4[4] = 
+	{
+		_mm_cvtepi32_ps(coloruint4_4[0]),
+		_mm_cvtepi32_ps(coloruint4_4[1]),
+		_mm_cvtepi32_ps(coloruint4_4[2]),
+		_mm_cvtepi32_ps(coloruint4_4[3])
+	};
+
+	const __m128 normalizedColorFloat4_4[4] = 
+	{
+		_mm_mul_ps(colorfloat4_4[0], ColorA16B16G16R16ToFloat4Divisor),
+		_mm_mul_ps(colorfloat4_4[1], ColorA16B16G16R16ToFloat4Divisor),
+		_mm_mul_ps(colorfloat4_4[2], ColorA16B16G16R16ToFloat4Divisor),
+		_mm_mul_ps(colorfloat4_4[3], ColorA16B16G16R16ToFloat4Divisor)
+	};
+
+	if (writeMask & 0x1)
+	{
+		outColor4[0].x = normalizedColorFloat4_4[0].m128_f32[0];
+		outColor4[1].x = normalizedColorFloat4_4[1].m128_f32[0];
+		outColor4[2].x = normalizedColorFloat4_4[2].m128_f32[0];
+		outColor4[3].x = normalizedColorFloat4_4[3].m128_f32[0];
+	}
+	if (writeMask & 0x2)
+	{
+		outColor4[0].y = normalizedColorFloat4_4[0].m128_f32[1];
+		outColor4[1].y = normalizedColorFloat4_4[1].m128_f32[1];
+		outColor4[2].y = normalizedColorFloat4_4[2].m128_f32[1];
+		outColor4[3].y = normalizedColorFloat4_4[3].m128_f32[1];
+	}
+	if (writeMask & 0x4)
+	{
+		outColor4[0].z = normalizedColorFloat4_4[0].m128_f32[2];
+		outColor4[1].z = normalizedColorFloat4_4[1].m128_f32[2];
+		outColor4[2].z = normalizedColorFloat4_4[2].m128_f32[2];
+		outColor4[3].z = normalizedColorFloat4_4[3].m128_f32[2];
+	}
+	if (writeMask & 0x8)
+	{
+		outColor4[0].w = normalizedColorFloat4_4[0].m128_f32[3];
+		outColor4[1].w = normalizedColorFloat4_4[1].m128_f32[3];
+		outColor4[2].w = normalizedColorFloat4_4[2].m128_f32[3];
+		outColor4[3].w = normalizedColorFloat4_4[3].m128_f32[3];
+	}
+}
+
+template <const unsigned char writeMask = 0xF>
 inline void Float4ToA16B16G16R16F(const D3DXVECTOR4& color, A16B16G16R16F& outColor)
 {
 	if (writeMask & 0x1)
@@ -1536,6 +1676,64 @@ inline void ColorA16B16G16R16FToFloat4(const A16B16G16R16F& color, D3DXVECTOR4& 
 }
 
 template <const unsigned char writeMask = 0xF>
+inline void ColorA16B16G16R16FToFloat4_4(const A16B16G16R16F* const (&color4)[4], D3DXVECTOR4 (&outColor4)[4])
+{
+	__m128i half4color4[4];
+	half4color4[0].m128i_u16[0] = *(const unsigned short* const)&color4[0]->r;
+	half4color4[0].m128i_u16[1] = *(const unsigned short* const)&color4[0]->g;
+	half4color4[0].m128i_u16[2] = *(const unsigned short* const)&color4[0]->b;
+	half4color4[0].m128i_u16[3] = *(const unsigned short* const)&color4[0]->a;
+	half4color4[1].m128i_u16[0] = *(const unsigned short* const)&color4[1]->r;
+	half4color4[1].m128i_u16[1] = *(const unsigned short* const)&color4[1]->g;
+	half4color4[1].m128i_u16[2] = *(const unsigned short* const)&color4[1]->b;
+	half4color4[1].m128i_u16[3] = *(const unsigned short* const)&color4[1]->a;
+	half4color4[2].m128i_u16[0] = *(const unsigned short* const)&color4[2]->r;
+	half4color4[2].m128i_u16[1] = *(const unsigned short* const)&color4[2]->g;
+	half4color4[2].m128i_u16[2] = *(const unsigned short* const)&color4[2]->b;
+	half4color4[2].m128i_u16[3] = *(const unsigned short* const)&color4[2]->a;
+	half4color4[3].m128i_u16[0] = *(const unsigned short* const)&color4[3]->r;
+	half4color4[3].m128i_u16[1] = *(const unsigned short* const)&color4[3]->g;
+	half4color4[3].m128i_u16[2] = *(const unsigned short* const)&color4[3]->b;
+	half4color4[3].m128i_u16[3] = *(const unsigned short* const)&color4[3]->a;
+
+	const __m128 float4color4[4] = 
+	{
+		_mm_cvtph_ps(half4color4[0]),
+		_mm_cvtph_ps(half4color4[1]),
+		_mm_cvtph_ps(half4color4[2]),
+		_mm_cvtph_ps(half4color4[3])
+	};
+	if (writeMask & 0x1)
+	{
+		outColor4[0].x = float4color4[0].m128_f32[0];
+		outColor4[1].x = float4color4[1].m128_f32[0];
+		outColor4[2].x = float4color4[2].m128_f32[0];
+		outColor4[3].x = float4color4[3].m128_f32[0];
+	}
+	if (writeMask & 0x2)
+	{
+		outColor4[0].y = float4color4[0].m128_f32[1];
+		outColor4[1].y = float4color4[1].m128_f32[1];
+		outColor4[2].y = float4color4[2].m128_f32[1];
+		outColor4[3].y = float4color4[3].m128_f32[1];
+	}
+	if (writeMask & 0x4)
+	{
+		outColor4[0].z = float4color4[0].m128_f32[2];
+		outColor4[1].z = float4color4[1].m128_f32[2];
+		outColor4[2].z = float4color4[2].m128_f32[2];
+		outColor4[3].z = float4color4[3].m128_f32[2];
+	}
+	if (writeMask & 0x8)
+	{
+		outColor4[0].w = float4color4[0].m128_f32[3];
+		outColor4[1].w = float4color4[1].m128_f32[3];
+		outColor4[2].w = float4color4[2].m128_f32[3];
+		outColor4[3].w = float4color4[3].m128_f32[3];
+	}
+}
+
+template <const unsigned char writeMask = 0xF>
 inline void Float4ToA32B32G32R32F(const D3DXVECTOR4& color, A32B32G32R32F& outColor)
 {
 	if (writeMask & 0x1)
@@ -1562,6 +1760,39 @@ inline void ColorA32B32G32R32FToFloat4(const A32B32G32R32F& color, D3DXVECTOR4& 
 }
 
 template <const unsigned char writeMask = 0xF>
+inline void ColorA32B32G32R32FToFloat4_4(const A32B32G32R32F* const (&color4)[4], D3DXVECTOR4 (&outColor4)[4])
+{
+	if (writeMask & 0x1)
+	{
+		outColor4[0].x = color4[0]->r;
+		outColor4[1].x = color4[1]->r;
+		outColor4[2].x = color4[2]->r;
+		outColor4[3].x = color4[3]->r;
+	}
+	if (writeMask & 0x2)
+	{
+		outColor4[0].y = color4[0]->g;
+		outColor4[1].y = color4[1]->g;
+		outColor4[2].y = color4[2]->g;
+		outColor4[3].y = color4[3]->g;
+	}
+	if (writeMask & 0x4)
+	{
+		outColor4[0].z = color4[0]->b;
+		outColor4[1].z = color4[1]->b;
+		outColor4[2].z = color4[2]->b;
+		outColor4[3].z = color4[3]->b;
+	}
+	if (writeMask & 0x8)
+	{
+		outColor4[0].w = color4[0]->a;
+		outColor4[1].w = color4[1]->a;
+		outColor4[2].w = color4[2]->a;
+		outColor4[3].w = color4[3]->a;
+	}
+}
+
+template <const unsigned char writeMask = 0xF>
 inline void Float4ToL8(const D3DXVECTOR4& color, unsigned char& outColor)
 {
 	if (writeMask & 0x1)
@@ -1579,10 +1810,11 @@ inline void Float4ToL8Clamp(const D3DXVECTOR4& color, unsigned char& outColor)
 	}
 }
 
+static const float inv255 = 1.0f / 255.0f;
 template <const unsigned char writeMask = 0xF>
 inline void L8ToFloat4(const unsigned char& color, D3DXVECTOR4& outColor)
 {
-	const float l8color = color / 255.0f;
+	const float l8color = color * inv255;
 	if (writeMask & 0x1)
 		outColor.x = l8color;
 	if (writeMask & 0x2)
@@ -1591,6 +1823,48 @@ inline void L8ToFloat4(const unsigned char& color, D3DXVECTOR4& outColor)
 		outColor.z = l8color;
 	if (writeMask & 0x8)
 		outColor.w = 1.0f; // L8 textures always treat the alpha channel as 1.0f: https://msdn.microsoft.com/en-us/library/windows/desktop/bb206224(v=vs.85).aspx
+}
+
+template <const unsigned char writeMask = 0xF>
+inline void L8ToFloat4_4(const unsigned char (&color4)[4], D3DXVECTOR4 (&outColor4)[4])
+{
+	__m128i l8_4;
+	l8_4.m128i_u8[0] = color4[0];
+	l8_4.m128i_u8[1] = color4[1];
+	l8_4.m128i_u8[2] = color4[2];
+	l8_4.m128i_u8[3] = color4[3];
+
+	__m128i l32_4 = _mm_cvtepu8_epi32(l8_4);
+	__m128 colorFloat4 = _mm_mul_ps(_mm_cvtepi32_ps(l32_4), ColorDWORDToFloat4Divisor);
+	if (writeMask & 0x1)
+	{
+		outColor4[0].x = colorFloat4.m128_f32[0];
+		outColor4[1].x = colorFloat4.m128_f32[1];
+		outColor4[2].x = colorFloat4.m128_f32[2];
+		outColor4[3].x = colorFloat4.m128_f32[3];
+	}
+	if (writeMask & 0x2)
+	{
+		outColor4[0].y = colorFloat4.m128_f32[0];
+		outColor4[1].y = colorFloat4.m128_f32[1];
+		outColor4[2].y = colorFloat4.m128_f32[2];
+		outColor4[3].y = colorFloat4.m128_f32[3];
+	}
+	if (writeMask & 0x4)
+	{
+		outColor4[0].z = colorFloat4.m128_f32[0];
+		outColor4[1].z = colorFloat4.m128_f32[1];
+		outColor4[2].z = colorFloat4.m128_f32[2];
+		outColor4[3].z = colorFloat4.m128_f32[3];
+	}
+	if (writeMask & 0x8)
+	{
+		// L8 textures always treat the alpha channel as 1.0f: https://msdn.microsoft.com/en-us/library/windows/desktop/bb206224(v=vs.85).aspx
+		outColor4[0].w = 1.0f;
+		outColor4[1].w = 1.0f;
+		outColor4[2].w = 1.0f;
+		outColor4[3].w = 1.0f;
+	}
 }
 
 template <const unsigned char writeMask = 0xF>
@@ -1605,9 +1879,10 @@ inline void ColorR16FToFloat4(const D3DXFLOAT16& color, D3DXVECTOR4& outColor)
 {
 	if (writeMask & 0x1)
 	{
-		D3DXVECTOR4 outargb;
-		D3DXFloat16To32Array(&outargb.x, &color, 1);
-		outColor.x = outargb.x;
+		__m128i colorHalf4;
+		colorHalf4.m128i_u16[0] = *(const unsigned short* const)&color;
+		const __m128 colorFloat4 = _mm_cvtph_ps(colorHalf4);
+		outColor.x = colorFloat4.m128_f32[0];
 	}
 	if (writeMask & 0x2)
 		outColor.y = 1.0f; // https://msdn.microsoft.com/en-us/library/windows/desktop/bb206224(v=vs.85).aspx
@@ -1615,6 +1890,47 @@ inline void ColorR16FToFloat4(const D3DXFLOAT16& color, D3DXVECTOR4& outColor)
 		outColor.z = 1.0f;
 	if (writeMask & 0x8)
 		outColor.w = 1.0f;
+}
+
+template <const unsigned char writeMask = 0xF>
+inline void ColorR16FToFloat4_4(const D3DXFLOAT16 (&color4)[4], D3DXVECTOR4 (&outColor4)[4])
+{
+	if (writeMask & 0x1)
+	{
+		__m128i colorHalf4;
+		colorHalf4.m128i_u16[0] = *(const unsigned short* const)&(color4[0]);
+		colorHalf4.m128i_u16[1] = *(const unsigned short* const)&(color4[0]);
+		colorHalf4.m128i_u16[2] = *(const unsigned short* const)&(color4[0]);
+		colorHalf4.m128i_u16[3] = *(const unsigned short* const)&(color4[0]);
+		const __m128 colorFloat4 = _mm_cvtph_ps(colorHalf4);
+
+		outColor4[0].x = colorFloat4.m128_f32[0];
+		outColor4[1].x = colorFloat4.m128_f32[1];
+		outColor4[2].x = colorFloat4.m128_f32[2];
+		outColor4[3].x = colorFloat4.m128_f32[3];
+	}
+	if (writeMask & 0x2)
+	{
+		// https://msdn.microsoft.com/en-us/library/windows/desktop/bb206224(v=vs.85).aspx
+		outColor4[0].y = 1.0f;
+		outColor4[1].y = 1.0f;
+		outColor4[2].y = 1.0f;
+		outColor4[3].y = 1.0f;
+	}
+	if (writeMask & 0x4)
+	{
+		outColor4[0].z = 1.0f;
+		outColor4[1].z = 1.0f;
+		outColor4[2].z = 1.0f;
+		outColor4[3].z = 1.0f;
+	}
+	if (writeMask & 0x8)
+	{
+		outColor4[0].w = 1.0f;
+		outColor4[1].w = 1.0f;
+		outColor4[2].w = 1.0f;
+		outColor4[3].w = 1.0f;
+	}
 }
 
 static inline const unsigned RoundUpTo4(const unsigned num)
