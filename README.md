@@ -4,7 +4,7 @@ Performs software emulation for all of Direct3D9 via a proxy DLL (drop-in proxy 
 
 ## Getting Started
 
-Download the repo and open Software_d3d9.sln in Visual Studio 2017 or higher (or if you really want to you could hack the project and solution files to use an earlier version of Visual Studio).
+Download the repo and open **Software_d3d9.sln** in Visual Studio 2017 or higher (or if you really want to you could hack the project and solution files to use an earlier version of Visual Studio).
 
 ### Prerequisites
 
