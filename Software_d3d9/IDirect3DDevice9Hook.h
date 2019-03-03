@@ -1645,14 +1645,19 @@ inline void ColorA16B16G16R16ToFloat4_4(const A16B16G16R16 (&color4)[4], D3DXVEC
 template <const unsigned char writeMask = 0xF>
 inline void Float4ToA16B16G16R16F(const D3DXVECTOR4& color, A16B16G16R16F& outColor)
 {
+	const __m128 float4Color = *(const __m128* const)&color;
+	
+	// Floating point rules specify round-to-nearest as the rounding mode for float16's: https://docs.microsoft.com/en-us/windows/desktop/direct3d10/d3d10-graphics-programming-guide-resources-float-rules
+	const __m128i half4Color = _mm_cvtps_ph(float4Color, _MM_FROUND_TO_NEAREST_INT);
+
 	if (writeMask & 0x1)
-		outColor.r = D3DXFLOAT16(color.x);
+		outColor.r = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[0]);
 	if (writeMask & 0x2)
-		outColor.g = D3DXFLOAT16(color.y);
+		outColor.g = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[1]);
 	if (writeMask & 0x4)
-		outColor.b = D3DXFLOAT16(color.z);
+		outColor.b = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[2]);
 	if (writeMask & 0x8)
-		outColor.a = D3DXFLOAT16(color.w);
+		outColor.a = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[3]);
 }
 
 template <const unsigned char writeMask = 0xF>
@@ -1870,8 +1875,13 @@ inline void L8ToFloat4_4(const unsigned char (&color4)[4], D3DXVECTOR4 (&outColo
 template <const unsigned char writeMask = 0xF>
 inline void Float4ToR16F(const D3DXVECTOR4& color, D3DXFLOAT16& outColor)
 {
+	const __m128 float4Color = *(const __m128* const)&color;
+
+	// Floating point rules specify round-to-nearest as the rounding mode for float16's: https://docs.microsoft.com/en-us/windows/desktop/direct3d10/d3d10-graphics-programming-guide-resources-float-rules
+	const __m128i half4Color = _mm_cvtps_ph(float4Color, _MM_FROUND_TO_NEAREST_INT);
+
 	if (writeMask & 0x1)
-		outColor = D3DXFLOAT16(color.x);
+		outColor = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[0]);
 }
 
 template <const unsigned char writeMask = 0xF>
