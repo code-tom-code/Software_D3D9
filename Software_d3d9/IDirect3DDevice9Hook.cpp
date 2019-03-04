@@ -856,7 +856,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Reset(THIS_
 	}
 
 	// Re-initialize the device state: 
-	InitializeState(modifiedParams, initialDevType, initialCreateFlags);
+	InitializeState(modifiedParams, initialDevType, initialCreateFlags, initialCreateFocusWindow);
 
 	return ret;
 }
@@ -3375,7 +3375,7 @@ const bool IDirect3DDevice9Hook::TotalDrawCallSkipTest(void) const
 		// Skip this draw call if END is held down
 		return false;
 	}
-#endif
+#endif // #ifdef ENABLE_END_TO_SKIP_DRAWS
 
 	bool DepthWriteEnabled = false;
 	if (currentState.currentDepthStencil != NULL)
@@ -6173,7 +6173,7 @@ const bool IDirect3DDevice9Hook::SkipVertexProcessing(void) const
 	}
 }
 
-void IDirect3DDevice9Hook::InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, const D3DDEVTYPE devType, const DWORD createFlags)
+void IDirect3DDevice9Hook::InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, const D3DDEVTYPE devType, const DWORD createFlags, const HWND focusWindow)
 {
 	// Init the viewport:
 	currentState.cachedViewport.viewport.X = currentState.cachedViewport.viewport.Y = 0;
@@ -6192,6 +6192,8 @@ void IDirect3DDevice9Hook::InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, c
 	// Very important to set these initial flags for the device:
 	initialDevType = devType;
 	initialCreateFlags = createFlags;
+	initialCreateFocusWindow = focusWindow;
+	initialCreateDeviceWindow = d3dpp.hDeviceWindow;
 
 	// Mixed-mode vertex processing starts in hardware mode by default
 	if (initialCreateFlags & (D3DCREATE_MIXED_VERTEXPROCESSING | D3DCREATE_HARDWARE_VERTEXPROCESSING) )
@@ -6334,7 +6336,7 @@ void IDirect3DDevice9Hook::InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, c
 }
 
 IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D9Hook* _parentHook) : d3d9dev(_d3d9dev), parentHook(_parentHook), refCount(1), initialDevType(D3DDEVTYPE_HAL), initialCreateFlags(D3DCREATE_HARDWARE_VERTEXPROCESSING),
-	enableDialogs(FALSE), sceneBegun(FALSE), implicitSwapChain(NULL), hConsoleHandle(INVALID_HANDLE_VALUE), overlayFontTexture(NULL), numPixelsPassedZTest(0)
+	enableDialogs(FALSE), sceneBegun(FALSE), implicitSwapChain(NULL), hConsoleHandle(INVALID_HANDLE_VALUE), overlayFontTexture(NULL), numPixelsPassedZTest(0), initialCreateFocusWindow(NULL), initialCreateDeviceWindow(NULL)
 {
 #ifdef _DEBUG
 	m_FirstMember = false;

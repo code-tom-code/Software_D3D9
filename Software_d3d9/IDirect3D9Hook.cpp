@@ -387,7 +387,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3D9Hook::CreateDevice(THIS
 	void* const alignedAlloc = _aligned_malloc(sizeof(IDirect3DDevice9Hook), 16);
 	IDirect3DDevice9Hook* newHookDevice = new (alignedAlloc) IDirect3DDevice9Hook(realDevice, this);
 	*ppReturnedDeviceInterface = newHookDevice;
-	newHookDevice->InitializeState(modifiedParams, DeviceType, BehaviorFlags);
+	newHookDevice->InitializeState(modifiedParams, DeviceType, BehaviorFlags, hFocusWindow);
 
 	return ret;
 }

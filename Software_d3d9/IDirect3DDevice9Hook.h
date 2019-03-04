@@ -1039,7 +1039,7 @@ public:
 	}
 
 	// Called after device creation or Reset()
-	void InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, const D3DDEVTYPE devType, const DWORD createFlags);
+	void InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, const D3DDEVTYPE devType, const DWORD createFlags, const HWND focusWindow);
 
 	// Returns true if the device is currently inside of a BeginScene()/EndScene() block
 	inline const bool HasBegunScene(void) const
@@ -1192,6 +1192,8 @@ protected:
 	// These flags are not modified on device-reset:
 	D3DDEVTYPE initialDevType;
 	DWORD initialCreateFlags;
+	HWND initialCreateFocusWindow;
+	HWND initialCreateDeviceWindow;
 	BOOL enableDialogs;
 
 	mutable VShaderEngine deviceMainVShaderEngine;
