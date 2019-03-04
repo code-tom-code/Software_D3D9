@@ -2965,42 +2965,17 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 
 				if (alreadyShadedVerts[index] != 0xFFFFFFFF)
 				{
-#ifdef MULTITHREAD_SHADING
 					// Do fix-ups after the loop, but only shade vertices once
 					outputBufferPtr++;
-#else
-					*outputBufferPtr++ = outputVerts[alreadyShadedVerts[index] ];
-#endif
 					++frameStats.numVertsReused;
 				}
 				else
 				{
-#ifdef MULTITHREAD_SHADING
 					vertJobCollector newJob;
 					newJob.outputRegs = outputBufferPtr++;
 					newJob.vertexIndex = index;
 					vertJobsToShade.push_back(newJob);
-#else
 
-#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-					LARGE_INTEGER vertexShadeStartTime;
-					QueryPerformanceCounter(&vertexShadeStartTime);
-#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-
-					if (anyUserClipPlanesEnabled)
-						ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
-					else
-						ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
-
-#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-					LARGE_INTEGER vertexShadeEndTime;
-					QueryPerformanceCounter(&vertexShadeEndTime);
-
-					totalVertexShadeTicks += (vertexShadeEndTime.QuadPart - vertexShadeStartTime.QuadPart);
-					++numVertexShadeTasks;
-#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-
-#endif
 					alreadyShadedVerts[index] = x;
 				}
 			}
@@ -3023,41 +2998,18 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 
 				if (alreadyShadedVerts[index] != 0xFFFFFFFF)
 				{
-#ifdef MULTITHREAD_SHADING
 					// Do fix-ups after the loop, but only shade vertices once
 					outputBufferPtr++;
-#else // #ifdef MULTITHREAD_SHADING
-					*outputBufferPtr++ = outputVerts[alreadyShadedVerts[index] ];
-#endif // #ifdef MULTITHREAD_SHADING
+
 					++frameStats.numVertsReused;
 				}
 				else
 				{
-#ifdef MULTITHREAD_SHADING
 					vertJobCollector newJob;
 					newJob.outputRegs = outputBufferPtr++;
 					newJob.vertexIndex = index;
 					vertJobsToShade.push_back(newJob);
-#else // #ifdef MULTITHREAD_SHADING
 
-#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-					LARGE_INTEGER vertexShadeStartTime;
-					QueryPerformanceCounter(&vertexShadeStartTime);
-#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-					if (anyUserClipPlanesEnabled)
-						ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
-					else
-						ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, index);
-
-#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-					LARGE_INTEGER vertexShadeEndTime;
-					QueryPerformanceCounter(&vertexShadeEndTime);
-
-					totalVertexShadeTicks += (vertexShadeEndTime.QuadPart - vertexShadeStartTime.QuadPart);
-					++numVertexShadeTasks;
-#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-
-#endif // #ifdef MULTITHREAD_SHADING
 					alreadyShadedVerts[index] = x;
 				}
 			}
@@ -3070,32 +3022,10 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 		for (unsigned x = 0; x < numOutputVerts; ++x)
 		{
 			// Uhhhh, this isn't correct except for point-lists, line-lists, and triangle-lists:
-#ifdef MULTITHREAD_SHADING
 			vertJobCollector newJob;
 			newJob.outputRegs = outputBufferPtr++;
 			newJob.vertexIndex = x + BaseVertexIndex;
 			vertJobsToShade.push_back(newJob);
-#else
-
-#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-					LARGE_INTEGER vertexShadeStartTime;
-					QueryPerformanceCounter(&vertexShadeStartTime);
-#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-
-			if (anyUserClipPlanesEnabled)
-				ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, x + BaseVertexIndex);
-			else
-				ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, outputBufferPtr++, x + BaseVertexIndex);
-
-#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-					LARGE_INTEGER vertexShadeEndTime;
-					QueryPerformanceCounter(&vertexShadeEndTime);
-
-					totalVertexShadeTicks += (vertexShadeEndTime.QuadPart - vertexShadeStartTime.QuadPart);
-					++numVertexShadeTasks;
-#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
-
-#endif
 		}
 	}
 
@@ -3110,7 +3040,6 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 	{
 		__debugbreak();
 	}*/
-#ifdef MULTITHREAD_SHADING
 	const unsigned numNewJobs = vertJobsToShade.size();
 
 #ifdef RUN_SHADERS_IN_WARPS
@@ -3147,13 +3076,57 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 					vertexIndices[y] = (&thisNewJob)[y].vertexIndex;
 					outputRegs[y] = (&thisNewJob)[y].outputRegs;
 				}
+#ifdef MULTITHREAD_SHADING
 				CreateNewVertexShadeJob(outputRegs, vertexIndices, vertexShade4Job);
+#else // #ifdef MULTITHREAD_SHADING
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+				LARGE_INTEGER vertexShadeStartTime;
+				QueryPerformanceCounter(&vertexShadeStartTime);
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
+				if (anyUserClipPlanesEnabled)
+					ProcessVertexToBuffer4<true>(mapping, &deviceMainVShaderEngine, outputRegs, vertexIndices);
+				else
+					ProcessVertexToBuffer4<false>(mapping, &deviceMainVShaderEngine, outputRegs, vertexIndices);
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+				LARGE_INTEGER vertexShadeEndTime;
+				QueryPerformanceCounter(&vertexShadeEndTime);
+
+				totalVertexShadeTicks += (vertexShadeEndTime.QuadPart - vertexShadeStartTime.QuadPart);
+				numVertexShadeTasks += 4;
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
+#endif // #ifdef MULTITHREAD_SHADING
 				x += 4;
 			}
 			else
 			{
 				const vertJobCollector& thisNewJob = vertJobsToShade[x];
+#ifdef MULTITHREAD_SHADING
 				CreateNewVertexShadeJob(&thisNewJob.outputRegs, &thisNewJob.vertexIndex, vertexShade1Job);
+#else // #ifdef MULTITHREAD_SHADING
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+				LARGE_INTEGER vertexShadeStartTime;
+				QueryPerformanceCounter(&vertexShadeStartTime);
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
+				if (anyUserClipPlanesEnabled)
+					ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, thisNewJob.outputRegs, thisNewJob.vertexIndex);
+				else
+					ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, thisNewJob.outputRegs, thisNewJob.vertexIndex);
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+				LARGE_INTEGER vertexShadeEndTime;
+				QueryPerformanceCounter(&vertexShadeEndTime);
+
+				totalVertexShadeTicks += (vertexShadeEndTime.QuadPart - vertexShadeStartTime.QuadPart);
+				++numVertexShadeTasks;
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
+#endif // #ifdef MULTITHREAD_SHADING
 				++x;
 			}
 		}
@@ -3164,12 +3137,37 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 		for (unsigned x = 0; x < numNewJobs; ++x)
 		{
 			const vertJobCollector& thisNewJob = vertJobsToShade[x];
+#ifdef MULTITHREAD_SHADING
 			CreateNewVertexShadeJob(&thisNewJob.outputRegs, &thisNewJob.vertexIndex, vertexShade1Job);
+#else // #ifdef MULTITHREAD_SHADING
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+			LARGE_INTEGER vertexShadeStartTime;
+			QueryPerformanceCounter(&vertexShadeStartTime);
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
+			if (anyUserClipPlanesEnabled)
+				ProcessVertexToBuffer<true>(mapping, &deviceMainVShaderEngine, thisNewJob.outputRegs, thisNewJob.vertexIndex);
+			else
+				ProcessVertexToBuffer<false>(mapping, &deviceMainVShaderEngine, thisNewJob.outputRegs, thisNewJob.vertexIndex);
+
+#ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+			LARGE_INTEGER vertexShadeEndTime;
+			QueryPerformanceCounter(&vertexShadeEndTime);
+
+			totalVertexShadeTicks += (vertexShadeEndTime.QuadPart - vertexShadeStartTime.QuadPart);
+			++numVertexShadeTasks;
+#endif // #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
+
+#endif // #ifdef MULTITHREAD_SHADING
 		}
 	}
+
+#ifdef MULTITHREAD_SHADING
 	//CloseThreadpoolCleanupGroupMembers(cleanup, FALSE, NULL);
 	//RefreshThreadpoolWork();
 	SynchronizeThreads();
+#endif // #ifdef MULTITHREAD_SHADING
 
 	// This is the "fixup phase" that's necessary to populate all of the vertex copies through here
 	// This avoids shading re-used vertices more than once and saves *a ton* of processing power! :)
@@ -3213,7 +3211,6 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 			break;
 		}
 	}
-#endif
 
 #ifdef DEBUG_VERTEX_OUT_POSITIONS
 	for (unsigned x = 0; x < outputVerts.size(); ++x)
