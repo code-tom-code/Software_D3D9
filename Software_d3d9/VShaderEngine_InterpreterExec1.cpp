@@ -275,19 +275,30 @@ const bool VShaderEngine::InterpreterExecStep1()
 	}
 		break;
 	case D3DSIO_CALL        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: CALL Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_CALLNZ      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: CALLNZ Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_LOOP        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const dstParameterToken dstParam = *(const dstParameterToken* const)instructionPtr++;
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: LOOP Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_RET         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: RET Shader function not yet implemented!"); // Not yet implemented!
 		return false;
 	case D3DSIO_ENDLOOP     :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: ENDLOOP Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_LABEL       :
 	{
@@ -298,7 +309,7 @@ const bool VShaderEngine::InterpreterExecStep1()
 	}
 		break;
 	case D3DSIO_DCL         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: DCL Should not be encountered during normal shader execution!");
 		break;
 	case D3DSIO_POW         :
 	{
@@ -385,28 +396,42 @@ const bool VShaderEngine::InterpreterExecStep1()
 	}
 		break;
 	case D3DSIO_REP         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: REP Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_ENDREP      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: ENDREP Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_IF          :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: IF Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_IFC         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: IFC Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_ELSE        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: ELSE Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_ENDIF       :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: ENDIF Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_BREAK       :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: BREAK Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_BREAKC      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: BREAKC Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_MOVA        :
 	{
@@ -422,74 +447,85 @@ const bool VShaderEngine::InterpreterExecStep1()
 	}
 		break;
 	case D3DSIO_DEFB        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: DEFB Should not be encountered during normal shader execution!");
 		break;
 	case D3DSIO_DEFI        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: DEFI Should not be encountered during normal shader execution!");
 		break;		
 	case D3DSIO_TEXCOORD    :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const dstParameterToken dstParam = *(const dstParameterToken* const)instructionPtr++;
+		DbgBreakPrint("Error: TEXCOORD Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_TEXKILL     :
 		DbgBreakPrint("Error: Should never hit TEXKILL inside a vertex shader!");
 		__debugbreak();
 		break;
 	case D3DSIO_TEXBEM      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXBEM Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXBEML     :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXBEML Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXREG2AR   :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXREG2AR Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXREG2GB   :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXREG2GB Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXM3x2PAD  :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x2PAD Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXM3x2TEX  :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x2TEX Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXM3x3PAD  :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3PAD Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXM3x3TEX  :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3TEX Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_RESERVED0   :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: RESERVED0 Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXM3x3SPEC :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3SPEC Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXM3x3VSPEC:
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3VSPEC Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_CND         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const dstParameterToken dstParam = *(const dstParameterToken* const)instructionPtr++;
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(instructionPtr);
+		const D3DXVECTOR4 src2 = ResolveSrcRegister(instructionPtr);
+		D3DXVECTOR4 dst;
+		cnd(dst, src0, src1, src2);
+		WriteDstParameter(dstParam, dst);
+	}
 		break;
 	case D3DSIO_DEF         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: DEF Should not be encountered during normal shader execution!"); // Not yet implemented!
 		break;
 	case D3DSIO_TEXREG2RGB  :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXREG2RGB Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXDP3TEX   :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXDP3TEX Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXM3x2DEPTH:
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x2DEPTH Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXDP3      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXDP3 Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXM3x3     :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3 Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_TEXDEPTH    :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXDEPTH Shader function not available in vertex shaders!");
 		break;
 	case D3DSIO_CMP         :
 	{
@@ -503,7 +539,12 @@ const bool VShaderEngine::InterpreterExecStep1()
 	}
 		break;
 	case D3DSIO_BEM         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const dstParameterToken dstParam = *(const dstParameterToken* const)instructionPtr++;
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: BEM Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_DP2ADD      :
 	{
@@ -539,10 +580,15 @@ const bool VShaderEngine::InterpreterExecStep1()
 	}
 		break;
 	case D3DSIO_TEXLDD      : // tex2Dgrad()
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXLDD Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_SETP        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const dstParameterToken dstParam = *(const dstParameterToken* const)instructionPtr++;
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: SETP Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 
 		// Technically tex2D() is not allowed in vertex shaders, however I don't see anything wrong with promoting it to tex2Dlod and just letting the shader run
@@ -564,10 +610,13 @@ const bool VShaderEngine::InterpreterExecStep1()
 	}
 		break;
 	case D3DSIO_BREAKP      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(instructionPtr);
+		DbgBreakPrint("Error: BREAKP Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;		
 	case D3DSIO_PHASE       :
-		DbgBreakPrint("Error: Should never hit PHASE instruction in vertex shader!"); // Not yet implemented!
+		DbgBreakPrint("Error: Should never hit PHASE instruction in vertex shader!");
 		break;
 	case D3DSIO_COMMENT     :
 	{

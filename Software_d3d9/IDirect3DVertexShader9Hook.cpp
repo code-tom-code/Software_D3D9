@@ -187,6 +187,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DVertexShader9Hook::GetFu
 
 void IDirect3DVertexShader9Hook::JitLoadShader()
 {
+#ifdef FORCE_INTERPRETED_VERTEX_SHADER
+	return;
+#endif
+
 	const char* const jitName = ConstructShaderJITName(vertexShaderInfo);
 	char jitFilenameBuffer[MAX_PATH] = {0};
 #pragma warning(push)

@@ -65,6 +65,15 @@ static INTRINSIC_INLINE void cmp(float& dst, const float src0, const float src1,
 	dst = src0 >= 0.0f ? src1 : src2;
 }
 
+// Conditional select: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/cnd---ps
+static INTRINSIC_INLINE void cnd(D3DXVECTOR4& dst, const D3DXVECTOR4& src0, const D3DXVECTOR4& src1, const D3DXVECTOR4& src2)
+{
+	dst.x = src0.x > 0.5f ? src1.x : src2.x;
+	dst.y = src0.y > 0.5f ? src1.y : src2.y;
+	dst.z = src0.z > 0.5f ? src1.z : src2.z;
+	dst.w = src0.w > 0.5f ? src1.w : src2.w;
+}
+
 // Cross-product: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/crs---vs
 static INTRINSIC_INLINE void crs(D3DXVECTOR4& dst, const D3DXVECTOR4& src0, const D3DXVECTOR4& src1)
 {

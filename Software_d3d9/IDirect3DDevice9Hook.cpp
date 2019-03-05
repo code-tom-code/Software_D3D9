@@ -75,7 +75,7 @@ struct _threadItem
 	HANDLE hThread;
 	VShaderEngine threadVS_2_0;
 	PShaderEngine threadPS_2_0;
-} threadItem [NUM_THREADS * 2 + 1] = {0};
+} threadItem [NUM_THREADS * 4 + 1] = {0};
 
 // This is volatile and aligned because it will be used with Interlocked operations
 static volatile long __declspec(align(16) ) tlsThreadNumber = 0;

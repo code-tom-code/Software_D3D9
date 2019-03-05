@@ -74,6 +74,30 @@ static INTRINSIC_INLINE void cmp4(D3DXVECTOR4 (&dst)[4], const D3DXVECTOR4 (&src
 	dst[3].w = src0[3].w >= 0.0f ? src1[3].w : src2[3].w;
 }
 
+// Conditional select: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/cnd---ps
+static INTRINSIC_INLINE void cnd4(D3DXVECTOR4 (&dst)[4], const D3DXVECTOR4 (&src0)[4], const D3DXVECTOR4 (&src1)[4], const D3DXVECTOR4 (&src2)[4])
+{
+	dst[0].x = src0[0].x > 0.5f ? src1[0].x : src2[0].x;
+	dst[1].x = src0[1].x > 0.5f ? src1[1].x : src2[1].x;
+	dst[2].x = src0[2].x > 0.5f ? src1[2].x : src2[2].x;
+	dst[3].x = src0[3].x > 0.5f ? src1[3].x : src2[3].x;
+
+	dst[0].y = src0[0].y > 0.5f ? src1[0].y : src2[0].y;
+	dst[1].y = src0[1].y > 0.5f ? src1[1].y : src2[1].y;
+	dst[2].y = src0[2].y > 0.5f ? src1[2].y : src2[2].y;
+	dst[3].y = src0[3].y > 0.5f ? src1[3].y : src2[3].y;
+
+	dst[0].z = src0[0].z > 0.5f ? src1[0].z : src2[0].z;
+	dst[1].z = src0[1].z > 0.5f ? src1[1].z : src2[1].z;
+	dst[2].z = src0[2].z > 0.5f ? src1[2].z : src2[2].z;
+	dst[3].z = src0[3].z > 0.5f ? src1[3].z : src2[3].z;
+
+	dst[0].w = src0[0].w > 0.5f ? src1[0].w : src2[0].w;
+	dst[1].w = src0[1].w > 0.5f ? src1[1].w : src2[1].w;
+	dst[2].w = src0[2].w > 0.5f ? src1[2].w : src2[2].w;
+	dst[3].w = src0[3].w > 0.5f ? src1[3].w : src2[3].w;
+}
+
 // Cross-product: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/crs---vs
 static INTRINSIC_INLINE void crs4(D3DXVECTOR4 (&dst)[4], const D3DXVECTOR4 (&src0)[4], const D3DXVECTOR4 (&src1)[4])
 {

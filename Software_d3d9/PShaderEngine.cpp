@@ -803,19 +803,30 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 	}
 		break;
 	case D3DSIO_CALL        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
+		DbgBreakPrint("Error: CALL Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_CALLNZ      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(*instructionPtr++);
+		DbgBreakPrint("Error: CALLNZ Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_LOOP        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const DWORD aLDst = *instructionPtr++;
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(*instructionPtr++);
+		DbgBreakPrint("Error: LOOP Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_RET         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: RET Shader function not yet implemented!"); // Not yet implemented!
 		return normalCompletion;
 	case D3DSIO_ENDLOOP     :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: ENDLOOP Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_LABEL       :
 	{
@@ -826,7 +837,7 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 	}
 		break;
 	case D3DSIO_DCL         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: DCL Should not be encountered during normal shader execution!");
 		break;
 	case D3DSIO_POW         :
 	{
@@ -912,43 +923,58 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 	case D3DSIO_REP         :
 	{
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: REP Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_ENDREP      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: ENDREP Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_IF          :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
+		DbgBreakPrint("Error: IF Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_IFC         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(*instructionPtr++);
+		DbgBreakPrint("Error: IFC Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_ELSE        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: ELSE Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_ENDIF       :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: ENDIF Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_BREAK       :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: BREAK Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_BREAKC      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
+		const D3DXVECTOR4 src1 = ResolveSrcRegister(*instructionPtr++);
+		DbgBreakPrint("Error: BREAKC Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;
 	case D3DSIO_MOVA        : // This is a vs-only instruction
-		DbgBreakPrint("Error: Instruction not available to pixel shaders!"); // Not yet implemented!
+	{
+		const DWORD dstParam = *instructionPtr++;
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
+		DbgBreakPrint("Error: MOVA Instruction not available to pixel shaders!");
+	}
 		break;
 	case D3DSIO_DEFB        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: DEFB Should not be encountered during normal shader execution!");
 		break;
 	case D3DSIO_DEFI        :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: DEFI Should not be encountered during normal shader execution!");
 		break;		
 	case D3DSIO_TEXCOORD    :
 	{
 		const DWORD dstParam = *instructionPtr++;
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXCOORD Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXKILL     :
@@ -1049,67 +1075,67 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXBEML Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXREG2AR   :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXREG2AR Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXREG2GB   :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXREG2GB Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXM3x2PAD  :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x2PAD Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXM3x2TEX  :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x2TEX Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXM3x3PAD  :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3PAD Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXM3x3TEX  :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3TEX Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_RESERVED0   :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: RESERVED0 Shader function not yet implemented!"); // Not yet implemented!
 		break;
 	case D3DSIO_TEXM3x3SPEC :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
 		const D3DXVECTOR4 src1 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3SPEC Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXM3x3VSPEC:
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3VSPEC Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_CND         :
@@ -1118,17 +1144,19 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
 		const D3DXVECTOR4 src1 = ResolveSrcRegister(*instructionPtr++);
 		const D3DXVECTOR4 src2 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		D3DXVECTOR4 dst;
+		cnd(dst, src0, src1, src2);
+		WriteDstParameter(dstParam, dst);
 	}
 		break;
 	case D3DSIO_DEF         :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: DEF Should not be encountered during normal shader execution!");
 		break;
 	case D3DSIO_TEXREG2RGB  :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXREG2RGB Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXDP3TEX   : // This is pretty complicated: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/texdp3tex---ps
@@ -1171,27 +1199,27 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x2DEPTH Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXDP3      :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXDP3 Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXM3x3     :
 	{
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXM3x3 Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXDEPTH    :
 	{
 		const DWORD dstParam = *instructionPtr++;
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: TEXDEPTH Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_CMP         :
@@ -1210,7 +1238,7 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
 		const D3DXVECTOR4 src1 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: BEM Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_DP2ADD      :
@@ -1267,7 +1295,7 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 		const DWORD dstParam = *instructionPtr++;
 		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
 		const D3DXVECTOR4 src1 = ResolveSrcRegister(*instructionPtr++);
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+		DbgBreakPrint("Error: SETP Shader function not yet implemented!"); // Not yet implemented!
 	}
 		break;
 	case D3DSIO_TEXLDL      : // tex2Dlod()
@@ -1285,7 +1313,10 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 	}
 		break;
 	case D3DSIO_BREAKP      :
-		DbgBreakPrint("Error: Shader function not yet implemented!"); // Not yet implemented!
+	{
+		const D3DXVECTOR4 src0 = ResolveSrcRegister(*instructionPtr++);
+		DbgBreakPrint("Error: BREAKP Shader function not yet implemented!"); // Not yet implemented!
+	}
 		break;		
 	case D3DSIO_PHASE       :
 		// Just do nothing, treat the whole shader as if it were a ps_2_0+ shader instead of a ps_1_4 shader

@@ -90,6 +90,10 @@ void IDirect3DPixelShader9Hook::CreatePixelShader(const DWORD* const pFunction)
 
 void IDirect3DPixelShader9Hook::JitLoadShader()
 {
+#ifdef FORCE_INTERPRETED_PIXEL_SHADER
+	return;
+#endif
+
 	const char* const jitName = ConstructShaderJITName(pixelShaderInfo);
 	char jitFilenameBuffer[MAX_PATH] = {0};
 #pragma warning(push)
