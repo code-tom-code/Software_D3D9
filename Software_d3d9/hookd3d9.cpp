@@ -2,7 +2,6 @@
 
 #undef UNICODE
 #undef _UNICODE
-#define WIN32_LEAN_AND_MEAN
 
 #include <windows.h>
 #pragma pack(1)
@@ -10,6 +9,10 @@
 #include "d3d9include.h"
 
 #include "IDirect3D9Hook.h"
+
+#ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
+	#pragma comment(lib, "Winmm.lib")
+#endif // #ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
 
 HINSTANCE hLThisDLL = 0;
 HINSTANCE hL = 0;
@@ -163,6 +166,10 @@ void CircumventSteamAntiDebugging(void)
 
 __declspec(dllexport) BOOL WINAPI DllMain(_In_ HINSTANCE hInst, _In_ DWORD reason, _In_ LPVOID /*lpvReserved*/)
 {
+#ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
+	static TIMECAPS timeCaps = {0};
+#endif // #ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
+
 	if (reason == DLL_PROCESS_ATTACH)
 	{
 		hLThisDLL = hInst;
@@ -171,11 +178,21 @@ __declspec(dllexport) BOOL WINAPI DllMain(_In_ HINSTANCE hInst, _In_ DWORD reaso
 		CircumventSteamAntiDebugging();
 #endif
 
+#ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
+		if (timeGetDevCaps(&timeCaps, sizeof(timeCaps) ) != MMSYSERR_NOERROR)
+		{
+			return FALSE;
+		}
+
+		timeBeginPeriod(timeCaps.wPeriodMin);
+#endif // #ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
+
 		// x86 32-bit version:
 		// TODO: Don't hardcode this path
 		hL = LoadLibraryA("C:\\Windows\\SysWOW64\\d3d9.dll");
 
-		if (!hL) return false;
+		if (!hL)
+			return FALSE;
 
 		p[0] = GetProcAddress(hL, "D3DPERF_BeginEvent");
 		p[1] = GetProcAddress(hL, "D3DPERF_EndEvent");
@@ -194,12 +211,17 @@ __declspec(dllexport) BOOL WINAPI DllMain(_In_ HINSTANCE hInst, _In_ DWORD reaso
 		p[14] = GetProcAddress(hL, "PSGPSampleTexture");
 		p[15] = GetProcAddress(hL, (LPCSTR)LOWORD(16u) ); // Apparently this is some undocumented function added in the Windows 8.1 update: "DWORD Direct3D9ForceHybridEnumeration(UINT)"
 	}
+
 	if (reason == DLL_PROCESS_DETACH)
 	{
+#ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
+		timeEndPeriod(timeCaps.wPeriodMin);
+#endif // #ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
+
 		FreeLibrary(hL);
 	}
 
-	return 1;
+	return TRUE;
 }
 
 // D3DPERF_BeginEvent

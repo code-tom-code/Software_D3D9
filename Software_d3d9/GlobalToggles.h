@@ -47,6 +47,12 @@
 	#define PROFILE_AVERAGE_PIXEL_SHADE_TIMES 1
 #endif
 
+// If defined, the software renderer will improve the system's scheduler resolution (which is useful when running many threads in the job system).
+// This increase only lasts as long as the process is running, and the default scheduler resolution will be applied when the process terminates.
+#ifdef MULTITHREAD_SHADING
+	#define INCREASE_SYSTEM_SCHEDULER_RESOLUTION 1
+#endif
+
 // Comment out to disable
 //#define INDEX_BUFFER_MAGIC_COOKIE 1
 
