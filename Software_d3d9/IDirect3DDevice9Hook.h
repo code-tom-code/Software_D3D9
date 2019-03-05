@@ -8,6 +8,8 @@
 #include <map>
 #include <intrin.h>
 
+#include "SimpleInstrumentedProfiler.h"
+
 // 16 is the maximum number of vertex input streams supported by D3D9
 #define MAX_D3D9_STREAMS 16u
 
@@ -40,7 +42,16 @@ enum workerJobType
 
 	VERTEX_SHADE_JOB_MAX,
 
-	pixelShadeJob
+	pixelShadeJob,
+#ifdef RUN_SHADERS_IN_WARPS
+	pixelShade4Job,
+	pixelShade16Job,
+	pixelShade64Job,
+#endif // #ifdef RUN_SHADERS_IN_WARPS
+
+	PIXEL_SHADE_JOB_MAX,
+
+	triangleRasterizeJob
 };
 #endif
 
@@ -828,12 +839,27 @@ struct primitivePixelJobData
 	bool VFace; // This is the ps_3_0 VFACE semantic or the ps_4_0 SV_IsFrontFace semantic for this primitive
 };
 
+struct drawCallTriangleRasterizeJobsData
+{
+	float fWidth, fHeight;
+	union
+	{
+		const DeclarationSemanticMapping* vertexDeclMapping;
+		const VStoPSMapping* vStoPSMapping;
+	};
+	bool rasterizerUsesEarlyZTest;
+	bool rasterizeTriangleFromShader; // true = from shader, false = from stream
+};
+
 struct currentDrawCallJobData
 {
 	drawCallVertexJobData vertexData;
 
 	// TODO: Mutable is gross, try and find another way to do this...
 	mutable drawCallPixelJobData pixelData;
+
+	// TODO: Mutable is gross, try and find another way to do this...
+	mutable drawCallTriangleRasterizeJobsData triangleRasterizeData;
 };
 
 __declspec(align(16) ) class IDirect3DDevice9Hook : public IDirect3DDevice9
@@ -986,8 +1012,8 @@ public:
 		const D3DPRIMITIVETYPE PrimitiveType, const INT BaseVertexIndex, const UINT MinVertexIndex, const UINT startIndex, const UINT primCount, const void* const vertStreamBytes, const unsigned short vertStreamStride) const;
 
 	// If indexBuffer is NULL, then synthesize an index buffer (0, 1, 2, 3, 4, etc...)
-	template <const bool useVertexBuffer, const bool useIndexBuffer>
-	void ProcessVerticesToBuffer(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, std::vector<VS_2_0_OutputRegisters>& outputVerts, const BYTE* const indexBuffer, const D3DFORMAT indexFormat,
+	template <const bool useVertexBuffer, const D3DFORMAT indexFormat>
+	void ProcessVerticesToBufferInner(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, std::vector<VS_2_0_OutputRegisters>& outputVerts, const BYTE* const indexBuffer,
 		const D3DPRIMITIVETYPE PrimitiveType, const INT BaseVertexIndex, const UINT MinVertexIndex, const UINT startIndex, const UINT primCount, const void* const vertStreamBytes, const unsigned short vertStreamStride) const;
 
 	// Process a single vertex:
@@ -1056,7 +1082,7 @@ public:
 
 	// Assumes pre-transformed vertices from a vertex declaration + raw vertex stream
 	template <const bool rasterizerUsesEarlyZTest>
-	void RasterizeTriangleFromStream(const DeclarationSemanticMapping& vertexDeclMapping, CONST D3DXVECTOR4* const v0, CONST D3DXVECTOR4* const v1, CONST D3DXVECTOR4* const v2, 
+	void RasterizeTriangleFromStream(PShaderEngine* const pShaderEngine, const DeclarationSemanticMapping& vertexDeclMapping, CONST D3DXVECTOR4* const v0, CONST D3DXVECTOR4* const v1, CONST D3DXVECTOR4* const v2, 
 		const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const;
 
 	// Assumes pre-transformed vertices from a vertex declaration + raw vertex stream
@@ -1067,7 +1093,7 @@ public:
 
 	// Assumes pre-transformed vertices from a processed vertex shader
 	template <const bool rasterizerUsesEarlyZTest>
-	void RasterizeTriangleFromShader(const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
+	void RasterizeTriangleFromShader(PShaderEngine* const pShaderEngine, const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
 		const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const;
 
 	// Assumes pre-transformed vertices from a processed vertex shader
@@ -1116,8 +1142,16 @@ public:
 
 #ifdef MULTITHREAD_SHADING
 	void CreateNewVertexShadeJob(VS_2_0_OutputRegisters* const * const outputRegs, const unsigned* const vertexIndices, const workerJobType jobWidth) const;
+
+#if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 	void CreateNewPixelShadeJob(const unsigned x, const unsigned y, const int barycentricA, const int barycentricB, const int barycentricC, const primitivePixelJobData* const primitiveData) const;
 #endif
+
+#if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
+	void CreateNewTriangleRasterJob(const UINT primitiveID, const UINT vertID0, const UINT vertID1, const UINT vertID2, const bool rasterizeFromShader, const void* const vert0, const void* const vert1, const void* const vert2) const;
+#endif
+
+#endif // #ifdef MULTITHREAD_SHADING
 
 	// TODO: Find another way to do this other than mutable
 	mutable primitivePixelJobData allPrimitiveJobData[1024 * 1024];
@@ -1146,6 +1180,7 @@ public:
 
 	COM_DECLSPEC_NOTHROW void SetupCurrentDrawCallVertexData(const DeclarationSemanticMapping& mapping);
 	COM_DECLSPEC_NOTHROW void SetupCurrentDrawCallPixelData(const bool useShaderVerts, const void* const vs_to_ps_mapping) const;
+	COM_DECLSPEC_NOTHROW void SetupCurrentDrawCallTriangleRasterizeData(const float fWidth, const float fHeight, const bool rasterizerUsesEarlyZTest, const bool rasterizeTriangleFromShader, const void* const interpolantDeclInfo) const;
 
 	void ApplyViewportTransform(D3DXVECTOR4& positionT) const;
 

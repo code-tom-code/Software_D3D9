@@ -161,6 +161,7 @@
     <ClInclude Include="ShaderIntrinsicFunctions4.h" />
     <ClInclude Include="ShaderJIT.h" />
     <ClInclude Include="ShaderJIT_HLSL_to_CPP_Tables.h" />
+    <ClInclude Include="SimpleInstrumentedProfiler.h" />
     <ClInclude Include="VShaderEngine.h" />
   </ItemGroup>
   <ItemGroup>

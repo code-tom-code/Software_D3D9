@@ -85,6 +85,18 @@ public:
 		outputRegisters = NULL;
 	}
 
+	inline PShaderEngine& operator=(const PShaderEngine& rhs)
+	{
+		shaderInfo = rhs.shaderInfo;
+		constantRegisters = rhs.constantRegisters;
+		return *this;
+	}
+
+	inline void DeepCopy(const PShaderEngine& rhs)
+	{
+		memcpy(this, &rhs, sizeof(*this) );
+	}
+
 	// Called once for each shader instruction
 	const shaderStatus InterpreterExecStep();
 

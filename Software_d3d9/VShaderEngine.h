@@ -109,6 +109,18 @@ public:
 			outputRegisters[x] = NULL;
 	}
 
+	inline VShaderEngine& operator=(const VShaderEngine& rhs)
+	{
+		shaderInfo = rhs.shaderInfo;
+		constantRegisters = rhs.constantRegisters;
+		return *this;
+	}
+
+	inline void DeepCopy(const VShaderEngine& rhs)
+	{
+		memcpy(this, &rhs, sizeof(*this) );
+	}
+
 	// Called once for each shader instruction
 	const bool InterpreterExecStep1();
 

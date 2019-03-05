@@ -49,6 +49,8 @@ COM_DECLSPEC_NOTHROW ULONG STDMETHODCALLTYPE IDirect3DSwapChain9Hook::Release(TH
 /*** IDirect3DSwapChain9 methods ***/
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::Present(THIS_ CONST RECT* pSourceRect,CONST RECT* pDestRect,HWND hDestWindowOverride,CONST RGNDATA* pDirtyRegion,DWORD dwFlags)
 {
+	SIMPLE_FUNC_SCOPE();
+
 	// Only allow source rects the same size as the backbuffer:
 	if (pSourceRect)
 	{
@@ -121,7 +123,11 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::Present(
 	}
 #endif
 
-	HRESULT ret = realObject->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+	HRESULT ret;
+	{
+		SIMPLE_NAME_SCOPE("Real Device Present");
+		ret = realObject->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion, dwFlags);
+	}
 	return ret;
 }
 
@@ -320,6 +326,8 @@ void IDirect3DSwapChain9Hook::InitBlitSurface(void)
 // Blit from the software backbuffer to the hardware backbuffer:
 void IDirect3DSwapChain9Hook::InternalBlit(void)
 {
+	SIMPLE_FUNC_SCOPE();
+
 	LPDIRECT3DDEVICE9 rawDevice = parentDevice->GetUnderlyingDevice();
 	LPDIRECT3DSURFACE9 rawBackBuffer = NULL;
 	rawDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &rawBackBuffer);
@@ -333,7 +341,12 @@ void IDirect3DSwapChain9Hook::InternalBlit(void)
 		__debugbreak();
 	}
 #endif
-	memcpy(d3dlr.pBits, surfaceBytesRaw, backBuffer->GetInternalWidth() * backBuffer->GetInternalHeight() * sizeof(D3DCOLOR) );
+	
+	{
+		SIMPLE_NAME_SCOPE("Blit Memcpy");
+		memcpy(d3dlr.pBits, surfaceBytesRaw, backBuffer->GetInternalWidth() * backBuffer->GetInternalHeight() * sizeof(D3DCOLOR) );
+	}
+
 	tempBlitSurface->UnlockRect();
 
 #ifdef FORCE_CLEAR_REAL_BACKBUFFER
