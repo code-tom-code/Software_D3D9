@@ -1957,9 +1957,9 @@ void IDirect3DSurface9Hook::InternalDepthFill(const float depth, const D3DRECT* 
 	{
 		unsigned short* const pixels = (unsigned short* const)surfaceBytesRaw;
 		const unsigned short formatPixel = (const unsigned short)(0x7FFF * depth);
-		for (unsigned y = 0; y < InternalHeight; ++y)
-			for (unsigned x = 0; x < InternalWidth; ++x)
-				pixels[y * InternalWidth + x] = formatPixel;
+		const unsigned numPixels = InternalWidth * InternalHeight;
+		for (unsigned x = 0; x < numPixels; ++x)
+			pixels[x] = formatPixel;
 	}
 	break;
 	case D3DFMT_D16:
@@ -1967,9 +1967,9 @@ void IDirect3DSurface9Hook::InternalDepthFill(const float depth, const D3DRECT* 
 	{
 		unsigned short* const pixels = (unsigned short* const)surfaceBytesRaw;
 		const unsigned short formatPixel = (const unsigned short)(0xFFFF * depth);
-		for (unsigned y = 0; y < InternalHeight; ++y)
-			for (unsigned x = 0; x < InternalWidth; ++x)
-				pixels[y * InternalWidth + x] = formatPixel;
+		const unsigned numPixels = InternalWidth * InternalHeight;
+		for (unsigned x = 0; x < numPixels; ++x)
+			pixels[x] = formatPixel;
 	}
 		break;
 	case D3DFMT_D24FS8:
@@ -1979,9 +1979,9 @@ void IDirect3DSurface9Hook::InternalDepthFill(const float depth, const D3DRECT* 
 	{
 		unsigned* const pixels = (unsigned* const)surfaceBytesRaw;
 		const unsigned formatPixel = (const unsigned)(0x00FFFFFF * depth);
-		for (unsigned y = 0; y < InternalHeight; ++y)
-			for (unsigned x = 0; x < InternalWidth; ++x)
-				pixels[y * InternalWidth + x] = formatPixel;
+		const unsigned numPixels = InternalWidth * InternalHeight;
+		for (unsigned x = 0; x < numPixels; ++x)
+			pixels[x] = formatPixel;
 	}
 		break;
 	case D3DFMT_D32:
@@ -1990,17 +1990,17 @@ void IDirect3DSurface9Hook::InternalDepthFill(const float depth, const D3DRECT* 
 	{
 		unsigned* const pixels = (unsigned * const)surfaceBytesRaw;
 		const unsigned formatPixel = (const unsigned)(0xFFFFFFFF * depth);
-		for (unsigned y = 0; y < InternalHeight; ++y)
-			for (unsigned x = 0; x < InternalWidth; ++x)
-				pixels[y * InternalWidth + x] = formatPixel;
+		const unsigned numPixels = InternalWidth * InternalHeight;
+		for (unsigned x = 0; x < numPixels; ++x)
+			pixels[x] = formatPixel;
 	}
 		break;
 	case D3DFMT_D32F_LOCKABLE:
 	{
 		float* const pixels = (float* const)surfaceBytesRaw;
-		for (unsigned y = 0; y < InternalHeight; ++y)
-			for (unsigned x = 0; x < InternalWidth; ++x)
-				pixels[y * InternalWidth + x] = depth;
+		const unsigned numPixels = InternalWidth * InternalHeight;
+		for (unsigned x = 0; x < numPixels; ++x)
+			pixels[x] = depth;
 	}
 		break;
 	default:
@@ -2028,9 +2028,7 @@ void IDirect3DSurface9Hook::InternalStencilFill(const DWORD stencil, const D3DRE
 	if (!pRect)
 	{
 		BYTE* const stencilBuffer = auxSurfaceBytesRaw;
-		for (unsigned y = 0; y < InternalHeight; ++y)
-			for (unsigned x = 0; x < InternalWidth; ++x)
-				stencilBuffer[y * InternalWidth + x] = maskedStencilByte;		
+		memset(stencilBuffer, maskedStencilByte, InternalWidth * InternalHeight * sizeof(BYTE) );
 	}
 	else
 	{
