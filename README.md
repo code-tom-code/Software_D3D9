@@ -1,6 +1,6 @@
-# Software_D3D9
+# Software D3D9
 
-Performs software emulation for all of Direct3D9 via a proxy DLL (drop-in proxy replacement for Microsoft's official **d3d9.dll**). This project is intended to be a working full software emulation of Direct3D9 for educational purposes. It is intended to work with real games and other programs, and eventually should support a high level of compatibility with a wide range of existing D3D9 games and programs. Since this is software emulating hardware, this will never be as fast as a real GPU. Hopefully people can use this to learn more about how D3D9 works under the hood and to feel inspired about how 3D graphics works as a larger whole.
+Performs software emulation for all of Direct3D 9 and Direct3D 9Ex via a proxy DLL (drop-in proxy replacement for Microsoft's official **d3d9.dll**). This project is intended to be a working full software emulation of Direct3D9 for educational purposes. It is intended to work with real games and other programs, and eventually should support a high level of compatibility with a wide range of existing D3D9 games and programs. Since this is software emulating hardware, this will never be as fast as a real GPU. Hopefully people can use this to learn more about how D3D9 works under the hood and to feel inspired about how 3D graphics works as a larger whole.
 
 ## Getting Started
 
@@ -71,7 +71,7 @@ Release/Win32: .\Release\
 Debug/Win64: .\x64\Debug\
 Release/Win64: .\x64\Release\
 ```
-Copy the newly build **d3d9.dll** file from that folder and paste it into the directory next to the program that you wish to test with it. Depending on how this program is launched and how it is configured to load DLLs, you may want to instead place the proxy DLL into the working directory of your test program rather than the immediate directory in which the executable resides. Due to how DLL loading works on Windows (unless programs specify otherwise), the proxy **d3d9.dll** should be picked up rather than the true Microsoft **d3d9.dll**.
+Copy the newly built **d3d9.dll** file from that folder and paste it into the directory next to the program that you wish to test with it. Depending on how this program is launched and how it is configured to load DLLs, you may want to instead place the proxy DLL into the working directory of your test program rather than the immediate directory in which the executable resides. Due to how DLL loading works on Windows (unless programs specify otherwise), the proxy **d3d9.dll** should be picked up rather than the true Microsoft **d3d9.dll**.
 
 If you run into errors while trying to launch your program about a missing **d3dx9_43.dll** (or any other version of "d3dx9_XX.dll"), then be sure to install the DirectX End-User Runtimes (https://www.microsoft.com/en-us/download/details.aspx?id=8109) before trying to launch your program. This should not be a problem on Windows 8 and up as these DLLs ship with the operating system, but may be an issue on Windows XP, Windows Vista, or Windows 7.
 
@@ -93,5 +93,5 @@ This project is licensed under the zLib/LibPNG License - see the [LICENSE.txt](L
 ## Acknowledgments
 
 * Thanks to Michael Chourdakis for his Wrappit code (https://www.codeproject.com/Articles/16541/Create-your-Proxy-DLLs-automatically). It's been useful for me for years now for easily generating a starting-point for a proxy DLL.
-* Thanks to Microsoft and MSDN for having awesome documentation for the Direct3D9/9Ex and the HLSL shader bytecode format docs to go off of. They have really helped with navigating edge cases and solving tricky problems.
+* Thanks to Microsoft and MSDN for having awesome documentation for the Direct3D9/9Ex API's and the HLSL shader bytecode format docs to go off of. They have really helped with navigating edge cases and solving tricky problems.
 * Thanks to rygorous (Fabian 'ryg' Giesen) for authoring his series of articles that illuminate how modern GPUs work under the hood in great detail (https://fgiesen.wordpress.com/2011/07/09/a-trip-through-the-graphics-pipeline-2011-index/).
