@@ -3,6 +3,14 @@
 #include "GlobalToggles.h"
 #include "IDirect3DSurface9Hook.h"
 
+static const __m128i zeroMaskVecI = { 0 };
+static const __m128 zeroVecF = { 0.0f, 0.0f, 0.0f, 0.0f };
+static const __m128 oneVecF = { 1.0f, 1.0f, 1.0f, 1.0f };
+static const __m128 d15divisor = { 1.0f / 32767.0f, 1.0f / 32767.0f, 1.0f / 32767.0f, 1.0f / 32767.0f };
+static const __m128 d16divisor = { 1.0f / 65535.0f, 1.0f / 65535.0f, 1.0f / 65535.0f, 1.0f / 65535.0f };
+static const __m128 d24divisor = { 1.0f / 16777215.0f, 1.0f / 16777215.0f, 1.0f / 16777215.0f, 1.0f / 16777215.0f };
+static const __m128 d32divisor = { 1.0f / 4294967295.0f, 1.0f / 4294967295.0f, 1.0f / 4294967295.0f, 1.0f / 4294967295.0f };
+
 static inline const bool IsCompressedFormat(const D3DFORMAT format)
 {
 	switch (format)
@@ -1323,6 +1331,17 @@ static inline void AllocSurfaceBytes(const unsigned surfaceBytesSize, BYTE*& out
 	outSurfaceBytesSize = surfaceBytesSize;
 }
 
+void IDirect3DSurface9Hook::UpdateCachedValuesOnCreate()
+{
+	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
+	InternalWidthM1 = InternalWidth - 1;
+	InternalHeightM1 = InternalHeight - 1;
+	InternalWidthM1F = (const float)InternalWidthM1;
+	InternalHeightM1F = (const float)InternalHeightM1;
+
+	InternalWidthSplatted = _mm_shuffle_epi32(_mm_loadu_si32(&InternalWidth), _MM_SHUFFLE(0, 0, 0, 0) );
+}
+
 void IDirect3DSurface9Hook::CreateOffscreenPlainSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DPOOL _Pool)
 {
 	creationMethod = createOffscreenPlain;
@@ -1332,11 +1351,7 @@ void IDirect3DSurface9Hook::CreateOffscreenPlainSurface(UINT _Width, UINT _Heigh
 	InternalPool = _Pool;
 	LockableRT = TRUE;
 	DiscardRT = FALSE;
-	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
-	InternalWidthM1 = InternalWidth - 1;
-	InternalHeightM1 = InternalHeight - 1;
-	InternalWidthM1F = (const float)InternalWidthM1;
-	InternalHeightM1F = (const float)InternalHeightM1;
+	UpdateCachedValuesOnCreate();
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
 #ifdef SURFACE_MAGIC_COOKIE
@@ -1373,11 +1388,7 @@ void IDirect3DSurface9Hook::CreateDepthStencilSurface(UINT _Width, UINT _Height,
 	LockableRT = FALSE;
 	InternalPool = D3DPOOL_DEFAULT;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_RENDERTARGET | D3DUSAGE_DEPTHSTENCIL);
-	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
-	InternalWidthM1 = InternalWidth - 1;
-	InternalHeightM1 = InternalHeight - 1;
-	InternalWidthM1F = (const float)InternalWidthM1;
-	InternalHeightM1F = (const float)InternalHeightM1;
+	UpdateCachedValuesOnCreate();
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
 #ifdef SURFACE_MAGIC_COOKIE
@@ -1414,11 +1425,7 @@ void IDirect3DSurface9Hook::CreateRenderTarget(UINT _Width, UINT _Height, D3DFOR
 	DiscardRT = FALSE;
 	InternalPool = D3DPOOL_DEFAULT;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_RENDERTARGET);
-	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
-	InternalWidthM1 = InternalWidth - 1;
-	InternalHeightM1 = InternalHeight - 1;
-	InternalWidthM1F = (const float)InternalWidthM1;
-	InternalHeightM1F = (const float)InternalHeightM1;
+	UpdateCachedValuesOnCreate();
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
 #ifdef SURFACE_MAGIC_COOKIE
@@ -1461,11 +1468,7 @@ void IDirect3DSurface9Hook::CreateTextureImplicitSurface(UINT _Width, UINT _Heig
 		LockableRT = FALSE;
 	}
 	DiscardRT = FALSE;
-	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
-	InternalWidthM1 = InternalWidth - 1;
-	InternalHeightM1 = InternalHeight - 1;
-	InternalWidthM1F = (const float)InternalWidthM1;
-	InternalHeightM1F = (const float)InternalHeightM1;
+	UpdateCachedValuesOnCreate();
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
 #ifdef SURFACE_MAGIC_COOKIE
@@ -1500,11 +1503,7 @@ void IDirect3DSurface9Hook::CreateDeviceImplicitSurface(const D3DPRESENT_PARAMET
 	InternalFormat = d3dpp.BackBufferFormat;
 	InternalPool = D3DPOOL_DEFAULT;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_RENDERTARGET); // The implicit backbuffer is a rendertarget
-	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
-	InternalWidthM1 = InternalWidth - 1;
-	InternalHeightM1 = InternalHeight - 1;
-	InternalWidthM1F = (const float)InternalWidthM1;
-	InternalHeightM1F = (const float)InternalHeightM1;
+	UpdateCachedValuesOnCreate();
 
 	if (d3dpp.Flags & D3DPRESENTFLAG_LOCKABLE_BACKBUFFER)
 		LockableRT = TRUE;
@@ -1547,11 +1546,7 @@ void IDirect3DSurface9Hook::CreateDeviceImplicitDepthStencil(const D3DPRESENT_PA
 	InternalPool = D3DPOOL_DEFAULT;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_DEPTHSTENCIL); // Important not to mark this with the D3DUSAGE_RENDERTARGET Usage because that will get a Usage-mismatch with real D3D9!
 	LockableRT = FALSE;
-	is1x1surface = (InternalWidth == 1 && InternalHeight == 1);
-	InternalWidthM1 = InternalWidth - 1;
-	InternalHeightM1 = InternalHeight - 1;
-	InternalWidthM1F = (const float)InternalWidthM1;
-	InternalHeightM1F = (const float)InternalHeightM1;
+	UpdateCachedValuesOnCreate();
 
 	if (d3dpp.Flags & D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL)
 		DiscardRT = TRUE;
@@ -2314,6 +2309,9 @@ void IDirect3DSurface9Hook::GetPixelVec(const unsigned x, const unsigned y, D3DX
 template <const unsigned char writeMask, const bool sRGBSurface>
 void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned (&y4)[4], D3DXVECTOR4 (&outColor4)[4]) const
 {
+	const __m128i x4vec = *(const __m128i* const)x4;
+	const __m128i y4vec = *(const __m128i* const)y4;
+	const __m128i pixelIndex = _mm_add_epi32(_mm_mullo_epi32(y4vec, InternalWidthSplatted), x4vec);
 	switch (InternalFormat)
 	{
 	default:
@@ -2325,15 +2323,17 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 	case D3DFMT_X8R8G8B8:
 	{
 		const D3DCOLOR* const pixels = (const D3DCOLOR* const)surfaceBytesRaw;
-		const D3DCOLOR ldrColor4[4] =
-		{
-			pixels[y4[0] * InternalWidth + x4[0] ],
-			pixels[y4[1] * InternalWidth + x4[1] ],
-			pixels[y4[2] * InternalWidth + x4[2] ],
-			pixels[y4[3] * InternalWidth + x4[3] ]
-		};
-		ColorDWORDToFloat4_4<writeMask & 0x7>(ldrColor4, outColor4);
-		outColor4[0].w = outColor4[1].w = outColor4[2].w = outColor4[3].w = 1.0f;
+
+		const __m128i ldrColor4 = _mm_i32gather_epi32( (const int* const)pixels, pixelIndex, 4);
+
+		ColorDWORDToFloat4_4<(writeMask == 0xF) ? 0xF : (writeMask & 0x7)>(ldrColor4, outColor4);
+
+		// Set the W components to 1.0f:
+		*(__m128* const)&outColor4[0] = _mm_blend_ps(*(__m128* const)&outColor4[0], oneVecF, 1 << 3);
+		*(__m128* const)&outColor4[1] = _mm_blend_ps(*(__m128* const)&outColor4[1], oneVecF, 1 << 3);
+		*(__m128* const)&outColor4[2] = _mm_blend_ps(*(__m128* const)&outColor4[2], oneVecF, 1 << 3);
+		*(__m128* const)&outColor4[3] = _mm_blend_ps(*(__m128* const)&outColor4[3], oneVecF, 1 << 3);
+
 		if (sRGBSurface)
 			GammaCorrectSample4<writeMask & 0x7>(outColor4);
 	}
@@ -2341,13 +2341,7 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 	case D3DFMT_A8R8G8B8:
 	{
 		const D3DCOLOR* const pixels = (const D3DCOLOR* const)surfaceBytesRaw;
-		const D3DCOLOR ldrColor4[4] =
-		{
-			pixels[y4[0] * InternalWidth + x4[0] ],
-			pixels[y4[1] * InternalWidth + x4[1] ],
-			pixels[y4[2] * InternalWidth + x4[2] ],
-			pixels[y4[3] * InternalWidth + x4[3] ]
-		};
+		const __m128i ldrColor4 = _mm_i32gather_epi32( (const int* const)pixels, pixelIndex, 4);
 		ColorDWORDToFloat4_4<writeMask>(ldrColor4, outColor4);
 		if (sRGBSurface)
 			GammaCorrectSample4<writeMask & 0x7>(outColor4);
@@ -2358,10 +2352,10 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 		const A16B16G16R16* const pixels = (const A16B16G16R16* const)surfaceBytesRaw;
 		const A16B16G16R16 pixel4[4] = 
 		{
-			pixels[y4[0] * InternalWidth + x4[0] ],
-			pixels[y4[1] * InternalWidth + x4[1] ],
-			pixels[y4[2] * InternalWidth + x4[2] ],
-			pixels[y4[3] * InternalWidth + x4[3] ]
+			pixels[pixelIndex.m128i_u32[0] ],
+			pixels[pixelIndex.m128i_u32[1] ],
+			pixels[pixelIndex.m128i_u32[2] ],
+			pixels[pixelIndex.m128i_u32[3] ]
 		};
 
 		ColorA16B16G16R16ToFloat4_4<writeMask>(pixel4, outColor4);
@@ -2374,10 +2368,10 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 		const A16B16G16R16F* const pixels = (const A16B16G16R16F* const)surfaceBytesRaw;
 		const A16B16G16R16F* const pixel4[4] = 
 		{
-			&pixels[y4[0] * InternalWidth + x4[0] ],
-			&pixels[y4[1] * InternalWidth + x4[1] ],
-			&pixels[y4[2] * InternalWidth + x4[2] ],
-			&pixels[y4[3] * InternalWidth + x4[3] ]
+			&pixels[pixelIndex.m128i_u32[0] ],
+			&pixels[pixelIndex.m128i_u32[1] ],
+			&pixels[pixelIndex.m128i_u32[2] ],
+			&pixels[pixelIndex.m128i_u32[3] ]
 		};
 
 		ColorA16B16G16R16FToFloat4_4<writeMask>(pixel4, outColor4);
@@ -2388,10 +2382,10 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 		const A32B32G32R32F* const pixels = (const A32B32G32R32F* const)surfaceBytesRaw;
 		const A32B32G32R32F* const pixel4[4] = 
 		{
-			&pixels[y4[0] * InternalWidth + x4[0] ],
-			&pixels[y4[1] * InternalWidth + x4[1] ],
-			&pixels[y4[2] * InternalWidth + x4[2] ],
-			&pixels[y4[3] * InternalWidth + x4[3] ]
+			&pixels[pixelIndex.m128i_u32[0]  ],
+			&pixels[pixelIndex.m128i_u32[1]  ],
+			&pixels[pixelIndex.m128i_u32[2]  ],
+			&pixels[pixelIndex.m128i_u32[3]  ]
 		};
 
 		ColorA32B32G32R32FToFloat4_4<writeMask>(pixel4, outColor4);
@@ -2402,10 +2396,10 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 		const D3DXFLOAT16* const pixels = (const D3DXFLOAT16* const)surfaceBytesRaw;
 		const D3DXFLOAT16 pixel4[4] = 
 		{
-			pixels[y4[0] * InternalWidth + x4[0] ],
-			pixels[y4[1] * InternalWidth + x4[1] ],
-			pixels[y4[2] * InternalWidth + x4[2] ],
-			pixels[y4[3] * InternalWidth + x4[3] ]
+			pixels[pixelIndex.m128i_u32[0] ],
+			pixels[pixelIndex.m128i_u32[1] ],
+			pixels[pixelIndex.m128i_u32[2] ],
+			pixels[pixelIndex.m128i_u32[3] ]
 		};
 
 		ColorR16FToFloat4_4<writeMask>(pixel4, outColor4);
@@ -2414,15 +2408,13 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 	case D3DFMT_L8:
 	{
 		const unsigned char* const pixels = (const unsigned char* const)surfaceBytesRaw;
-		const unsigned char pixel4[4] = 
-		{
-			pixels[y4[0] * InternalWidth + x4[0] ],
-			pixels[y4[1] * InternalWidth + x4[1] ],
-			pixels[y4[2] * InternalWidth + x4[2] ],
-			pixels[y4[3] * InternalWidth + x4[3] ]
-		};
+		__m128i pixelsSSE;
+		pixelsSSE.m128i_u8[0] = pixels[pixelIndex.m128i_u32[0] ];
+		pixelsSSE.m128i_u8[1] = pixels[pixelIndex.m128i_u32[1] ];
+		pixelsSSE.m128i_u8[2] = pixels[pixelIndex.m128i_u32[2] ];
+		pixelsSSE.m128i_u8[3] = pixels[pixelIndex.m128i_u32[3] ];
 
-		L8ToFloat4_4<writeMask>(pixel4, outColor4);
+		L8ToFloat4_4<writeMask>(pixelsSSE, outColor4);
 		if (sRGBSurface)
 			GammaCorrectSample4<writeMask & 0x7>(outColor4);
 	}
@@ -2434,13 +2426,7 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 	case D3DFMT_DXT5:
 	{
 		const D3DCOLOR* const rawPixels = (const D3DCOLOR* const)auxSurfaceBytesRaw;
-		const D3DCOLOR ldrColor4[4] = 
-		{
-			rawPixels[y4[0] * InternalWidth + x4[0] ],
-			rawPixels[y4[1] * InternalWidth + x4[1] ],
-			rawPixels[y4[2] * InternalWidth + x4[2] ],
-			rawPixels[y4[3] * InternalWidth + x4[3] ]
-		};
+		const __m128i ldrColor4 = _mm_i32gather_epi32( (const int* const)rawPixels, pixelIndex, 4);
 		ColorDWORDToFloat4_4<writeMask>(ldrColor4, outColor4);
 		if (sRGBSurface)
 			GammaCorrectSample4<writeMask & 0x7>(outColor4);
@@ -2497,10 +2483,83 @@ const float IDirect3DSurface9Hook::GetDepth(const unsigned x, const unsigned y) 
 	default:
 #ifdef _DEBUG
 		__debugbreak(); // Error: Can't call GetDepth() on non-depth formats!
+#else
+		__assume(0);
 #endif
 		break;
 	}
 	return 0.0f;
+}
+
+const __m128 IDirect3DSurface9Hook::GetDepth4(const __m128i x4, const __m128i y4) const
+{
+	const __m128i pixelIndex4 = _mm_add_epi32(_mm_mullo_epi32(y4, InternalWidthSplatted), x4);
+
+	switch (InternalFormat)
+	{
+	case D3DFMT_D15S1:
+	{
+		const unsigned short* const pixels = (const unsigned short* const)surfaceBytesRaw;
+
+		__m128i rawDepth4;
+		rawDepth4.m128i_u32[0] = pixels[pixelIndex4.m128i_u32[0] ];
+		rawDepth4.m128i_u32[1] = pixels[pixelIndex4.m128i_u32[1] ];
+		rawDepth4.m128i_u32[2] = pixels[pixelIndex4.m128i_u32[2] ];
+		rawDepth4.m128i_u32[3] = pixels[pixelIndex4.m128i_u32[3] ];
+
+		const __m128 rawFloatDepth4 = _mm_cvtepi32_ps(rawDepth4);
+		return _mm_mul_ps(rawFloatDepth4, d15divisor);
+	}
+	case D3DFMT_D16:
+	case D3DFMT_D16_LOCKABLE:
+	{
+		const unsigned short* const pixels = (const unsigned short* const)surfaceBytesRaw;
+
+		__m128i rawDepth4;
+		rawDepth4.m128i_u32[0] = pixels[pixelIndex4.m128i_u32[0] ];
+		rawDepth4.m128i_u32[1] = pixels[pixelIndex4.m128i_u32[1] ];
+		rawDepth4.m128i_u32[2] = pixels[pixelIndex4.m128i_u32[2] ];
+		rawDepth4.m128i_u32[3] = pixels[pixelIndex4.m128i_u32[3] ];
+
+		const __m128 rawFloatDepth4 = _mm_cvtepi32_ps(rawDepth4);
+		return _mm_mul_ps(rawFloatDepth4, d16divisor);
+	}
+	case D3DFMT_D24FS8:
+	case D3DFMT_D24S8:
+	case D3DFMT_D24X4S4:
+	case D3DFMT_D24X8:
+	{
+		const int* const pixels = (const int* const)surfaceBytesRaw;
+		const __m128i rawDepth4 = _mm_i32gather_epi32(pixels, pixelIndex4, 4);
+
+		const __m128 rawFloatDepth4 = _mm_cvtepi32_ps(rawDepth4);
+		return _mm_mul_ps(rawFloatDepth4, d24divisor);
+	}
+	case D3DFMT_D32:
+	case D3DFMT_D32_LOCKABLE:
+	case MAKEFOURCC('I', 'N', 'T', 'Z'):
+	{
+		const int* const pixels = (const int* const)surfaceBytesRaw;
+		const __m128i rawDepth4 = _mm_i32gather_epi32(pixels, pixelIndex4, 4);
+
+		const __m128 rawFloatDepth4 = _mm_cvtepi32_ps(rawDepth4);
+		return _mm_mul_ps(rawFloatDepth4, d32divisor);
+	}
+	case D3DFMT_D32F_LOCKABLE:
+	{
+		const float* const pixels = (const float* const)surfaceBytesRaw;
+		const __m128 rawFloatDepth4 = _mm_i32gather_ps(pixels, pixelIndex4, 4);
+		return rawFloatDepth4;
+	}
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // Error: Can't call GetDepth() on non-depth formats!
+#else
+		__assume(0);
+#endif
+		break;
+	}
+	return zeroVecF;
 }
 
 const unsigned IDirect3DSurface9Hook::GetRawDepthValueFromFloatDepth(const float floatDepth) const
@@ -2526,6 +2585,8 @@ const unsigned IDirect3DSurface9Hook::GetRawDepthValueFromFloatDepth(const float
 	default:
 #ifdef _DEBUG
 		__debugbreak(); // Error: Can't call GetDepth() on non-depth formats!
+#else
+		__assume(0);
 #endif
 		return 0u;
 	}
@@ -2579,10 +2640,55 @@ const unsigned IDirect3DSurface9Hook::GetRawDepth(const unsigned x, const unsign
 	default:
 #ifdef _DEBUG
 		__debugbreak(); // Error: Can't call GetDepth() on non-depth formats!
+#else
+		__assume(0);
 #endif
 		break;
 	}
 	return 0x00000000;
+}
+
+const __m128i IDirect3DSurface9Hook::GetRawDepth4(const __m128i x4, const __m128i y4) const
+{
+	const __m128i pixelIndex4 = _mm_add_epi32(_mm_mullo_epi32(y4, InternalWidthSplatted), x4);
+
+	switch (InternalFormat)
+	{
+	case D3DFMT_D15S1:
+	case D3DFMT_D16:
+	case D3DFMT_D16_LOCKABLE:
+	{
+		const unsigned short* const pixels = (const unsigned short* const)surfaceBytesRaw;
+
+		__m128i rawDepth4;
+		rawDepth4.m128i_u32[0] = pixels[pixelIndex4.m128i_u32[0] ];
+		rawDepth4.m128i_u32[1] = pixels[pixelIndex4.m128i_u32[1] ];
+		rawDepth4.m128i_u32[2] = pixels[pixelIndex4.m128i_u32[2] ];
+		rawDepth4.m128i_u32[3] = pixels[pixelIndex4.m128i_u32[3] ];
+		return rawDepth4;
+	}
+	case D3DFMT_D24FS8:
+	case D3DFMT_D24S8:
+	case D3DFMT_D24X4S4:
+	case D3DFMT_D24X8:
+	case D3DFMT_D32:
+	case D3DFMT_D32_LOCKABLE:
+	case D3DFMT_D32F_LOCKABLE:
+	case MAKEFOURCC('I', 'N', 'T', 'Z'):
+	{
+		const int* const pixels = (const int* const)surfaceBytesRaw;
+		const __m128i rawDepth4 = _mm_i32gather_epi32(pixels, pixelIndex4, 4);
+		return rawDepth4;
+	}
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // Error: Can't call GetDepth() on non-depth formats!
+#else
+		__assume(0);
+#endif
+		break;
+	}
+	return zeroMaskVecI;
 }
 
 void IDirect3DSurface9Hook::SetDepth(const unsigned x, const unsigned y, const float depth)
@@ -2645,6 +2751,97 @@ void IDirect3DSurface9Hook::SetDepth(const unsigned x, const unsigned y, const f
 	default:
 #ifdef _DEBUG
 		__debugbreak(); // Error: Can't call SetDepth() on non-depth formats!
+#else
+		__assume(0);
+#endif
+		break;
+	}
+}
+
+const __m128 depthScale15 = { 32767.0f, 32767.0f, 32767.0f, 32767.0f };
+const __m128 depthScale16 = { 65535.0f, 65535.0f, 65535.0f, 65535.0f };
+const __m128 depthScale24 = { 16777215.0f, 16777215.0f, 16777215.0f, 16777215.0f };
+const __m128 depthScale32 = { 4294967295.0f, 4294967295.0f, 4294967295.0f, 4294967295.0f };
+void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const __m128 depth4)
+{
+	const __m128i pixelIndex = _mm_add_epi32(_mm_mullo_epi32(y4, InternalWidthSplatted), x4);
+
+	// Sadly we don't have scatter instructions in AVX2, so four consecutive writes is the best we can do
+	switch (InternalFormat)
+	{
+	case D3DFMT_D15S1:
+	{
+		unsigned short* const pixels = (unsigned short* const)surfaceBytesRaw;
+
+		const __m128 scaledDepth4 = _mm_mul_ps(depthScale15, depth4);
+		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
+
+		pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+		pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+		pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+	}
+		break;
+	case D3DFMT_D16:
+	case D3DFMT_D16_LOCKABLE:
+	{
+		unsigned short* const pixels = (unsigned short* const)surfaceBytesRaw;
+
+		const __m128 scaledDepth4 = _mm_mul_ps(depthScale16, depth4);
+		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
+
+		pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+		pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+		pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+	}
+		break;
+	case D3DFMT_D24FS8:
+	case D3DFMT_D24S8:
+	case D3DFMT_D24X4S4:
+	case D3DFMT_D24X8:
+	{
+		unsigned* const pixels = (unsigned* const)surfaceBytesRaw;
+
+		const __m128 scaledDepth4 = _mm_mul_ps(depthScale24, depth4);
+		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
+
+		pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+		pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+		pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+	}
+		break;
+	case D3DFMT_D32:
+	case D3DFMT_D32_LOCKABLE:
+	case MAKEFOURCC('I', 'N', 'T', 'Z'):
+	{
+		unsigned* const pixels = (unsigned* const)surfaceBytesRaw;
+
+		const __m128 scaledDepth4 = _mm_mul_ps(depthScale32, depth4);
+		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
+
+		pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+		pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+		pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+	}
+		break;
+	case D3DFMT_D32F_LOCKABLE:
+	{
+		float* const pixels = (float* const)surfaceBytesRaw;
+
+		pixels[pixelIndex.m128i_u32[0] ] = depth4.m128_f32[0];
+		pixels[pixelIndex.m128i_u32[1] ] = depth4.m128_f32[1];
+		pixels[pixelIndex.m128i_u32[2] ] = depth4.m128_f32[2];
+		pixels[pixelIndex.m128i_u32[3] ] = depth4.m128_f32[3];
+	}
+		break;
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // Error: Can't call SetDepth() on non-depth formats!
+#else
+		__assume(0);
 #endif
 		break;
 	}
@@ -2674,10 +2871,45 @@ void IDirect3DSurface9Hook::SetStencil(const unsigned x, const unsigned y, const
 #endif
 }
 
+void IDirect3DSurface9Hook::SetStencil4(const __m128i x4, const __m128i y4, const DWORD stencil4)
+{
+	DWORD stencilMask4 = GetStencilFormatMask(InternalFormat);
+	stencilMask4 |= (stencilMask4 << 8);
+	stencilMask4 |= (stencilMask4 << 16);
+	const DWORD maskedStencil = stencil4 & stencilMask4;
+
+	const __m128i pixelIndex4 = _mm_add_epi32(_mm_mullo_epi32(y4, InternalWidthSplatted), x4);
+
+	BYTE* const stencilBuffer = auxSurfaceBytesRaw;
+	stencilBuffer[pixelIndex4.m128i_u32[0] ] = (const BYTE)maskedStencil;
+	stencilBuffer[pixelIndex4.m128i_u32[1] ] = (const BYTE)(maskedStencil >> 8);
+	stencilBuffer[pixelIndex4.m128i_u32[2] ] = (const BYTE)(maskedStencil >> 16);
+	stencilBuffer[pixelIndex4.m128i_u32[3] ] = (const BYTE)(maskedStencil >> 24);
+
+#ifdef WITH_SURFACE_HASHING
+	RecomputeSurfaceHash();
+#endif
+}
+
 const DWORD IDirect3DSurface9Hook::GetStencil(const unsigned x, const unsigned y) const
 {
 	const BYTE* const stencilBuffer = auxSurfaceBytesRaw;
 	return stencilBuffer[y * InternalWidth + x];
+}
+
+const __m128i IDirect3DSurface9Hook::GetStencil4(const __m128i x4, const __m128i y4) const
+{
+	const BYTE* const stencilBuffer = auxSurfaceBytesRaw;
+
+	const __m128i byteOffsets = _mm_add_epi32(_mm_mullo_epi32(InternalWidthSplatted, y4), x4);
+
+	__m128i stencilLookups;
+	stencilLookups.m128i_u32[0] = stencilBuffer[byteOffsets.m128i_u32[0] ];
+	stencilLookups.m128i_u32[1] = stencilBuffer[byteOffsets.m128i_u32[1] ];
+	stencilLookups.m128i_u32[2] = stencilBuffer[byteOffsets.m128i_u32[2] ];
+	stencilLookups.m128i_u32[3] = stencilBuffer[byteOffsets.m128i_u32[3] ];
+
+	return stencilLookups;
 }
 
 // Don't define the <0> version of this function. Anybody calling it is a dummy because it doesn't write anything anyway.
@@ -2698,7 +2930,7 @@ template void IDirect3DSurface9Hook::SetPixelVec<13>(const unsigned x, const uns
 template void IDirect3DSurface9Hook::SetPixelVec<14>(const unsigned x, const unsigned y, const D3DXVECTOR4& color);
 template void IDirect3DSurface9Hook::SetPixelVec<15>(const unsigned x, const unsigned y, const D3DXVECTOR4& color);
 
-template <const unsigned char writeMask>
+template <const unsigned char channelWriteMask>
 void IDirect3DSurface9Hook::SetPixelVec(const unsigned x, const unsigned y, const D3DXVECTOR4& color)
 {
 #ifdef _DEBUG
@@ -2722,13 +2954,13 @@ void IDirect3DSurface9Hook::SetPixelVec(const unsigned x, const unsigned y, cons
 #endif
 	case D3DFMT_X8R8G8B8:
 	{
-		const D3DCOLOR ldrColor = Float4ToX8R8G8B8Clamp<writeMask & 0x7>(color);
+		const D3DCOLOR ldrColor = Float4ToX8R8G8B8Clamp<channelWriteMask & 0x7>(color);
 		SetPixel(x, y, ldrColor);
 	}
 		break;
 	case D3DFMT_A8R8G8B8:
 	{
-		const D3DCOLOR ldrColor = Float4ToD3DCOLORClamp<writeMask>(color);
+		const D3DCOLOR ldrColor = Float4ToD3DCOLORClamp<channelWriteMask>(color);
 		SetPixel(x, y, ldrColor);
 	}
 		break;
@@ -2739,7 +2971,7 @@ void IDirect3DSurface9Hook::SetPixelVec(const unsigned x, const unsigned y, cons
 #ifdef WITH_SURFACE_HASHING
 		RecomputePartialSurfaceHashXor(writePixel);
 #endif
-		Float4ToA16B16G16R16<writeMask>(color, writePixel);
+		Float4ToA16B16G16R16<channelWriteMask>(color, writePixel);
 #ifdef WITH_SURFACE_HASHING
 		RecomputePartialSurfaceHashXor(writePixel);
 #endif
@@ -2752,7 +2984,7 @@ void IDirect3DSurface9Hook::SetPixelVec(const unsigned x, const unsigned y, cons
 #ifdef WITH_SURFACE_HASHING
 		RecomputePartialSurfaceHashXor(writePixel);
 #endif
-		Float4ToA16B16G16R16F<writeMask>(color, writePixel);
+		Float4ToA16B16G16R16F<channelWriteMask>(color, writePixel);
 #ifdef WITH_SURFACE_HASHING
 		RecomputePartialSurfaceHashXor(writePixel);
 #endif
@@ -2765,7 +2997,7 @@ void IDirect3DSurface9Hook::SetPixelVec(const unsigned x, const unsigned y, cons
 #ifdef WITH_SURFACE_HASHING
 		RecomputePartialSurfaceHashXor(writePixel);
 #endif
-		Float4ToA32B32G32R32F<writeMask>(color, writePixel);
+		Float4ToA32B32G32R32F<channelWriteMask>(color, writePixel);
 #ifdef WITH_SURFACE_HASHING
 		RecomputePartialSurfaceHashXor(writePixel);
 #endif
@@ -2775,7 +3007,7 @@ void IDirect3DSurface9Hook::SetPixelVec(const unsigned x, const unsigned y, cons
 	{
 		D3DXFLOAT16* const pixels = (D3DXFLOAT16* const)surfaceBytesRaw;
 		D3DXFLOAT16& writePixel = pixels[y * InternalWidth + x];
-		Float4ToR16F<writeMask>(color, writePixel);
+		Float4ToR16F<channelWriteMask>(color, writePixel);
 
 		// Can't update the surface hash in this case...
 	}
@@ -2784,7 +3016,147 @@ void IDirect3DSurface9Hook::SetPixelVec(const unsigned x, const unsigned y, cons
 	{
 		unsigned char* const pixels = (unsigned char* const)surfaceBytesRaw;
 		unsigned char& writePixel = pixels[y * InternalWidth + x];
-		Float4ToL8Clamp<writeMask>(color, writePixel);
+		Float4ToL8Clamp<channelWriteMask>(color, writePixel);
+
+		// Can't update the surface hash in this case...
+	}
+		break;
+	}
+}
+
+template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+void IDirect3DSurface9Hook::SetPixelVec4(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4])
+{
+	if (channelWriteMask == 0)
+	{
+#ifdef _DEBUG
+		__debugbreak(); // Don't call this with 0 write masks!
+#endif
+		return;
+	}
+
+	if (pixelWriteMask == 0)
+	{
+#ifdef _DEBUG
+		__debugbreak(); // Don't call this with 0 write masks!
+#endif
+		return;
+	}
+
+	// See if we can drop down to non-quad operations if possible:
+	if (pixelWriteMask == 0x1)
+	{
+		SetPixelVec<channelWriteMask>(x4.m128i_u32[0], y4.m128i_u32[0], color[0]);
+		return;
+	}
+	else if (pixelWriteMask == 0x2)
+	{
+		SetPixelVec<channelWriteMask>(x4.m128i_u32[1], y4.m128i_u32[1], color[1]);
+		return;
+	}
+	else if (pixelWriteMask == 0x4)
+	{
+		SetPixelVec<channelWriteMask>(x4.m128i_u32[2], y4.m128i_u32[2], color[2]);
+		return;
+	}
+	else if (pixelWriteMask == 0x8)
+	{
+		SetPixelVec<channelWriteMask>(x4.m128i_u32[3], y4.m128i_u32[3], color[3]);
+		return;
+	}
+
+	const __m128i pixelIndex = _mm_add_epi32(_mm_mullo_epi32(y4vec, InternalWidthSplatted), x4vec);
+	switch (InternalFormat)
+	{
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // TODO: Add more surface formats
+#else
+		__assume(0);
+#endif
+	case D3DFMT_X8R8G8B8:
+	{
+		D3DCOLOR* const pixels = (D3DCOLOR* const)surfaceBytesRaw;
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 2); // Left-shift by 2 is the same as multiply by sizeof(D3DCOLOR)
+#ifdef _M_X64
+		#error This won't work on x64!
+#else
+		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
+#endif
+		Float4ToX8R8G8B8_4Clamp4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+	}
+		break;
+	case D3DFMT_A8R8G8B8:
+	{
+		D3DCOLOR* const pixels = (D3DCOLOR* const)surfaceBytesRaw;
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 2); // Left-shift by 2 is the same as multiply by sizeof(D3DCOLOR)
+#ifdef _M_X64
+		#error This won't work on x64!
+#else
+		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
+#endif
+		Float4ToD3DCOLOR4Clamp4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+	}
+		break;
+	case D3DFMT_A16B16G16R16:
+	{
+		A16B16G16R16* const pixels = (A16B16G16R16* const)surfaceBytesRaw;
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 3); // Left-shift by 3 is the same as multiply by sizeof(A16B16G16R16)
+#ifdef _M_X64
+		#error This won't work on x64!
+#else
+		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
+#endif
+		Float4ToA16B16G16R16_4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+	}
+		break;
+	case D3DFMT_A16B16G16R16F:
+	{
+		A16B16G16R16F* const pixels = (A16B16G16R16F* const)surfaceBytesRaw;
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 3); // Left-shift by 3 is the same as multiply by sizeof(A16B16G16R16F)
+#ifdef _M_X64
+		#error This won't work on x64!
+#else
+		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
+#endif
+		Float4ToA16B16G16R16F4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+	}
+		break;
+	case D3DFMT_A32B32G32R32F:
+	{
+		A32B32G32R32F* const pixels = (A32B32G32R32F* const)surfaceBytesRaw;
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 4); // Left-shift by 4 is the same as multiply by sizeof(A32B32G32R32F)
+#ifdef _M_X64
+		#error This won't work on x64!
+#else
+		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
+#endif
+		Float4ToA32B32G32R32F4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+	}
+		break;
+	case D3DFMT_R16F:
+	{
+		D3DXFLOAT16* const pixels = (D3DXFLOAT16* const)surfaceBytesRaw;
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 1); // Left-shift by 1 is the same as multiply by sizeof(D3DXFLOAT16)
+#ifdef _M_X64
+		#error This won't work on x64!
+#else
+		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
+#endif
+		Float4ToR16F4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+
+		// Can't update the surface hash in this case...
+	}
+		break;
+	case D3DFMT_L8:
+	{
+		unsigned char* const pixels = (unsigned char* const)surfaceBytesRaw;
+#ifdef _M_X64
+		#error This won't work on x64!
+#else
+		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelIndex);
+#endif
+		Float4ToL8Clamp4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
 
 		// Can't update the surface hash in this case...
 	}
@@ -2916,7 +3288,7 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal(const float x, const float y, 
 		const unsigned cuBotright = cuTopright;
 		const unsigned cvBotright = cvBotleft;
 
-		const unsigned cu4[4] =
+		__declspec(align(16) ) const unsigned cu4[4] =
 		{
 			(const unsigned)cuTopleft,
 			cuTopright,
@@ -2924,7 +3296,7 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal(const float x, const float y, 
 			cuBotright
 		};
 
-		const unsigned cv4[4] =
+		__declspec(align(16) ) const unsigned cv4[4] =
 		{
 			(const unsigned)cvTopleft,
 			cvTopright,
@@ -2932,7 +3304,7 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal(const float x, const float y, 
 			cvBotright
 		};
 
-		D3DXVECTOR4 bilinearSamples[4];
+		__declspec(align(16) ) D3DXVECTOR4 bilinearSamples[4];
 		GetPixelVec4<writeMask, sRGBSurface>(cu4, cv4, bilinearSamples);
 
 		D3DXVECTOR4 topHorizLerp, botHorizLerp;
@@ -3038,9 +3410,9 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const f
 	case D3DTEXF_LINEAR         :
 	{
 		// D3DXVECTOR4 topleft, topright, botleft, botright;
-		D3DXVECTOR4 topleft4[4];
+		__declspec(align(16) ) D3DXVECTOR4 topleft4[4];
 
-		const unsigned cuTopleft4[4] =
+		__declspec(align(16) ) const unsigned cuTopleft4[4] =
 		{
 			(const unsigned)u4[0],
 			(const unsigned)u4[1],
@@ -3048,7 +3420,7 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const f
 			(const unsigned)u4[3]
 		};
 
-		const unsigned cvTopleft4[4] =
+		__declspec(align(16) ) const unsigned cvTopleft4[4] =
 		{
 			(const unsigned)v4[0],
 			(const unsigned)v4[1],
@@ -3058,7 +3430,7 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const f
 
 		GetPixelVec4<writeMask, sRGBSurface>(cuTopleft4, cvTopleft4, topleft4);
 
-		unsigned cuTopright4[4] =
+		__declspec(align(16) ) unsigned cuTopright4[4] =
 		{
 			(const unsigned)(cuTopleft4[0] + 1),
 			(const unsigned)(cuTopleft4[1] + 1),
@@ -3071,10 +3443,10 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const f
 		if (cuTopright4[2] > WidthM1) cuTopright4[2] = WidthM1;
 		if (cuTopright4[3] > WidthM1) cuTopright4[3] = WidthM1;
 
-		D3DXVECTOR4 topright4[4];
+		__declspec(align(16) ) D3DXVECTOR4 topright4[4];
 		GetPixelVec4<writeMask, sRGBSurface>(cuTopright4, cvTopleft4, topright4);
 
-		unsigned cvBotleft4[4] =
+		__declspec(align(16) ) unsigned cvBotleft4[4] =
 		{
 			(const unsigned)(cvTopleft4[0] + 1),
 			(const unsigned)(cvTopleft4[1] + 1),
@@ -3087,10 +3459,10 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const f
 		if (cvBotleft4[2] > HeightM1) cvBotleft4[2] = HeightM1;
 		if (cvBotleft4[3] > HeightM1) cvBotleft4[3] = HeightM1;
 
-		D3DXVECTOR4 botleft4[4];
+		__declspec(align(16) ) D3DXVECTOR4 botleft4[4];
 		GetPixelVec4<writeMask, sRGBSurface>(cuTopleft4, cvBotleft4, botleft4);
 
-		D3DXVECTOR4 botright4[4];
+		__declspec(align(16) ) D3DXVECTOR4 botright4[4];
 		GetPixelVec4<writeMask, sRGBSurface>(cuTopright4, cvBotleft4, botright4);
 
 		D3DXVECTOR4 topHorizLerp4[4];
@@ -3140,14 +3512,14 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const f
 	case D3DTEXF_NONE           :
 	case D3DTEXF_POINT          :
 	{
-		const unsigned u4i[4] =
+		__declspec(align(16) ) const unsigned u4i[4] =
 		{
 			(const unsigned)u4[0],
 			(const unsigned)u4[1],
 			(const unsigned)u4[2],
 			(const unsigned)u4[3]
 		};
-		const unsigned v4i[4] =
+		__declspec(align(16) ) const unsigned v4i[4] =
 		{
 			(const unsigned)v4[0],
 			(const unsigned)v4[1],

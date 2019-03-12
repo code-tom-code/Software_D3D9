@@ -40,6 +40,12 @@ static const D3DXVECTOR4 vertShaderInputRegisterDefault(0.0f, 0.0f, 0.0f, 1.0f);
 static const D3DXVECTOR4 staticColorWhiteOpaque(1.0f, 1.0f, 1.0f, 1.0f);
 static const D3DXVECTOR4 staticColorBlackTranslucent(0.0f, 0.0f, 0.0f, 0.0f);
 
+static const __m128 zeroMaskVec = { 0.0f, 0.0f, 0.0f, 0.0f };
+static const __m128i zeroMaskVecI = { 0 };
+static const unsigned oneMaskVecBytes[4] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
+static const __m128i oneMaskVec = *(const __m128i* const)oneMaskVecBytes;
+static_assert(sizeof(oneMaskVecBytes) == sizeof(oneMaskVec), "Error! Unexpected vector size");
+
 #ifdef PROFILE_AVERAGE_VERTEX_SHADE_TIMES
 	static __int64 totalVertexShadeTicks = 0;
 	static __int64 numVertexShadeTasks = 0;
@@ -87,6 +93,11 @@ static volatile long __declspec(align(16) ) tlsThreadNumber = 0;
 
 static_assert(sizeof(_threadItem) > 64, "Error: False sharing may occur if thread struct is smaller than a cache line!");
 
+struct int3
+{
+	int a, b, c;
+};
+
 __declspec(align(16) ) struct slist_item
 {
 	workerJobType jobType;
@@ -101,11 +112,9 @@ __declspec(align(16) ) struct slist_item
 		struct _pixelJobData
 		{
 			const primitivePixelJobData* primitiveData;
-			unsigned x;
-			unsigned y;
-			int barycentricA;
-			int barycentricB;
-			int barycentricC;
+			int3 barycentricCoords[4];
+			unsigned x[4];
+			unsigned y[4];
 		} pixelJobData;
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 
@@ -177,24 +186,53 @@ static inline void PixelShadeJob1(slist_item& job, _threadItem* const myPtr)
 	const slist_item::_jobData::_pixelJobData& pixelJobData = job.jobData.pixelJobData;
 	const primitivePixelJobData* const primitiveData = pixelJobData.primitiveData;
 
-	SIMPLE_FUNC_SCOPE_CONDITIONAL(primitiveData->primitiveID == 0 && abs( (const int)(320 - pixelJobData.x) ) < 5 && abs( (const int)(240 - pixelJobData.y) ) < 5);
+	SIMPLE_FUNC_SCOPE_CONDITIONAL(primitiveData->primitiveID == 0 && abs( (const int)(320 - pixelJobData.x[0]) ) < 5 && abs( (const int)(240 - pixelJobData.y[0]) ) < 5);
 
-	const D3DXVECTOR3 barycentricInterpolants(pixelJobData.barycentricA * primitiveData->barycentricNormalizeFactor,
-		pixelJobData.barycentricB * primitiveData->barycentricNormalizeFactor,
-		pixelJobData.barycentricC * primitiveData->barycentricNormalizeFactor);
+	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
+	const __m128i barycentricCoordsVector = _mm_load_si128( (const __m128i* const)&pixelJobData.barycentricCoords[0]);
+	const __m128 barycentricCoordsVectorF = _mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordsVector), barycentricNormalizeFactor);
+
 	if (drawCallData.useShaderVerts)
 	{
 		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
-		devHook->ShadePixelFromShader(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), pixelJobData.x, pixelJobData.y, 
+		devHook->ShadePixelFromShader(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), pixelJobData.x[0], pixelJobData.y[0], 
+			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
+	}
+	else
+	{
+		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
+		devHook->ShadePixelFromStream(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), pixelJobData.x[0], pixelJobData.y[0], 
+			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
+	}
+}
+
+/*static inline void PixelShadeJob4(slist_item& job, _threadItem* const myPtr)
+{
+	const IDirect3DDevice9Hook* const devHook = myPtr->devHook;
+	const drawCallPixelJobData& drawCallData = devHook->currentDrawCallData.pixelData;
+	const slist_item::_jobData::_pixelJobData& pixelJobData = job.jobData.pixelJobData;
+	const primitivePixelJobData* const primitiveData = pixelJobData.primitiveData;
+
+	SIMPLE_FUNC_SCOPE_CONDITIONAL(primitiveData->primitiveID == 0 && abs( (const int)(320 - pixelJobData.x[0]) ) < 5 && abs( (const int)(240 - pixelJobData.y[0]) ) < 5);
+
+	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
+
+	const D3DXVECTOR3 barycentricInterpolants(pixelJobData.barycentricA[0] * primitiveData->barycentricNormalizeFactor,
+		pixelJobData.barycentricB[0] * primitiveData->barycentricNormalizeFactor,
+		pixelJobData.barycentricC[0] * primitiveData->barycentricNormalizeFactor);
+	if (drawCallData.useShaderVerts)
+	{
+		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
+		devHook->ShadePixelFromShader(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), pixelJobData.x[0], pixelJobData.y[0], 
 			barycentricInterpolants, drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
 	}
 	else
 	{
 		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
-		devHook->ShadePixelFromStream(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), pixelJobData.x, pixelJobData.y, 
+		devHook->ShadePixelFromStream(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), pixelJobData.x[0], pixelJobData.y[0], 
 			barycentricInterpolants, drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
 	}
-}
+}*/
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
@@ -330,7 +368,7 @@ static inline void WorkUntilNoMoreWork(void* const jobData)
 #endif // #ifdef RUN_SHADERS_IN_WARPS
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-		case pixelShadeJob:
+		case pixelShade1Job:
 			PixelShadeJob1(*item, myPtr);
 			break;
 #ifdef RUN_SHADERS_IN_WARPS
@@ -588,6 +626,79 @@ static inline const bool DepthTest(const float pixelDepth, const unsigned buffer
 		return quantizedPixelDepth >= bufferDepth;
 	case D3DCMP_ALWAYS      :
 		return true;
+	}
+}
+
+// Returns 0xFF if the pixel "passes" the depth test (should be written) and 0x00 if the pixel "fails" the depth test (should be discarded)
+static const __m128 pixelDepthScaleD15 = { 32768.0f, 32768.0f, 32768.0f, 32768.0f };
+static const __m128 pixelDepthScaleD16 = { 65536.0f, 65536.0f, 65536.0f, 65536.0f };
+static const __m128 pixelDepthScaleD24 = { 16777216.0f, 16777216.0f, 16777216.0f, 16777216.0f };
+static const __m128 pixelDepthScaleD32 = { 4294967296.0f, 4294967296.0f, 4294967296.0f, 4294967296.0f };
+static inline const __m128i DepthTest4(const __m128 pixelDepth4, const __m128i bufferDepth4, const D3DCMPFUNC comparison, const D3DFORMAT depthFmt)
+{
+	__m128i quantizedPixelDepth4;
+	switch (depthFmt)
+	{
+	case D3DFMT_D15S1:
+	{
+		const __m128 scaledDepth4 = _mm_mul_ps(pixelDepthScaleD15, pixelDepth4);
+		quantizedPixelDepth4 = _mm_cvtps_epu32(scaledDepth4);
+	}
+		break;
+	case D3DFMT_D16:
+	case D3DFMT_D16_LOCKABLE:
+	{
+		const __m128 scaledDepth4 = _mm_mul_ps(pixelDepthScaleD16, pixelDepth4);
+		quantizedPixelDepth4 = _mm_cvtps_epu32(scaledDepth4);
+	}
+		break;
+	default:
+		DbgBreakPrint("Error: Unknown Depth buffer format!");
+	case D3DFMT_D24FS8:
+	case D3DFMT_D24S8:
+	case D3DFMT_D24X4S4:
+	case D3DFMT_D24X8:
+	{
+		const __m128 scaledDepth4 = _mm_mul_ps(pixelDepthScaleD24, pixelDepth4);
+		quantizedPixelDepth4 = _mm_cvtps_epu32(scaledDepth4);
+	}
+		break;
+	case D3DFMT_D32:
+	case D3DFMT_D32_LOCKABLE:
+	{
+		const __m128 scaledDepth4 = _mm_mul_ps(pixelDepthScaleD32, pixelDepth4);
+		quantizedPixelDepth4 = _mm_cvtps_epu32(scaledDepth4);
+	}
+		break;
+	case D3DFMT_D32F_LOCKABLE:
+	{
+		quantizedPixelDepth4 = *(const __m128i* const)&pixelDepth4;
+	}
+		break;
+	}
+
+	switch (comparison)
+	{
+	case D3DCMP_NEVER       :
+		return zeroMaskVecI;
+	case D3DCMP_LESS        :
+		return _mm_cmplt_epi32(quantizedPixelDepth4, bufferDepth4);
+	case D3DCMP_EQUAL       :
+		return _mm_cmpeq_epi32(quantizedPixelDepth4, bufferDepth4);
+	default:
+#ifdef _DEBUG
+		DbgBreakPrint("Error: Undefined D3DCMP specified for DepthTest");
+#endif
+	case D3DCMP_LESSEQUAL   : // Implemented as !>
+		return _mm_xor_si128(_mm_cmpgt_epi32(quantizedPixelDepth4, bufferDepth4), oneMaskVec);
+	case D3DCMP_GREATER     :
+		return _mm_cmpgt_epi32(quantizedPixelDepth4, bufferDepth4);
+	case D3DCMP_NOTEQUAL    : // Implemented as !=
+		return _mm_xor_si128(_mm_cmpeq_epi32(quantizedPixelDepth4, bufferDepth4), oneMaskVec);
+	case D3DCMP_GREATEREQUAL: // Implemented as !<
+		return _mm_xor_si128(_mm_cmplt_epi32(quantizedPixelDepth4, bufferDepth4), oneMaskVec);
+	case D3DCMP_ALWAYS      :
+		return oneMaskVec;
 	}
 }
 
@@ -2950,7 +3061,7 @@ void IDirect3DDevice9Hook::CreateNewVertexShadeJob(VS_2_0_OutputRegisters* const
 void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsigned y, const int barycentricA, const int barycentricB, const int barycentricC, const primitivePixelJobData* const primitiveData) const
 {
 	slist_item* const newItem = GetNewWorkerJob<true>();
-	newItem->jobType = pixelShadeJob;
+	newItem->jobType = pixelShade1Job;
 	slist_item::_jobData::_pixelJobData& pixelJobData = newItem->jobData.pixelJobData;
 #ifdef _DEBUG
 	if (!primitiveData)
@@ -2959,11 +3070,11 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 	}
 #endif
 	pixelJobData.primitiveData = primitiveData;
-	pixelJobData.x = x;
-	pixelJobData.y = y;
-	pixelJobData.barycentricA = barycentricA;
-	pixelJobData.barycentricB = barycentricB;
-	pixelJobData.barycentricC = barycentricC;
+	pixelJobData.x[0] = x;
+	pixelJobData.y[0] = y;
+	pixelJobData.barycentricCoords[0].a = barycentricA;
+	pixelJobData.barycentricCoords[0].b = barycentricB;
+	pixelJobData.barycentricCoords[0].c = barycentricC;
 
 	++workStatus.numJobs;
 }
@@ -3251,6 +3362,12 @@ void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDec
 				{
 					vertexIndices[y] = (&thisNewJob)[y].vertexIndex;
 					outputRegs[y] = (&thisNewJob)[y].outputRegs;
+#ifdef _DEBUG
+					if ( ( ( (const size_t)outputRegs[y]) & 0xF) != 0)
+					{
+						__debugbreak(); // Oh noes, our registers aren't aligned and this will break SSE instructions!
+					}
+#endif
 				}
 #ifdef MULTITHREAD_SHADING
 				CreateNewVertexShadeJob(outputRegs, vertexIndices, vertexShade4Job);
@@ -3922,20 +4039,107 @@ static inline const int computeEdgeSidedness(const int ax, const int ay, const i
 	return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
 }
 
-template <const unsigned char writeMask>
-void IDirect3DDevice9Hook::LoadSrcBlend(D3DXVECTOR4& srcBlend, const D3DBLEND blendMode, const D3DXVECTOR4& srcColor, const D3DXVECTOR4& dstColor) const
+template <const unsigned char channelWriteMask>
+void IDirect3DDevice9Hook::LoadBlend(D3DXVECTOR4& outBlend, const D3DBLEND blendMode, const D3DXVECTOR4& srcColor, const D3DXVECTOR4& dstColor) const
 {
+	// Simple + fast mode:
+	if ( (channelWriteMask & 0x7) == 0x7)
+	{
+		switch (blendMode)
+		{
+		case D3DBLEND_ZERO:
+			outBlend = zeroVec;
+			return;
+		default:
+#ifdef _DEBUG
+			DbgBreakPrint("Error: Invalid D3DBLEND type passed to blending unit");
+#else
+			__assume(0);
+#endif
+		case D3DBLEND_ONE            :
+			outBlend = staticColorWhiteOpaque;
+			return;
+		case D3DBLEND_INVSRCCOLOR2   :
+#ifdef _DEBUG
+			DbgBreakPrint("Error: D3DBLEND_INVSRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+			__assume(0);
+#endif
+		case D3DBLEND_SRCCOLOR2      :
+#ifdef _DEBUG
+			DbgBreakPrint("Error: D3DBLEND_SRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+			__assume(0);
+#endif
+		case D3DBLEND_SRCCOLOR       :
+			outBlend = srcColor;
+			return;
+		case D3DBLEND_INVSRCCOLOR    :
+			// TODO: SIMDify this
+			outBlend = staticColorWhiteOpaque - srcColor;
+			return;
+		case D3DBLEND_BOTHSRCALPHA   :
+		case D3DBLEND_SRCALPHA       :
+			// TODO: SIMDify this
+			outBlend.x = outBlend.y = outBlend.z = outBlend.w = srcColor.w;
+			return;
+		case D3DBLEND_BOTHINVSRCALPHA:
+		case D3DBLEND_INVSRCALPHA    :
+			// TODO: SIMDify this
+			outBlend.x = outBlend.y = outBlend.z = outBlend.w = (1.0f - srcColor.w);
+			return;
+		case D3DBLEND_DESTALPHA      :
+			// TODO: SIMDify this
+			outBlend.x = outBlend.y = outBlend.z = outBlend.w = dstColor.w;
+			return;
+		case D3DBLEND_INVDESTALPHA   :
+			// TODO: SIMDify this
+			outBlend.x = outBlend.y = outBlend.z = outBlend.w = (1.0f - dstColor.w);
+			return;
+		case D3DBLEND_DESTCOLOR      :
+			outBlend = dstColor;
+			return;
+		case D3DBLEND_INVDESTCOLOR:
+			// TODO: SIMDify this
+			outBlend = staticColorWhiteOpaque - dstColor;
+			return;
+		case D3DBLEND_SRCALPHASAT    :
+		{
+			// TODO: Low-priorty SIMDify this (nobody uses this blend state anyway)
+			const float as = srcColor.w;
+			const float invad = 1.0f - dstColor.w;
+			const float f = as < invad ? as : invad;
+			if (channelWriteMask & 0x1)
+				outBlend.x = f;
+			if (channelWriteMask & 0x2)
+				outBlend.y = f;
+			if (channelWriteMask & 0x4)
+				outBlend.z = f;
+			if (channelWriteMask & 0x8)
+				outBlend.w = 1.0f;
+			return;
+		}
+		case D3DBLEND_BLENDFACTOR    :
+			outBlend = currentState.currentRenderStates.cachedBlendFactor;
+			return;
+		case D3DBLEND_INVBLENDFACTOR:
+			outBlend = currentState.currentRenderStates.cachedInvBlendFactor;
+			return;
+		}
+		return;
+	}
+
 	switch (blendMode)
 	{
 	case D3DBLEND_ZERO           :
-		if (writeMask & 0x1)
-			srcBlend.x = 0.0f;
-		if (writeMask & 0x2)
-			srcBlend.y = 0.0f;
-		if (writeMask & 0x4)
-			srcBlend.z = 0.0f;
-		if (writeMask & 0x8)
-			srcBlend.w = 0.0f;
+		if (channelWriteMask & 0x1)
+			outBlend.x = 0.0f;
+		if (channelWriteMask & 0x2)
+			outBlend.y = 0.0f;
+		if (channelWriteMask & 0x4)
+			outBlend.z = 0.0f;
+		if (channelWriteMask & 0x8)
+			outBlend.w = 0.0f;
 		break;
 	default:
 #ifdef _DEBUG
@@ -3944,14 +4148,14 @@ void IDirect3DDevice9Hook::LoadSrcBlend(D3DXVECTOR4& srcBlend, const D3DBLEND bl
 		__assume(0);
 #endif
 	case D3DBLEND_ONE            :
-		if (writeMask & 0x1)
-			srcBlend.x = 1.0f;
-		if (writeMask & 0x2)
-			srcBlend.y = 1.0f;
-		if (writeMask & 0x4)
-			srcBlend.z = 1.0f;
-		if (writeMask & 0x8)
-			srcBlend.w = 1.0f;
+		if (channelWriteMask & 0x1)
+			outBlend.x = 1.0f;
+		if (channelWriteMask & 0x2)
+			outBlend.y = 1.0f;
+		if (channelWriteMask & 0x4)
+			outBlend.z = 1.0f;
+		if (channelWriteMask & 0x8)
+			outBlend.w = 1.0f;
 		break;
 	case D3DBLEND_INVSRCCOLOR2   :
 #ifdef _DEBUG
@@ -3966,308 +4170,186 @@ void IDirect3DDevice9Hook::LoadSrcBlend(D3DXVECTOR4& srcBlend, const D3DBLEND bl
 		__assume(0);
 #endif
 	case D3DBLEND_SRCCOLOR       :
-		if (writeMask & 0x1)
-			srcBlend.x = srcColor.x;
-		if (writeMask & 0x2)
-			srcBlend.y = srcColor.y;
-		if (writeMask & 0x4)
-			srcBlend.z = srcColor.z;
-		if (writeMask & 0x8)
-			srcBlend.w = srcColor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = srcColor.x;
+		if (channelWriteMask & 0x2)
+			outBlend.y = srcColor.y;
+		if (channelWriteMask & 0x4)
+			outBlend.z = srcColor.z;
+		if (channelWriteMask & 0x8)
+			outBlend.w = srcColor.w;
 		break;
 	case D3DBLEND_INVSRCCOLOR    :
-		if (writeMask & 0x1)
-			srcBlend.x = 1.0f - srcColor.x;
-		if (writeMask & 0x2)
-			srcBlend.y = 1.0f - srcColor.y;
-		if (writeMask & 0x4)
-			srcBlend.z = 1.0f - srcColor.z;
-		if (writeMask & 0x8)
-			srcBlend.w = 1.0f - srcColor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = 1.0f - srcColor.x;
+		if (channelWriteMask & 0x2)
+			outBlend.y = 1.0f - srcColor.y;
+		if (channelWriteMask & 0x4)
+			outBlend.z = 1.0f - srcColor.z;
+		if (channelWriteMask & 0x8)
+			outBlend.w = 1.0f - srcColor.w;
 		break;
 	case D3DBLEND_BOTHSRCALPHA   :
 	case D3DBLEND_SRCALPHA       :
-		if (writeMask & 0x1)
-			srcBlend.x = srcColor.w;
-		if (writeMask & 0x2)
-			srcBlend.y = srcColor.w;
-		if (writeMask & 0x4)
-			srcBlend.z = srcColor.w;
-		if (writeMask & 0x8)
-			srcBlend.w = srcColor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = srcColor.w;
+		if (channelWriteMask & 0x2)
+			outBlend.y = srcColor.w;
+		if (channelWriteMask & 0x4)
+			outBlend.z = srcColor.w;
+		if (channelWriteMask & 0x8)
+			outBlend.w = srcColor.w;
 		break;
 	case D3DBLEND_BOTHINVSRCALPHA:
 	case D3DBLEND_INVSRCALPHA    :
-		if (writeMask & 0x1)
-			srcBlend.x = 1.0f - srcColor.w;
-		if (writeMask & 0x2)
-			srcBlend.y = 1.0f - srcColor.w;
-		if (writeMask & 0x4)
-			srcBlend.z = 1.0f - srcColor.w;
-		if (writeMask & 0x8)
-			srcBlend.w = 1.0f - srcColor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = 1.0f - srcColor.w;
+		if (channelWriteMask & 0x2)
+			outBlend.y = 1.0f - srcColor.w;
+		if (channelWriteMask & 0x4)
+			outBlend.z = 1.0f - srcColor.w;
+		if (channelWriteMask & 0x8)
+			outBlend.w = 1.0f - srcColor.w;
 		break;
 	case D3DBLEND_DESTALPHA      :
-		if (writeMask & 0x1)
-			srcBlend.x = dstColor.w;
-		if (writeMask & 0x2)
-			srcBlend.y = dstColor.w;
-		if (writeMask & 0x4)
-			srcBlend.z = dstColor.w;
-		if (writeMask & 0x8)
-			srcBlend.w = dstColor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = dstColor.w;
+		if (channelWriteMask & 0x2)
+			outBlend.y = dstColor.w;
+		if (channelWriteMask & 0x4)
+			outBlend.z = dstColor.w;
+		if (channelWriteMask & 0x8)
+			outBlend.w = dstColor.w;
 		break;
 	case D3DBLEND_INVDESTALPHA   :
-		if (writeMask & 0x1)
-			srcBlend.x = 1.0f - dstColor.w;
-		if (writeMask & 0x2)
-			srcBlend.y = 1.0f - dstColor.w;
-		if (writeMask & 0x4)
-			srcBlend.z = 1.0f - dstColor.w;
-		if (writeMask & 0x8)
-			srcBlend.w = 1.0f - dstColor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = 1.0f - dstColor.w;
+		if (channelWriteMask & 0x2)
+			outBlend.y = 1.0f - dstColor.w;
+		if (channelWriteMask & 0x4)
+			outBlend.z = 1.0f - dstColor.w;
+		if (channelWriteMask & 0x8)
+			outBlend.w = 1.0f - dstColor.w;
 		break;
 	case D3DBLEND_DESTCOLOR      :
-		if (writeMask & 0x1)
-			srcBlend.x = dstColor.x;
-		if (writeMask & 0x2)
-			srcBlend.y = dstColor.y;
-		if (writeMask & 0x4)
-			srcBlend.z = dstColor.z;
-		if (writeMask & 0x8)
-			srcBlend.w = dstColor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = dstColor.x;
+		if (channelWriteMask & 0x2)
+			outBlend.y = dstColor.y;
+		if (channelWriteMask & 0x4)
+			outBlend.z = dstColor.z;
+		if (channelWriteMask & 0x8)
+			outBlend.w = dstColor.w;
 		break;
 	case D3DBLEND_INVDESTCOLOR   :
-		if (writeMask & 0x1)
-			srcBlend.x = 1.0f - dstColor.x;
-		if (writeMask & 0x2)
-			srcBlend.y = 1.0f - dstColor.y;
-		if (writeMask & 0x4)
-			srcBlend.z = 1.0f - dstColor.z;
-		if (writeMask & 0x8)
-			srcBlend.w = 1.0f - dstColor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = 1.0f - dstColor.x;
+		if (channelWriteMask & 0x2)
+			outBlend.y = 1.0f - dstColor.y;
+		if (channelWriteMask & 0x4)
+			outBlend.z = 1.0f - dstColor.z;
+		if (channelWriteMask & 0x8)
+			outBlend.w = 1.0f - dstColor.w;
 		break;
 	case D3DBLEND_SRCALPHASAT    :
 	{
 		const float as = srcColor.w;
 		const float invad = 1.0f - dstColor.w;
 		const float f = as < invad ? as : invad;
-		if (writeMask & 0x1)
-			srcBlend.x = f;
-		if (writeMask & 0x2)
-			srcBlend.y = f;
-		if (writeMask & 0x4)
-			srcBlend.z = f;
-		if (writeMask & 0x8)
-			srcBlend.w = 1.0f;
+		if (channelWriteMask & 0x1)
+			outBlend.x = f;
+		if (channelWriteMask & 0x2)
+			outBlend.y = f;
+		if (channelWriteMask & 0x4)
+			outBlend.z = f;
+		if (channelWriteMask & 0x8)
+			outBlend.w = 1.0f;
 	}
 		break;
 	case D3DBLEND_BLENDFACTOR    :
-		if (writeMask & 0x1)
-			srcBlend.x = currentState.currentRenderStates.cachedBlendFactor.x;
-		if (writeMask & 0x2)
-			srcBlend.y = currentState.currentRenderStates.cachedBlendFactor.y;
-		if (writeMask & 0x4)
-			srcBlend.z = currentState.currentRenderStates.cachedBlendFactor.z;
-		if (writeMask & 0x8)
-			srcBlend.w = currentState.currentRenderStates.cachedBlendFactor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = currentState.currentRenderStates.cachedBlendFactor.x;
+		if (channelWriteMask & 0x2)
+			outBlend.y = currentState.currentRenderStates.cachedBlendFactor.y;
+		if (channelWriteMask & 0x4)
+			outBlend.z = currentState.currentRenderStates.cachedBlendFactor.z;
+		if (channelWriteMask & 0x8)
+			outBlend.w = currentState.currentRenderStates.cachedBlendFactor.w;
 		break;
 	case D3DBLEND_INVBLENDFACTOR :
-		if (writeMask & 0x1)
-			srcBlend.x = currentState.currentRenderStates.cachedInvBlendFactor.x;
-		if (writeMask & 0x2)
-			srcBlend.y = currentState.currentRenderStates.cachedInvBlendFactor.y;
-		if (writeMask & 0x4)
-			srcBlend.z = currentState.currentRenderStates.cachedInvBlendFactor.z;
-		if (writeMask & 0x8)
-			srcBlend.w = currentState.currentRenderStates.cachedInvBlendFactor.w;
+		if (channelWriteMask & 0x1)
+			outBlend.x = currentState.currentRenderStates.cachedInvBlendFactor.x;
+		if (channelWriteMask & 0x2)
+			outBlend.y = currentState.currentRenderStates.cachedInvBlendFactor.y;
+		if (channelWriteMask & 0x4)
+			outBlend.z = currentState.currentRenderStates.cachedInvBlendFactor.z;
+		if (channelWriteMask & 0x8)
+			outBlend.w = currentState.currentRenderStates.cachedInvBlendFactor.w;
 		break;
 	}
 }
 
-template <const unsigned char writeMask>
-void IDirect3DDevice9Hook::LoadDstBlend(D3DXVECTOR4& dstBlend, const D3DBLEND blendMode, const D3DXVECTOR4& srcColor, const D3DXVECTOR4& dstColor) const
-{
-	switch (blendMode)
-	{
-	case D3DBLEND_ZERO           :
-		if (writeMask & 0x1)
-			dstBlend.x = 0.0f;
-		if (writeMask & 0x2)
-			dstBlend.y = 0.0f;
-		if (writeMask & 0x4)
-			dstBlend.z = 0.0f;
-		if (writeMask & 0x8)
-			dstBlend.w = 0.0f;
-		break;
-	default:
-#ifdef _DEBUG
-		DbgBreakPrint("Error: Invalid D3DBLEND passed to blending unit");
-#else
-		__assume(0);
-#endif
-	case D3DBLEND_ONE            :
-		if (writeMask & 0x1)
-			dstBlend.x = 1.0f;
-		if (writeMask & 0x2)
-			dstBlend.y = 1.0f;
-		if (writeMask & 0x4)
-			dstBlend.z = 1.0f;
-		if (writeMask & 0x8)
-			dstBlend.w = 1.0f;
-		break;
-	case D3DBLEND_SRCCOLOR       :
-		if (writeMask & 0x1)
-			dstBlend.x = srcColor.x;
-		if (writeMask & 0x2)
-			dstBlend.y = srcColor.y;
-		if (writeMask & 0x4)
-			dstBlend.z = srcColor.z;
-		if (writeMask & 0x8)
-			dstBlend.w = srcColor.w;
-		break;
-	case D3DBLEND_INVSRCCOLOR    :
-		if (writeMask & 0x1)
-			dstBlend.x = 1.0f - srcColor.x;
-		if (writeMask & 0x2)
-			dstBlend.y = 1.0f - srcColor.y;
-		if (writeMask & 0x4)
-			dstBlend.z = 1.0f - srcColor.z;
-		if (writeMask & 0x8)
-			dstBlend.w = 1.0f - srcColor.w;
-		break;
-	case D3DBLEND_BOTHINVSRCALPHA:
-	case D3DBLEND_SRCALPHA       :
-		if (writeMask & 0x1)
-			dstBlend.x = srcColor.w;
-		if (writeMask & 0x2)
-			dstBlend.y = srcColor.w;
-		if (writeMask & 0x4)
-			dstBlend.z = srcColor.w;
-		if (writeMask & 0x8)
-			dstBlend.w = srcColor.w;
-		break;
-	case D3DBLEND_BOTHSRCALPHA   :
-	case D3DBLEND_INVSRCALPHA    :
-		if (writeMask & 0x1)
-			dstBlend.x = 1.0f - srcColor.w;
-		if (writeMask & 0x2)
-			dstBlend.y = 1.0f - srcColor.w;
-		if (writeMask & 0x4)
-			dstBlend.z = 1.0f - srcColor.w;
-		if (writeMask & 0x8)
-			dstBlend.w = 1.0f - srcColor.w;
-		break;
-	case D3DBLEND_DESTALPHA      :
-		if (writeMask & 0x1)
-			dstBlend.x = dstColor.w;
-		if (writeMask & 0x2)
-			dstBlend.y = dstColor.w;
-		if (writeMask & 0x4)
-			dstBlend.z = dstColor.w;
-		if (writeMask & 0x8)
-			dstBlend.w = dstColor.w;
-		break;
-	case D3DBLEND_INVDESTALPHA   :
-		if (writeMask & 0x1)
-			dstBlend.x = 1.0f - dstColor.w;
-		if (writeMask & 0x2)
-			dstBlend.y = 1.0f - dstColor.w;
-		if (writeMask & 0x4)
-			dstBlend.z = 1.0f - dstColor.w;
-		if (writeMask & 0x8)
-			dstBlend.w = 1.0f - dstColor.w;
-		break;
-	case D3DBLEND_INVSRCCOLOR2   :
-#ifdef _DEBUG
-		DbgBreakPrint("Error: D3DBLEND_INVSRCCOLOR2 is not yet supported!"); // Not yet supported!
-#else
-		__assume(0);
-#endif
-	case D3DBLEND_SRCCOLOR2      :
-#ifdef _DEBUG
-		DbgBreakPrint("Error: D3DBLEND_SRCCOLOR2 is not yet supported!"); // Not yet supported!
-#else
-		__assume(0);
-#endif
-	case D3DBLEND_DESTCOLOR      :
-		if (writeMask & 0x1)
-			dstBlend.x = dstColor.x;
-		if (writeMask & 0x2)
-			dstBlend.y = dstColor.y;
-		if (writeMask & 0x4)
-			dstBlend.z = dstColor.z;
-		if (writeMask & 0x8)
-			dstBlend.w = dstColor.w;
-		break;
-	case D3DBLEND_INVDESTCOLOR   :
-		if (writeMask & 0x1)
-			dstBlend.x = 1.0f - dstColor.x;
-		if (writeMask & 0x2)
-			dstBlend.y = 1.0f - dstColor.y;
-		if (writeMask & 0x4)
-			dstBlend.z = 1.0f - dstColor.z;
-		if (writeMask & 0x8)
-			dstBlend.w = 1.0f - dstColor.w;
-		break;
-	case D3DBLEND_SRCALPHASAT    :
-	{
-		const float as = srcColor.w;
-		const float invad = 1.0f - dstColor.w;
-		const float f = as < invad ? as : invad;
-		if (writeMask & 0x1)
-			dstBlend.x = f;
-		if (writeMask & 0x2)
-			dstBlend.y = f;
-		if (writeMask & 0x4)
-			dstBlend.z = f;
-		if (writeMask & 0x8)
-			dstBlend.w = 1.0f;
-	}
-		break;
-	case D3DBLEND_BLENDFACTOR    :
-		if (writeMask & 0x1)
-			dstBlend.x = currentState.currentRenderStates.cachedBlendFactor.x;
-		if (writeMask & 0x2)
-			dstBlend.y = currentState.currentRenderStates.cachedBlendFactor.y;
-		if (writeMask & 0x4)
-			dstBlend.z = currentState.currentRenderStates.cachedBlendFactor.z;
-		if (writeMask & 0x8)
-			dstBlend.w = currentState.currentRenderStates.cachedBlendFactor.w;
-		break;
-	case D3DBLEND_INVBLENDFACTOR :
-		if (writeMask & 0x1)
-			dstBlend.x = currentState.currentRenderStates.cachedInvBlendFactor.x;
-		if (writeMask & 0x2)
-			dstBlend.y = currentState.currentRenderStates.cachedInvBlendFactor.y;
-		if (writeMask & 0x4)
-			dstBlend.z = currentState.currentRenderStates.cachedInvBlendFactor.z;
-		if (writeMask & 0x8)
-			dstBlend.w = currentState.currentRenderStates.cachedInvBlendFactor.w;
-		break;
-	}
-}
-
-template <const unsigned char writeMask>
+template <const unsigned char channelWriteMask>
 void IDirect3DDevice9Hook::AlphaBlend(D3DXVECTOR4& outVec, const D3DBLENDOP blendOp, const D3DXVECTOR4& srcBlend, const D3DXVECTOR4& dstBlend, const D3DXVECTOR4& srcColor, const D3DXVECTOR4& dstColor) const
 {
+	// Simple SIMD version
+	if ( (channelWriteMask & 0x7) == 0x7)
+	{
+		__m128 combinedSrc, combinedDst;
+		combinedSrc = _mm_mul_ps(*(const __m128* const)&srcBlend, *(const __m128* const)&srcColor);
+		combinedDst = _mm_mul_ps(*(const __m128* const)&dstBlend, *(const __m128* const)&dstColor);
+
+		switch (blendOp)
+		{
+		default:
+#ifdef _DEBUG
+			DbgBreakPrint("Error: Invalid D3DBLENDOP passed to alpha blending unit");
+#else
+			__assume(0);
+#endif
+		case D3DBLENDOP_ADD        :
+			*(__m128* const)&outVec = _mm_add_ps(combinedSrc, combinedDst);
+			return;
+		case D3DBLENDOP_SUBTRACT   :
+			*(__m128* const)&outVec = _mm_sub_ps(combinedSrc, combinedDst);
+			return;
+		case D3DBLENDOP_REVSUBTRACT:
+			*(__m128* const)&outVec = _mm_sub_ps(combinedDst, combinedSrc);
+			return;
+		case D3DBLENDOP_MIN        :
+		{
+			const __m128 cmpMask = _mm_cmplt_ps(combinedSrc, combinedDst);
+			*(__m128* const)&outVec = _mm_blendv_ps(combinedSrc, combinedDst, cmpMask);
+		}
+			return;
+		case D3DBLENDOP_MAX        :
+		{
+			const __m128 cmpMask = _mm_cmpgt_ps(combinedSrc, combinedDst);
+			*(__m128* const)&outVec = _mm_blendv_ps(combinedSrc, combinedDst, cmpMask);
+		}
+			return;
+		}
+
+		return;
+	}
+
 	float4 combinedSrc, combinedDst;
-	if (writeMask & 0x1)
+	if (channelWriteMask & 0x1)
 	{
 		mul(combinedSrc.x, srcBlend.x, srcColor.x);
 		mul(combinedDst.x, dstBlend.x, dstColor.x);
 	}
-	if (writeMask & 0x2)
+	if (channelWriteMask & 0x2)
 	{
 		mul(combinedSrc.y, srcBlend.y, srcColor.y);
 		mul(combinedDst.y, dstBlend.y, dstColor.y);
 	}
-	if (writeMask & 0x4)
+	if (channelWriteMask & 0x4)
 	{
 		mul(combinedSrc.z, srcBlend.z, srcColor.z);
 		mul(combinedDst.z, dstBlend.z, dstColor.z);
 	}
-	if (writeMask & 0x8)
+	if (channelWriteMask & 0x8)
 	{
 		mul(combinedSrc.w, srcBlend.w, srcColor.w);
 		mul(combinedDst.w, dstBlend.w, dstColor.w);
@@ -4282,53 +4364,53 @@ void IDirect3DDevice9Hook::AlphaBlend(D3DXVECTOR4& outVec, const D3DBLENDOP blen
 		__assume(0);
 #endif
 	case D3DBLENDOP_ADD        :
-		if (writeMask & 0x1)
+		if (channelWriteMask & 0x1)
 			outVec.x = combinedSrc.x + combinedDst.x;
-		if (writeMask & 0x2)
+		if (channelWriteMask & 0x2)
 			outVec.y = combinedSrc.y + combinedDst.y;
-		if (writeMask & 0x4)
+		if (channelWriteMask & 0x4)
 			outVec.z = combinedSrc.z + combinedDst.z;
-		if (writeMask & 0x8)
+		if (channelWriteMask & 0x8)
 			outVec.w = combinedSrc.w + combinedDst.w;
 		break;
 	case D3DBLENDOP_SUBTRACT   :
-		if (writeMask & 0x1)
+		if (channelWriteMask & 0x1)
 			outVec.x = combinedSrc.x - combinedDst.x;
-		if (writeMask & 0x2)
+		if (channelWriteMask & 0x2)
 			outVec.y = combinedSrc.y - combinedDst.y;
-		if (writeMask & 0x4)
+		if (channelWriteMask & 0x4)
 			outVec.z = combinedSrc.z - combinedDst.z;
-		if (writeMask & 0x8)
+		if (channelWriteMask & 0x8)
 			outVec.w = combinedSrc.w - combinedDst.w;
 		break;
 	case D3DBLENDOP_REVSUBTRACT:
-		if (writeMask & 0x1)
+		if (channelWriteMask & 0x1)
 			outVec.x = combinedDst.x - combinedSrc.x;
-		if (writeMask & 0x2)
+		if (channelWriteMask & 0x2)
 			outVec.y = combinedDst.y - combinedSrc.y;
-		if (writeMask & 0x4)
+		if (channelWriteMask & 0x4)
 			outVec.z = combinedDst.z - combinedSrc.z;
-		if (writeMask & 0x8)
+		if (channelWriteMask & 0x8)
 			outVec.w = combinedDst.w - combinedSrc.w;
 		break;
 	case D3DBLENDOP_MIN        :
-		if (writeMask & 0x1)
+		if (channelWriteMask & 0x1)
 			outVec.x = combinedSrc.x < combinedDst.x ? combinedSrc.x : combinedDst.x;
-		if (writeMask & 0x2)
+		if (channelWriteMask & 0x2)
 			outVec.y = combinedSrc.y < combinedDst.y ? combinedSrc.y : combinedDst.y;
-		if (writeMask & 0x4)
+		if (channelWriteMask & 0x4)
 			outVec.z = combinedSrc.z < combinedDst.z ? combinedSrc.z : combinedDst.z;
-		if (writeMask & 0x8)
+		if (channelWriteMask & 0x8)
 			outVec.w = combinedSrc.w < combinedDst.w ? combinedSrc.w : combinedDst.w;
 		break;
 	case D3DBLENDOP_MAX        :
-		if (writeMask & 0x1)
+		if (channelWriteMask & 0x1)
 			outVec.x = combinedSrc.x > combinedDst.x ? combinedSrc.x : combinedDst.x;
-		if (writeMask & 0x2)
+		if (channelWriteMask & 0x2)
 			outVec.y = combinedSrc.y > combinedDst.y ? combinedSrc.y : combinedDst.y;
-		if (writeMask & 0x4)
+		if (channelWriteMask & 0x4)
 			outVec.z = combinedSrc.z > combinedDst.z ? combinedSrc.z : combinedDst.z;
-		if (writeMask & 0x8)
+		if (channelWriteMask & 0x8)
 			outVec.w = combinedSrc.w > combinedDst.w ? combinedSrc.w : combinedDst.w;
 		break;
 	}
@@ -4425,36 +4507,36 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask(IDirect3DSurface9Hook* const outSur
 {
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable)
 	{
+		// Alpha blend skip:
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
+			currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+		{
+			if (value.w == 0.0f)
+				return;
+		}
+		// Additive blend skip
+		else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
+			currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
+		{
+			if (value.x == 0.0f && value.y == 0.0f && value.z == 0.0f)
+				return;
+		}
+
 		if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable) // Have to run alpha blending twice for separate alpha
 		{
-			// Alpha blend skip:
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
-				currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
-			{
-				if (value.w == 0.0f)
-					return;
-			}
-			// Additive blend skip
-			else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
-				currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
-			{
-				if (value.x == 0.0f && value.y == 0.0f && value.z == 0.0f)
-					return;
-			}
-
 			D3DXVECTOR4 dstColor, finalColor;
 			outSurface->GetPixelVec<writeMask, false>(x, y, dstColor);
 
 			D3DXVECTOR4 srcBlendColor, dstBlendColor;
-			LoadSrcBlend<writeMask & 0x7>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
-			LoadDstBlend<writeMask & 0x7>(dstBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
+			LoadBlend<writeMask & 0x7>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
+			LoadBlend<writeMask & 0x7>(dstBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
 			AlphaBlend<writeMask & 0x7>(finalColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlendColor, dstBlendColor, value, dstColor);
 
 			if (writeMask & 0x8)
 			{
 				D3DXVECTOR4 srcBlendAlpha, dstBlendAlpha, finalAlpha;
-				LoadSrcBlend<writeMask & 0x8>(srcBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlendAlpha, value, dstColor);
-				LoadDstBlend<writeMask & 0x8>(dstBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlendAlpha, value, dstColor);
+				LoadBlend<writeMask & 0x8>(srcBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlendAlpha, value, dstColor);
+				LoadBlend<writeMask & 0x8>(dstBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlendAlpha, value, dstColor);
 				AlphaBlend<writeMask & 0x8>(finalAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOpAlpha, srcBlendAlpha, dstBlendAlpha, value, dstColor);
 				finalColor.w = finalAlpha.w;
 			}
@@ -4466,27 +4548,13 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask(IDirect3DSurface9Hook* const outSur
 		}
 		else // Simple alpha blending without separate alpha
 		{
-			// Alpha blend skip:
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
-				currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
-			{
-				if (value.w == 0.0f)
-					return;
-			}
-			// Additive blend skip
-			else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
-				currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
-			{
-				if (value.x == 0.0f && value.y == 0.0f && value.z == 0.0f)
-					return;
-			}
 			__declspec(align(16) ) D3DXVECTOR4 dstColor;
 			outSurface->GetPixelVec<writeMask, false>(x, y, dstColor);
 
 			__declspec(align(16) ) D3DXVECTOR4 srcBlend;
 			__declspec(align(16) ) D3DXVECTOR4 dstBlend;
-			LoadSrcBlend<writeMask>(srcBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
-			LoadDstBlend<writeMask>(dstBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
+			LoadBlend<writeMask>(srcBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
+			LoadBlend<writeMask>(dstBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
 			AlphaBlend<writeMask>(dstColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlend, dstBlend, value, dstColor);
 
 			if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
@@ -4584,11 +4652,13 @@ void IDirect3DDevice9Hook::PreShadePixel(const unsigned x, const unsigned y, PSh
 }
 
 // Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const D3DXVECTOR3& barycentricInterpolants, const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const
+void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const
 {
 	// Perform Z-clipping (clip the pixel if it's outside of the [0.0, 1.0] range):
-	float invZ0, invZ1, invZ2;
-	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, offsetBytesToOPosition, v0, v1, v2, invZ0, invZ1, invZ2);
+	__m128 invZ;
+	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, offsetBytesToOPosition, v0, v1, v2, invZ);
+
+	// In the future when we have proper vertex clipping, this step shouldn't be necessary as the verts coming in from the rasterizer should always be clipped between 0.0 and 1.0
 	if (pixelDepth < 0.0f)
 		return;
 	else if (pixelDepth > 1.0f)
@@ -4628,7 +4698,7 @@ void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine
 		}
 	}
 
-	InterpolateStreamIntoRegisters(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ0, invZ1, invZ2, pixelDepth);
+	InterpolateStreamIntoRegisters(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth);
 
 	ShadePixel(x, y, pixelEngine);
 }
@@ -4643,17 +4713,84 @@ static inline void InterpolateVertexAttribute(const D3DXVECTOR3& floatBarycentri
 }
 
 // This is a perspective-correct attribute interpolation:
-static inline void InterpolateVertexAttribute_PerspectiveCorrect(const D3DXVECTOR3& floatBarycentrics, const D3DXVECTOR4& attr0, const D3DXVECTOR4& attr1, const D3DXVECTOR4& attr2, const float invZ0, const float invZ1, const float invZ2, const float pixelZ, D3DXVECTOR4& outAttr)
+static inline void InterpolateVertexAttribute_PerspectiveCorrect(const D3DXVECTOR4& attr0, const D3DXVECTOR4& attr1, const D3DXVECTOR4& attr2, const __m128 floatBarycentricsInvZ_X, const __m128 floatBarycentricsInvZ_Y, const __m128 floatBarycentricsInvZ_Z, const float pixelZ, D3DXVECTOR4& outAttr)
 {
-	outAttr.x = pixelZ * (attr0.x * invZ0 * floatBarycentrics.x + attr1.x * invZ1 * floatBarycentrics.y + attr2.x * invZ2 * floatBarycentrics.z);
-	outAttr.y = pixelZ * (attr0.y * invZ0 * floatBarycentrics.x + attr1.y * invZ1 * floatBarycentrics.y + attr2.y * invZ2 * floatBarycentrics.z);
-	outAttr.z = pixelZ * (attr0.z * invZ0 * floatBarycentrics.x + attr1.z * invZ1 * floatBarycentrics.y + attr2.z * invZ2 * floatBarycentrics.z);
-	outAttr.w = pixelZ * (attr0.w * invZ0 * floatBarycentrics.x + attr1.w * invZ1 * floatBarycentrics.y + attr2.w * invZ2 * floatBarycentrics.z);
+	const __m128* const attr0ptr = (const __m128* const)&attr0;
+	const __m128* const attr1ptr = (const __m128* const)&attr1;
+	const __m128* const attr2ptr = (const __m128* const)&attr2;
+
+	// I think that mul, mul, mul, add, add is the best we can do here since the attribute data comes in and needs a transpose, which prevents us from using dotproduct3
+	const __m128 mulResultA = _mm_mul_ps(floatBarycentricsInvZ_X, *attr0ptr);
+	const __m128 mulResultB = _mm_mul_ps(floatBarycentricsInvZ_Y, *attr1ptr);
+	const __m128 mulResultC = _mm_mul_ps(floatBarycentricsInvZ_Z, *attr2ptr);
+
+	const __m128 result = _mm_add_ps(_mm_add_ps(mulResultA, mulResultB), mulResultC);
+
+	__m128* const outAttrPtr = (__m128* const)&outAttr;
+
+	const __m128 pixelZ_float4 = _mm_load1_ps(&pixelZ);
+	*outAttrPtr = _mm_mul_ps(pixelZ_float4, result);
+}
+
+// This is a perspective-correct attribute interpolation:
+static inline void InterpolateVertexAttribute_PerspectiveCorrect4(const D3DXVECTOR4& attr0, const D3DXVECTOR4& attr1, const D3DXVECTOR4& attr2, const __m128 (&invZSplatted)[4], const __m128 pixelZ4, D3DXVECTOR4 (&outAttr4)[4])
+{
+	const __m128 attr0vec = *(const __m128* const)&attr0;
+	const __m128 attr1vec = *(const __m128* const)&attr1;
+	const __m128 attr2vec = *(const __m128* const)&attr2;
+
+	// I think that mul, mul, mul, add, add is the best we can do here since the attribute data comes in and needs a transpose, which prevents us from using dotproduct3
+	const __m128 mulResultA[4] = 
+	{
+		_mm_mul_ps(invZSplatted[0], attr0vec),
+		_mm_mul_ps(invZSplatted[1], attr0vec),
+		_mm_mul_ps(invZSplatted[2], attr0vec),
+		_mm_mul_ps(invZSplatted[3], attr0vec)
+	};
+	const __m128 mulResultB[4] = 
+	{
+		_mm_mul_ps(invZSplatted[0], attr1vec),
+		_mm_mul_ps(invZSplatted[1], attr1vec),
+		_mm_mul_ps(invZSplatted[2], attr1vec),
+		_mm_mul_ps(invZSplatted[3], attr1vec)
+	};
+	const __m128 mulResultC[4] = 
+	{
+		_mm_mul_ps(invZSplatted[0], attr2vec),
+		_mm_mul_ps(invZSplatted[1], attr2vec),
+		_mm_mul_ps(invZSplatted[2], attr2vec),
+		_mm_mul_ps(invZSplatted[3], attr2vec)
+	};
+	const __m128 result[4] = 
+	{
+		_mm_add_ps(_mm_add_ps(mulResultA[0], mulResultB[0]), mulResultC[0]),
+		_mm_add_ps(_mm_add_ps(mulResultA[1], mulResultB[1]), mulResultC[1]),
+		_mm_add_ps(_mm_add_ps(mulResultA[2], mulResultB[2]), mulResultC[2]),
+		_mm_add_ps(_mm_add_ps(mulResultA[3], mulResultB[3]), mulResultC[3])
+	};
+
+	const __m128 pixelZ_float4[4] = 
+	{
+		_mm_permute_ps(pixelZ4, _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(pixelZ4, _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(pixelZ4, _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(pixelZ4, _MM_SHUFFLE(3, 3, 3, 3) )
+	};
+	*(__m128* const)&(outAttr4[0]) = _mm_mul_ps(pixelZ_float4[0], result[0]);
+	*(__m128* const)&(outAttr4[1]) = _mm_mul_ps(pixelZ_float4[1], result[1]);
+	*(__m128* const)&(outAttr4[2]) = _mm_mul_ps(pixelZ_float4[2], result[2]);
+	*(__m128* const)&(outAttr4[3]) = _mm_mul_ps(pixelZ_float4[3], result[3]);
 }
 
 // Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
-void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, const D3DXVECTOR3& barycentricInterpolants, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const float invZ0, const float invZ1, const float invZ2, const float pixelZ) const
+void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, const __m128 barycentricInterpolants, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ, const float pixelZ) const
 {
+	// Precompute some vectors that will be used for all of attribute interpolation
+	const __m128 floatBarycentricsInvZ = _mm_mul_ps(invZ, barycentricInterpolants);
+	const __m128 floatBarycentricsInvZ_X = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(0, 0, 0, 0) );
+	const __m128 floatBarycentricsInvZ_Y = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(1, 1, 1, 1) );
+	const __m128 floatBarycentricsInvZ_Z = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(2, 2, 2, 2) );
+
 	const ShaderInfo& pixelShaderInfo = currentState.currentPixelShader->GetShaderInfo();
 	if (pixelShaderInfo.shaderMajorVersion == 1)
 	{
@@ -4666,18 +4803,19 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 				const DebuggableD3DVERTEXELEMENT9* const foundColorValue = vertexDeclMapping.vals[D3DDECLUSAGE_COLOR][v];
 				if (foundColorValue)
 				{
-					D3DXVECTOR4 cf0;
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
 					const D3DDECLTYPE registerLoadType = foundColorValue->Type;
 					LoadElementToRegister(cf0, registerLoadType, (v0 + foundColorValue->Offset) );
 
 					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT)
 					{
 						// Color interpolator registers:
-						D3DXVECTOR4 cf1, cf2;
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
 						LoadElementToRegister(cf1, registerLoadType, (v1 + foundColorValue->Offset) );
 						LoadElementToRegister(cf2, registerLoadType, (v2 + foundColorValue->Offset) );
 
-						InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+						InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 					}
 					else
 					{
@@ -4700,18 +4838,19 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 				const DebuggableD3DVERTEXELEMENT9* const foundTexcoordValue = vertexDeclMapping.vals[D3DDECLUSAGE_TEXCOORD][t];
 				if (foundTexcoordValue)
 				{
-					D3DXVECTOR4 cf0;
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
 					const D3DDECLTYPE registerLoadType = foundTexcoordValue->Type;
 					LoadElementToRegister(cf0, registerLoadType, (v0 + foundTexcoordValue->Offset) );
 
 					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT)
 					{
 						// Texcoord interpolator registers:
-						D3DXVECTOR4 cf1, cf2;
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
 						LoadElementToRegister(cf1, registerLoadType, (v1 + foundTexcoordValue->Offset) );
 						LoadElementToRegister(cf2, registerLoadType, (v2 + foundTexcoordValue->Offset) );
 
-						InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+						InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 					}
 					else
 					{
@@ -4750,18 +4889,20 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 				}
 				else
 				{
-					D3DXVECTOR4 cf0;
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
 					const D3DDECLTYPE registerLoadType = element->Type;
 					LoadElementToRegister(cf0, registerLoadType, (v0 + element->Offset) );
 
+					// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
 					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
 					{
 						// Color interpolator registers:
-						D3DXVECTOR4 cf1, cf2;
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
 						LoadElementToRegister(cf1, registerLoadType, (v1 + element->Offset) );
 						LoadElementToRegister(cf2, registerLoadType, (v2 + element->Offset) );
 
-						InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+						InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 					}
 					else
 					{
@@ -4788,18 +4929,20 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 				}
 				else
 				{
-					D3DXVECTOR4 cf0;
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
 					const D3DDECLTYPE registerLoadType = element->Type;
 					LoadElementToRegister(cf0, registerLoadType, (v0 + element->Offset) );
 
+					// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
 					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
 					{
 						// Texcoord interpolator registers:
-						D3DXVECTOR4 cf1, cf2;
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
 						LoadElementToRegister(cf1, registerLoadType, (v1 + element->Offset) );
 						LoadElementToRegister(cf2, registerLoadType, (v2 + element->Offset) );
 
-						InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+						InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 					}
 					else
 					{
@@ -4834,19 +4977,22 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 				}
 				else
 				{
-					D3DXVECTOR4 cf0;
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
 					const D3DDECLTYPE registerLoadType = element->Type;
 
 					LoadElementToRegister(cf0, registerLoadType, (v0 + element->Offset) );
+
+					// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
 					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
 					{
 						// Interpolator registers:
-						D3DXVECTOR4 cf1, cf2;
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
 						LoadElementToRegister(cf1, registerLoadType, (v1 + element->Offset) );
 						LoadElementToRegister(cf2, registerLoadType, (v2 + element->Offset) );
 
 						// TODO: Implement PS_3_0 interpreters too
-						InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+						InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 					}
 					else
 					{
@@ -4864,7 +5010,10 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 #endif
 }
 
-const float IDirect3DDevice9Hook::InterpolatePixelDepth(const D3DXVECTOR3& barycentricInterpolants, const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, float& invZ0, float& invZ1, float& invZ2) const
+static const __m128 oneVec = { 1.0f, 1.0f, 1.0f, 1.0f };
+static const __m128 maxDepth24Bit = { 16777216.0f, 16777216.0f, 16777216.0f, 16777216.0f };
+
+const float IDirect3DDevice9Hook::InterpolatePixelDepth(const __m128 barycentricInterpolants, const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128& outInvZ) const
 {
 	// TODO: This assumes that the PositionT element is a D3DDECLTYPE_FLOAT4 (which is the default, and the case in the vast majority of situations)
 	const D3DXVECTOR4& xyzRhw0 = *(const D3DXVECTOR4* const)(v0 + byteOffsetToOPosition);
@@ -4872,23 +5021,81 @@ const float IDirect3DDevice9Hook::InterpolatePixelDepth(const D3DXVECTOR3& baryc
 	const D3DXVECTOR4& xyzRhw2 = *(const D3DXVECTOR4* const)(v2 + byteOffsetToOPosition);
 
 	// Apply perspective-correct Z interpolation:
-	const float localInvZ0 = xyzRhw0.z == 0.0f ? (16777216.0f) : 1.0f / xyzRhw0.z;
-	const float localInvZ1 = xyzRhw1.z == 0.0f ? (16777216.0f) : 1.0f / xyzRhw1.z;
-	const float localInvZ2 = xyzRhw2.z == 0.0f ? (16777216.0f) : 1.0f / xyzRhw2.z;
+	__m128 localInvZ;
+	localInvZ.m128_f32[0] = xyzRhw0.z;
+	localInvZ.m128_f32[1] = xyzRhw1.z;
+	localInvZ.m128_f32[2] = xyzRhw2.z;
 
-	const float invInterpolatedDepth = (localInvZ0 * barycentricInterpolants.x) + (localInvZ1 * barycentricInterpolants.y) + (localInvZ2 * barycentricInterpolants.z);
+	const __m128 zeroVec = _mm_setzero_ps();
+	const __m128 localZ = _mm_div_ps(oneVec, localInvZ);
+	const __m128 selectMask = _mm_cmpeq_ps(zeroVec, localInvZ); // Members that equal zero will be set to 0xFF, members that don't will be set to 0x00
+	const __m128 localInvZSelected = _mm_blendv_ps(localZ, maxDepth24Bit, selectMask);
 
-	invZ0 = localInvZ0;
-	invZ1 = localInvZ1;
-	invZ2 = localInvZ2;
+	const __m128 invInterpolatedDepth = _mm_dp_ps(localInvZSelected, barycentricInterpolants, 0x7F);
 
-	return 1.0f / invInterpolatedDepth;
+	outInvZ = localInvZSelected;
+
+	return _mm_div_ps(oneVec, invInterpolatedDepth).m128_f32[0];
+}
+
+void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128 (&outInvZAndDepth4)[4]) const
+{
+	// TODO: This assumes that the PositionT element is a D3DDECLTYPE_FLOAT4 (which is the default, and the case in the vast majority of situations)
+	const D3DXVECTOR4& xyzRhw0 = *(const D3DXVECTOR4* const)(v0 + byteOffsetToOPosition);
+	const D3DXVECTOR4& xyzRhw1 = *(const D3DXVECTOR4* const)(v1 + byteOffsetToOPosition);
+	const D3DXVECTOR4& xyzRhw2 = *(const D3DXVECTOR4* const)(v2 + byteOffsetToOPosition);
+
+	// Apply perspective-correct Z interpolation:
+	__m128 localInvZ;
+	localInvZ.m128_f32[0] = xyzRhw0.z;
+	localInvZ.m128_f32[1] = xyzRhw1.z;
+	localInvZ.m128_f32[2] = xyzRhw2.z;
+
+	const __m128 zeroVec = _mm_setzero_ps();
+	const __m128 localZ = _mm_div_ps(oneVec, localInvZ);
+	const __m128 selectMask = _mm_cmpeq_ps(zeroVec, localInvZ); // Members that equal zero will be set to 0xFF, members that don't will be set to 0x00
+	const __m128 localInvZSelected = _mm_blendv_ps(localZ, maxDepth24Bit, selectMask);
+
+	const __m128 dotProdResult0 = _mm_dp_ps(localInvZSelected, barycentricInterpolants4[0], 0x7F);
+	const __m128 dotProdResult1 = _mm_dp_ps(localInvZSelected, barycentricInterpolants4[1], 0x7F);
+	const __m128 dotProdResult2 = _mm_dp_ps(localInvZSelected, barycentricInterpolants4[2], 0x7F);
+	const __m128 dotProdResult3 = _mm_dp_ps(localInvZSelected, barycentricInterpolants4[3], 0x7F);
+
+	const __m128 invInterpolatedDepth4 = 
+	{
+		dotProdResult0.m128_f32[0],
+		dotProdResult1.m128_f32[0],
+		dotProdResult2.m128_f32[0],
+		dotProdResult3.m128_f32[0]
+	};
+
+	const __m128 pixelDepth4 = _mm_div_ps(oneVec, invInterpolatedDepth4);
+	__m128 out0 = localInvZSelected;
+	__m128 out1 = localInvZSelected;
+	__m128 out2 = localInvZSelected;
+	__m128 out3 = localInvZSelected;
+
+	out0.m128_f32[3] = pixelDepth4.m128_f32[0];
+	out1.m128_f32[3] = pixelDepth4.m128_f32[1];
+	out2.m128_f32[3] = pixelDepth4.m128_f32[2];
+	out3.m128_f32[3] = pixelDepth4.m128_f32[3];
+
+	outInvZAndDepth4[0] = out0;
+	outInvZAndDepth4[1] = out1;
+	outInvZAndDepth4[2] = out2;
+	outInvZAndDepth4[3] = out3;
 }
 
 // Handles interpolating pixel shader input registers from vertex shader output registers
 // TODO: Like InterpolateStreamIntoRegisters, have this function fill with (1,1,1,1) for input color usage registers or (0,0,0,0) for other usages if the vertex shader doesn't write to the corresponding output registers
-void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const D3DXVECTOR3& barycentricInterpolants, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const float invZ0, const float invZ1, const float invZ2, const float pixelZ) const
+void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const __m128 barycentricInterpolants, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ, const float pixelZ) const
 {
+	// Precompute some vectors that will be used for all of attribute interpolation
+	const __m128 floatBarycentricsInvZ = _mm_mul_ps(invZ, barycentricInterpolants);
+	const __m128 floatBarycentricsInvZ_X = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(0, 0, 0, 0) );
+	const __m128 floatBarycentricsInvZ_Y = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(1, 1, 1, 1) );
+	const __m128 floatBarycentricsInvZ_Z = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(2, 2, 2, 2) );
+
 	const ShaderInfo& pixelShaderInfo = currentState.currentPixelShader->GetShaderInfo();
 	if (pixelShaderInfo.shaderMajorVersion == 1)
 	{
@@ -4904,7 +5111,7 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 				{
 					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_2_0_outputs.oD[vsRegisterIndex]);
 					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_2_0_outputs.oD[vsRegisterIndex]);
-					InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+					InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 				}
 				else
 				{
@@ -4923,7 +5130,7 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 				{
 					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_2_0_outputs.oT[vsRegisterIndex]);
 					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_2_0_outputs.oT[vsRegisterIndex]);
-					InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+					InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 				}
 				else
 				{
@@ -4946,12 +5153,13 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 
 				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]);
 
+				// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
 				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
 				{
 					// Color interpolator registers:
 					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
 					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
-					InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+					InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 				}
 				else
 				{
@@ -4965,12 +5173,13 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
 				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]);
 
+				// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
 				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
 				{
 					// Texcoord interpolator registers:
 					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
 					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
-					InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+					InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 				}
 				else
 				{
@@ -4992,6 +5201,7 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
 				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]);
 
+				// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
 				if (reg.usageType != D3DDECLUSAGE_BLENDINDICES)
 				{
 					// Interpolator registers:
@@ -4999,7 +5209,7 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
 
 					// TODO: Implement PS_3_0 interpreters too
-					InterpolateVertexAttribute_PerspectiveCorrect(barycentricInterpolants, cf0, cf1, cf2, invZ0, invZ1, invZ2, pixelZ, interpolatedFloatValue);
+					InterpolateVertexAttribute_PerspectiveCorrect(cf0, cf1, cf2, floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z, pixelZ, interpolatedFloatValue);
 				}
 				else
 				{
@@ -5016,6 +5226,29 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 #endif
 }
 
+
+/*
+Last big chunks before pixel4 is ready:
+ROPBlendWriteMask
+StencilOperation
+InterpolateStreamIntoRegisters/InterpolateShaderIntoRegisters
+Interpreter engine
+Job forking
+
+Enum for why a pixel was culled:
+0) NormalWrite (no cull)
+1) Rasterizer skip (polygon edge)
+2) Early Z skip
+3) Interpolated Z nearclip
+4) Interpolated Z farclip
+5) Pixel outside of depthstencil buffer
+6) Fail stencil test
+7) Fail Z test
+8) texkill (discard)
+9) alpha test
+10) alpha blend skip (0 alpha)
+11) additive blend skip (0 color)
+*/
 void IDirect3DDevice9Hook::ShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const
 {
 	++frameStats.numPixelsShaded;
@@ -5178,6 +5411,21 @@ void IDirect3DDevice9Hook::StencilPassOperation(const unsigned x, const unsigned
 	StencilOperation(x, y, currentState.currentRenderStates.renderStatesUnion.namedStates.stencilPass);
 }
 
+/*void IDirect3DDevice9Hook::StencilFailOperation4(const __m128i x4, const __m128i y4) const
+{
+	StencilOperation4(x4, y4, currentState.currentRenderStates.renderStatesUnion.namedStates.stencilFail);
+}
+
+void IDirect3DDevice9Hook::StencilZFailOperation4(const __m128i x4, const __m128i y4) const
+{
+	StencilOperation4(x4, y4, currentState.currentRenderStates.renderStatesUnion.namedStates.stencilZFail);
+}
+
+void IDirect3DDevice9Hook::StencilPassOperation4(const __m128i x4, const __m128i y4) const
+{
+	StencilOperation4(x4, y4, currentState.currentRenderStates.renderStatesUnion.namedStates.stencilPass);
+}*/
+
 // true = "pass" (draw the pixel), false = "fail" (discard the pixel for all render targets and also discard depth/stencil writes for this pixel)
 const bool IDirect3DDevice9Hook::AlphaTest(const D3DXVECTOR4& outColor) const
 {
@@ -5227,6 +5475,8 @@ const bool IDirect3DDevice9Hook::AlphaTest(const D3DXVECTOR4& outColor) const
 		default:
 #ifdef _DEBUG
 			DbgBreakPrint("Error: Invalid D3DCMP function passed to Alpha Test");
+#else
+			__assume(0);
 #endif
 		case D3DCMP_ALWAYS      :
 			return true;
@@ -5234,6 +5484,66 @@ const bool IDirect3DDevice9Hook::AlphaTest(const D3DXVECTOR4& outColor) const
 	}
 
 	return true;
+}
+
+// Returns a SSE vector mask (0xFF for "test pass" and 0x00 for "test fail")
+const __m128 IDirect3DDevice9Hook::AlphaTest4(const D3DXVECTOR4 (&outColor4)[4]) const
+{
+	// Alpha testing:
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaTestEnable)
+	{
+		switch (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaFunc)
+		{
+		case D3DCMP_NEVER       :
+			return *(const __m128* const)&zeroMaskVec;
+		case D3DCMP_LESS        :
+		{
+			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
+			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
+			return _mm_cmplt_ps(alphaVec, alphaRef);
+		}
+		case D3DCMP_EQUAL       :
+		{
+			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
+			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
+			return _mm_cmpeq_ps(alphaVec, alphaRef);
+		}
+		case D3DCMP_LESSEQUAL   :
+		{
+			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
+			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
+			return _mm_cmple_ps(alphaVec, alphaRef);
+		}
+		case D3DCMP_GREATER     :
+		{
+			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
+			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
+			return _mm_cmpgt_ps(alphaVec, alphaRef);
+		}
+		case D3DCMP_NOTEQUAL    :
+		{
+			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
+			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
+			return _mm_cmpneq_ps(alphaVec, alphaRef);
+		}
+		case D3DCMP_GREATEREQUAL:
+		{
+			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
+			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
+			return _mm_cmpge_ps(alphaVec, alphaRef);
+		}
+		default:
+#ifdef _DEBUG
+			DbgBreakPrint("Error: Invalid D3DCMP function passed to Alpha Test");
+#else
+			__assume(0);
+#endif
+		case D3DCMP_ALWAYS      :
+			break;
+		}
+	}
+
+	return *(const __m128* const)&oneMaskVec;
 }
 
 // true = "pass" (draw the pixel), false = "fail" (discard the pixel)
@@ -5277,11 +5587,13 @@ const bool IDirect3DDevice9Hook::StencilTestNoWrite(const unsigned x, const unsi
 }
 
 // Handles running the pixel shader from a processed vertex shader
-void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const D3DXVECTOR3& barycentricInterpolants, const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const
+void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const
 {
 	// Perform Z-clipping (clip the pixel if it's outside of the [0.0, 1.0] range):
-	float invZ0, invZ1, invZ2;
-	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, byteOffsetToOPosition, (CONST BYTE* const)&v0, (CONST BYTE* const)&v1, (CONST BYTE* const)&v2, invZ0, invZ1, invZ2);
+	__m128 invZ;
+	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, byteOffsetToOPosition, (CONST BYTE* const)&v0, (CONST BYTE* const)&v1, (CONST BYTE* const)&v2, invZ);
+
+	// In the future when we have proper vertex clipping, this step shouldn't be necessary as the verts coming in from the rasterizer should always be clipped between 0.0 and 1.0
 	if (pixelDepth < 0.0f)
 		return;
 	else if (pixelDepth > 1.0f)
@@ -5321,7 +5633,7 @@ void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine
 		}
 	}
 
-	InterpolateShaderIntoRegisters(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ0, invZ1, invZ2, pixelDepth);
+	InterpolateShaderIntoRegisters(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth);
 
 	ShadePixel(x, y, pixelEngine);
 }

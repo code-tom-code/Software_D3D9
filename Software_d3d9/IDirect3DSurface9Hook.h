@@ -21,6 +21,11 @@ static inline const DWORD GetStencilFormatMask(const D3DFORMAT format)
 	case D3DFMT_S8_LOCKABLE:
 		return 0xFF;
 	default:
+#ifdef _DEBUG
+		__debugbreak(); // Should never be here
+#else
+		__assume(0);
+#endif
 		return 0x00;
 	}
 }
@@ -65,7 +70,7 @@ static inline void ValidateSurfaceMagicCookie(const std::vector<BYTE>& bytes)
 }
 #endif
 
-class IDirect3DSurface9Hook : public IDirect3DSurface9
+__declspec(align(16) ) class IDirect3DSurface9Hook : public IDirect3DSurface9
 {
 public:
 	IDirect3DSurface9Hook(LPDIRECT3DSURFACE9 _realObject, IDirect3DDevice9Hook* _parentDevice) : realObject(_realObject), parentDevice(_parentDevice), refCount(1),
@@ -112,6 +117,16 @@ public:
 #endif
 	}
 
+	void* operator new(size_t siz)
+	{
+		return _mm_malloc(siz, 16);
+	}
+
+	void operator delete(void* ptr)
+	{
+		_mm_free(ptr);
+	}
+
 	// Creation functions:
 	void CreateOffscreenPlainSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DPOOL _Pool);
 	void CreateDepthStencilSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DMULTISAMPLE_TYPE _MultiSample, DWORD _MultisampleQuality, BOOL _Discard);
@@ -119,6 +134,8 @@ public:
 	void CreateTextureImplicitSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DPOOL _Pool, const DebuggableUsage _Usage, UINT _Level, IDirect3DTexture9Hook* _HookParentTexturePtr);
 	void CreateDeviceImplicitSurface(const D3DPRESENT_PARAMETERS& d3dpp);
 	void CreateDeviceImplicitDepthStencil(const D3DPRESENT_PARAMETERS& d3dpp);
+
+	void UpdateCachedValuesOnCreate();
 
 	/*** IUnknown methods ***/
     virtual COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE QueryInterface(THIS_ REFIID riid, void** ppvObj) override;
@@ -177,6 +194,9 @@ public:
 	template <const unsigned char writeMask>
 	void SetPixelVec(const unsigned x, const unsigned y, const D3DXVECTOR4& color);
 
+	template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+	void SetPixelVec4(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+
 	const D3DCOLOR GetPixel(const unsigned x, const unsigned y) const;
 
 	template <const unsigned char writeMask, const bool sRGBSurface>
@@ -187,16 +207,21 @@ public:
 
 	// Depth functions:
 	void SetDepth(const unsigned x, const unsigned y, const float depth);
+	void SetDepth4(const __m128i x4, const __m128i y4, const __m128 depth4);
 
 	const float GetDepth(const unsigned x, const unsigned y) const;
+	const __m128 GetDepth4(const __m128i x4, const __m128i y4) const;
 
 	const unsigned GetRawDepthValueFromFloatDepth(const float floatDepth) const;
 
 	const unsigned GetRawDepth(const unsigned x, const unsigned y) const;
+	const __m128i GetRawDepth4(const __m128i x4, const __m128i y4) const;
 
 	// Stencil functions:
 	void SetStencil(const unsigned x, const unsigned y, const DWORD stencil);
+	void SetStencil4(const __m128i x4, const __m128i y4, const DWORD stencil4);
 	const DWORD GetStencil(const unsigned x, const unsigned y) const;
+	const __m128i GetStencil4(const __m128i x4, const __m128i y4) const;
 
 	void UpdateSurfaceInternal(const IDirect3DSurface9Hook* const sourceSurface, const RECT* const sourceRect, const POINT* const destPoint);
 
@@ -300,6 +325,7 @@ protected:
 	UINT surfaceBytesRawSize;
 	UINT auxSurfaceBytesRawSize;
 
+	__declspec(align(16) ) __m128i InternalWidthSplatted; // This is in the format of (uint32[4])(InternalWidth, InternalWidth, InternalWidth, InternalWidth)
 	UINT InternalWidthM1;
 	UINT InternalHeightM1;
 	float InternalWidthM1F;

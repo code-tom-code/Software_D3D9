@@ -25,13 +25,13 @@ struct PS_2_0_InputRegisters
 	{
 		struct _ps_2_0_inputs
 		{
-			D3DCOLORVALUE v[D3DMCS_COLOR2]; // Input vertex color registers (0 = diffuse, 1 = specular)
-			D3DCOLORVALUE t[D3DDP_MAXTEXCOORD]; // Texcoord registers
+			__declspec(align(16) ) D3DCOLORVALUE v[D3DMCS_COLOR2]; // Input vertex color registers (0 = diffuse, 1 = specular)
+			__declspec(align(16) ) D3DCOLORVALUE t[D3DDP_MAXTEXCOORD]; // Texcoord registers
 		} ps_2_0_inputs;
 
 		struct _ps_3_0_inputs
 		{
-			D3DCOLORVALUE t[MAX_NUM_PS_INPUTS]; // Input interpolator registers
+			__declspec(align(16) ) D3DCOLORVALUE t[MAX_NUM_PS_INPUTS]; // Input interpolator registers
 		} ps_3_0_inputs;
 	} ps_interpolated_inputs;
 };
@@ -112,8 +112,8 @@ public:
 	void InterpreterExecutePixel(void);
 
 	const PS_2_0_ConstantsBuffer* constantRegisters;
-	PS_2_0_InputRegisters inputRegisters;
-	PS_2_0_RuntimeRegisters runtimeRegisters;
+	__declspec(align(16) ) PS_2_0_InputRegisters inputRegisters;
+	__declspec(align(16) ) PS_2_0_RuntimeRegisters runtimeRegisters;
 	PS_2_0_OutputRegisters* outputRegisters;
 	PS_2_0_MiscRegisters miscRegisters;
 

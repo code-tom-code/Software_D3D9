@@ -19,7 +19,7 @@ struct VS_2_0_ConstantsBuffer
 
 struct VS_2_0_InputRegisters
 {
-	D3DXVECTOR4 v[VS_MAX_INPUT_REGISTERS]; // Input registers from vertex stream
+	__declspec(align(16) ) D3DXVECTOR4 v[VS_MAX_INPUT_REGISTERS]; // Input registers from vertex stream
 };
 
 struct VS_2_0_RuntimeRegisters
@@ -66,22 +66,22 @@ struct VS_2_0_OutputRegisters
 #endif
 	}
 
-	D3DXVECTOR4 oPos; // Output position register for pre-vs_3_0 (very important)
+	__declspec(align(16) )  D3DXVECTOR4 oPos; // Output position register for pre-vs_3_0 (very important)
 
 	// TODO: MSDN says that the fog and point-size registers are float1's, not float4's. Is this right, or does HLSL allow storing float4's in these registers?
-	D3DXVECTOR4 oFog; // Output fog register
-	D3DXVECTOR4 oPts; // Output point-size register
+	__declspec(align(16) )  D3DXVECTOR4 oFog; // Output fog register
+	__declspec(align(16) )  D3DXVECTOR4 oPts; // Output point-size register
 	union _vs_interpolated_outputs
 	{
 		struct _vs_2_0_outputs
 		{
-			D3DCOLORVALUE oD[D3DMCS_COLOR2]; // Diffuse and Specular color output registers
-			D3DCOLORVALUE oT[D3DDP_MAXTEXCOORD]; // Output texcoord registers
+			__declspec(align(16) )  D3DCOLORVALUE oD[D3DMCS_COLOR2]; // Diffuse and Specular color output registers
+			__declspec(align(16) )  D3DCOLORVALUE oT[D3DDP_MAXTEXCOORD]; // Output texcoord registers
 		} vs_2_0_outputs;
 
 		struct _vs_3_0_outputs
 		{
-			D3DCOLORVALUE oT[10]; // Output texcoord registers
+			__declspec(align(16) )  D3DCOLORVALUE oT[10]; // Output texcoord registers
 		} vs_3_0_outputs;
 	} vs_interpolated_outputs;
 	union vertexClipUnion
@@ -137,8 +137,8 @@ public:
 	void Reset(VS_2_0_OutputRegisters* const * const outputVerts, const unsigned char numVerts);
 
 	const VS_2_0_ConstantsBuffer* constantRegisters;
-	VS_2_0_InputRegisters inputRegisters[4];
-	VS_2_0_RuntimeRegisters runtimeRegisters[4];
+	__declspec(align(16) ) VS_2_0_InputRegisters inputRegisters[4];
+	__declspec(align(16) ) VS_2_0_RuntimeRegisters runtimeRegisters[4];
 	VS_2_0_OutputRegisters* outputRegisters[4];
 
 	D3DXVECTOR4& ResolveDstParameter(const dstParameterToken dstParameter);
