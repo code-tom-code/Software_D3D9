@@ -1112,8 +1112,12 @@ public:
 	void RenderOutput(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
 
 	// Handles blending and write-masking
-	template <const unsigned char writeMask>
+	template <const unsigned char channelWriteMask>
 	void ROPBlendWriteMask(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
+
+	// Handles blending and write-masking
+	template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+	void ROPBlendWriteMask4(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&value)[4]) const;
 
 	// Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
 	void InterpolateStreamIntoRegisters(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, const __m128 barycentricInterpolants, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ, const float pixelZ) const;
@@ -1137,6 +1141,9 @@ public:
 
 	template <const unsigned char channelWriteMask>
 	void AlphaBlend(D3DXVECTOR4& outVec, const D3DBLENDOP blendOp, const D3DXVECTOR4& srcBlend, const D3DXVECTOR4& dstBlend, const D3DXVECTOR4& srcColor, const D3DXVECTOR4& dstColor) const;
+
+	template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+	void AlphaBlend4(D3DXVECTOR4 (&outVec)[4], const D3DBLENDOP blendOp, const D3DXVECTOR4 (&srcBlend)[4], const D3DXVECTOR4 (&dstBlend)[4], const D3DXVECTOR4 (&srcColor)[4], const D3DXVECTOR4 (&dstColor)[4]) const;
 
 	void InitVertexShader(const DeviceState& deviceState, const ShaderInfo& vertexShaderInfo) const;
 	void InitPixelShader(const DeviceState& deviceState, const ShaderInfo& pixelShaderInfo) const;

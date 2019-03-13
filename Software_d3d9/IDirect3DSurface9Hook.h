@@ -202,8 +202,8 @@ public:
 	template <const unsigned char writeMask, const bool sRGBSurface>
 	void GetPixelVec(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 
-	template <const unsigned char writeMask, const bool sRGBSurface>
-	void GetPixelVec4(const unsigned (&x4)[4], const unsigned (&y4)[4], D3DXVECTOR4 (&outColor4)[4]) const;
+	template <const unsigned char writeMask, const bool sRGBSurface, const unsigned char pixelWriteMask = 0xF>
+	void GetPixelVec4(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
 
 	// Depth functions:
 	void SetDepth(const unsigned x, const unsigned y, const float depth);
@@ -285,7 +285,7 @@ protected:
 	template <const unsigned char writeMask, const bool sRGBSurface>
 	void SampleSurfaceInternal(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
 
-	template <const unsigned char writeMask, const bool sRGBSurface>
+	template <const unsigned char writeMask, const bool sRGBSurface, const unsigned pixelWriteMask>
 	void SampleSurfaceInternal4(const float (&x4)[4], const float (&y4)[4], const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4 (&outColor4)[4]) const;
 
 	LPDIRECT3DSURFACE9 realObject;
@@ -326,9 +326,15 @@ protected:
 	UINT auxSurfaceBytesRawSize;
 
 	__declspec(align(16) ) __m128i InternalWidthSplatted; // This is in the format of (uint32[4])(InternalWidth, InternalWidth, InternalWidth, InternalWidth)
+	__declspec(align(16) ) __m128 InternalWidthSplattedF; // This is in the format of (float32[4])(InternalWidth, InternalWidth, InternalWidth, InternalWidth)
+	__declspec(align(16) ) __m128 InternalHeightSplattedF; // This is in the format of (float32[4])(InternalHeight, InternalHeight, InternalHeight, InternalHeight)
 	UINT InternalWidthM1;
 	UINT InternalHeightM1;
 	float InternalWidthM1F;
 	float InternalHeightM1F;
+	__declspec(align(16) ) __m128 InternalWidthM1SplattedF;
+	__declspec(align(16) ) __m128 InternalHeightM1SplattedF;
+	__declspec(align(16) ) __m128i InternalWidthM1Splatted;
+	__declspec(align(16) ) __m128i InternalHeightM1Splatted;
 	bool is1x1surface;
 };

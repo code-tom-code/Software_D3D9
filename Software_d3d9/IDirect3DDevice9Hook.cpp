@@ -14,6 +14,7 @@
 #include "FixedFunctionToShader.h"
 #include "SemanticMappings.h"
 #include "resource.h"
+#include "DitherTables.h"
 
 #ifdef MULTITHREAD_SHADING
 	#if PARALLEL_LIBRARY == PARALLELLIB_CONCRT
@@ -4075,33 +4076,27 @@ void IDirect3DDevice9Hook::LoadBlend(D3DXVECTOR4& outBlend, const D3DBLEND blend
 			outBlend = srcColor;
 			return;
 		case D3DBLEND_INVSRCCOLOR    :
-			// TODO: SIMDify this
-			outBlend = staticColorWhiteOpaque - srcColor;
+			*(__m128* const)&outBlend = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&srcColor);
 			return;
 		case D3DBLEND_BOTHSRCALPHA   :
 		case D3DBLEND_SRCALPHA       :
-			// TODO: SIMDify this
-			outBlend.x = outBlend.y = outBlend.z = outBlend.w = srcColor.w;
+			*(__m128* const)&outBlend = _mm_load1_ps(&srcColor.w);
 			return;
 		case D3DBLEND_BOTHINVSRCALPHA:
 		case D3DBLEND_INVSRCALPHA    :
-			// TODO: SIMDify this
-			outBlend.x = outBlend.y = outBlend.z = outBlend.w = (1.0f - srcColor.w);
+			*(__m128* const)&outBlend = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&srcColor.w) );
 			return;
 		case D3DBLEND_DESTALPHA      :
-			// TODO: SIMDify this
-			outBlend.x = outBlend.y = outBlend.z = outBlend.w = dstColor.w;
+			*(__m128* const)&outBlend = _mm_load1_ps(&dstColor.w);
 			return;
 		case D3DBLEND_INVDESTALPHA   :
-			// TODO: SIMDify this
-			outBlend.x = outBlend.y = outBlend.z = outBlend.w = (1.0f - dstColor.w);
+			*(__m128* const)&outBlend = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&dstColor.w) );
 			return;
 		case D3DBLEND_DESTCOLOR      :
 			outBlend = dstColor;
 			return;
 		case D3DBLEND_INVDESTCOLOR:
-			// TODO: SIMDify this
-			outBlend = staticColorWhiteOpaque - dstColor;
+			*(__m128* const)&outBlend = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&dstColor);
 			return;
 		case D3DBLEND_SRCALPHASAT    :
 		{
@@ -4289,16 +4284,598 @@ void IDirect3DDevice9Hook::LoadBlend(D3DXVECTOR4& outBlend, const D3DBLEND blend
 	}
 }
 
+template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::LoadBlend4(D3DXVECTOR4 (&outBlend)[4], const D3DBLEND blendMode, const D3DXVECTOR4 (&srcColor)[4], const D3DXVECTOR4 (&dstColor)[4]) const
+{
+	if (pixelWriteMask == 0x0)
+	{
+#ifdef _DEBUG
+		__debugbreak(); // Don't call this function if you aren't going to write anything out!
+#endif
+		return;
+	}
+
+	// Simple + fast mode:
+	if ( (channelWriteMask & 0x7) == 0x7)
+	{
+		switch (blendMode)
+		{
+		case D3DBLEND_ZERO:
+			if (pixelWriteMask & 0x1) outBlend[0] = zeroVec;
+			if (pixelWriteMask & 0x2) outBlend[1] = zeroVec;
+			if (pixelWriteMask & 0x4) outBlend[2] = zeroVec;
+			if (pixelWriteMask & 0x8) outBlend[3] = zeroVec;
+			return;
+		default:
+#ifdef _DEBUG
+			DbgBreakPrint("Error: Invalid D3DBLEND type passed to blending unit");
+#else
+			__assume(0);
+#endif
+		case D3DBLEND_ONE            :
+			if (pixelWriteMask & 0x1) outBlend[0] = staticColorWhiteOpaque;
+			if (pixelWriteMask & 0x2) outBlend[1] = staticColorWhiteOpaque;
+			if (pixelWriteMask & 0x4) outBlend[2] = staticColorWhiteOpaque;
+			if (pixelWriteMask & 0x8) outBlend[3] = staticColorWhiteOpaque;
+			return;
+		case D3DBLEND_INVSRCCOLOR2   :
+#ifdef _DEBUG
+			DbgBreakPrint("Error: D3DBLEND_INVSRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+			__assume(0);
+#endif
+		case D3DBLEND_SRCCOLOR2      :
+#ifdef _DEBUG
+			DbgBreakPrint("Error: D3DBLEND_SRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+			__assume(0);
+#endif
+		case D3DBLEND_SRCCOLOR       :
+			if (pixelWriteMask & 0x1) outBlend[0] = srcColor[0];
+			if (pixelWriteMask & 0x2) outBlend[1] = srcColor[1];
+			if (pixelWriteMask & 0x4) outBlend[2] = srcColor[2];
+			if (pixelWriteMask & 0x8) outBlend[3] = srcColor[3];
+			return;
+		case D3DBLEND_INVSRCCOLOR    :
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outBlend[0]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(srcColor[0]) );
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outBlend[1]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(srcColor[1]) );
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outBlend[2]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(srcColor[2]) );
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outBlend[3]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(srcColor[3]) );
+			return;
+		case D3DBLEND_BOTHSRCALPHA   :
+		case D3DBLEND_SRCALPHA       :
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outBlend[0]) = _mm_load1_ps(&(srcColor[0].w) );
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outBlend[1]) = _mm_load1_ps(&(srcColor[1].w) );
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outBlend[2]) = _mm_load1_ps(&(srcColor[2].w) );
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outBlend[3]) = _mm_load1_ps(&(srcColor[3].w) );
+			return;
+		case D3DBLEND_BOTHINVSRCALPHA:
+		case D3DBLEND_INVSRCALPHA    :
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outBlend[0]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&(srcColor[0].w) ) );
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outBlend[1]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&(srcColor[1].w) ) );
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outBlend[2]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&(srcColor[2].w) ) );
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outBlend[3]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&(srcColor[3].w) ) );
+			return;
+		case D3DBLEND_DESTALPHA      :
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outBlend[0]) = _mm_load1_ps(&(dstColor[0].w) );
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outBlend[1]) = _mm_load1_ps(&(dstColor[1].w) );
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outBlend[2]) = _mm_load1_ps(&(dstColor[2].w) );
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outBlend[3]) = _mm_load1_ps(&(dstColor[3].w) );
+			return;
+		case D3DBLEND_INVDESTALPHA   :
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outBlend[0]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&(dstColor[0].w) ) );
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outBlend[1]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&(dstColor[1].w) ) );
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outBlend[2]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&(dstColor[2].w) ) );
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outBlend[3]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, _mm_load1_ps(&(dstColor[3].w) ) );
+			return;
+		case D3DBLEND_DESTCOLOR      :
+			if (pixelWriteMask & 0x1) outBlend[0] = dstColor[0];
+			if (pixelWriteMask & 0x2) outBlend[1] = dstColor[1];
+			if (pixelWriteMask & 0x4) outBlend[2] = dstColor[2];
+			if (pixelWriteMask & 0x8) outBlend[3] = dstColor[3];
+			return;
+		case D3DBLEND_INVDESTCOLOR:
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outBlend[0]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(dstColor[0]) );
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outBlend[1]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(dstColor[1]) );
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outBlend[2]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(dstColor[2]) );
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outBlend[3]) = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(dstColor[3]) );
+			return;
+		case D3DBLEND_SRCALPHASAT    :
+		{
+			// TODO: Low-priorty SIMDify this (nobody uses this blend state anyway)
+			for (unsigned x = 0; x < 4; ++x)
+			{
+				if (pixelWriteMask & (1 << x) )
+				{
+					const float as = srcColor[x].w;
+					const float invad = 1.0f - dstColor[x].w;
+					const float f = as < invad ? as : invad;
+					if (channelWriteMask & 0x1)
+						outBlend[x].x = f;
+					if (channelWriteMask & 0x2)
+						outBlend[x].y = f;
+					if (channelWriteMask & 0x4)
+						outBlend[x].z = f;
+					if (channelWriteMask & 0x8)
+						outBlend[x].w = 1.0f;
+				}
+			}
+			return;
+		}
+		case D3DBLEND_BLENDFACTOR    :
+		{
+			const __m128 blendFactor = *(const __m128* const)&(currentState.currentRenderStates.cachedBlendFactor);
+			if (pixelWriteMask & 0x1) *(__m128* const)(outBlend[0]) = blendFactor;
+			if (pixelWriteMask & 0x2) *(__m128* const)(outBlend[1]) = blendFactor;
+			if (pixelWriteMask & 0x4) *(__m128* const)(outBlend[2]) = blendFactor;
+			if (pixelWriteMask & 0x8) *(__m128* const)(outBlend[3]) = blendFactor;
+		}
+			return;
+		case D3DBLEND_INVBLENDFACTOR:
+		{
+			const __m128 invBlendFactor = *(const __m128* const)&(currentState.currentRenderStates.cachedInvBlendFactor);
+			if (pixelWriteMask & 0x1) *(__m128* const)(outBlend[0]) = invBlendFactor;
+			if (pixelWriteMask & 0x2) *(__m128* const)(outBlend[1]) = invBlendFactor;
+			if (pixelWriteMask & 0x4) *(__m128* const)(outBlend[2]) = invBlendFactor;
+			if (pixelWriteMask & 0x8) *(__m128* const)(outBlend[3]) = invBlendFactor;
+		}
+			return;
+		}
+		return;
+	}
+
+	switch (blendMode)
+	{
+	case D3DBLEND_ZERO           :
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1) outBlend[0].x = 0.0f;
+			if (channelWriteMask & 0x2)	outBlend[0].y = 0.0f;
+			if (channelWriteMask & 0x4)	outBlend[0].z = 0.0f;
+			if (channelWriteMask & 0x8)	outBlend[0].w = 0.0f;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1) outBlend[1].x = 0.0f;
+			if (channelWriteMask & 0x2)	outBlend[1].y = 0.0f;
+			if (channelWriteMask & 0x4)	outBlend[1].z = 0.0f;
+			if (channelWriteMask & 0x8)	outBlend[1].w = 0.0f;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1) outBlend[2].x = 0.0f;
+			if (channelWriteMask & 0x2)	outBlend[2].y = 0.0f;
+			if (channelWriteMask & 0x4)	outBlend[2].z = 0.0f;
+			if (channelWriteMask & 0x8)	outBlend[2].w = 0.0f;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1) outBlend[3].x = 0.0f;
+			if (channelWriteMask & 0x2)	outBlend[3].y = 0.0f;
+			if (channelWriteMask & 0x4)	outBlend[3].z = 0.0f;
+			if (channelWriteMask & 0x8)	outBlend[3].w = 0.0f;
+		}
+		break;
+	default:
+#ifdef _DEBUG
+		DbgBreakPrint("Error: Invalid D3DBLEND type passed to blending unit");
+#else
+		__assume(0);
+#endif
+	case D3DBLEND_ONE            :
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = 1.0f;
+			if (channelWriteMask & 0x2)	outBlend[0].y = 1.0f;
+			if (channelWriteMask & 0x4)	outBlend[0].z = 1.0f;
+			if (channelWriteMask & 0x8)	outBlend[0].w = 1.0f;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = 1.0f;
+			if (channelWriteMask & 0x2)	outBlend[1].y = 1.0f;
+			if (channelWriteMask & 0x4)	outBlend[1].z = 1.0f;
+			if (channelWriteMask & 0x8)	outBlend[1].w = 1.0f;
+		}
+		if (pixelWriteMask & 0x3)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = 1.0f;
+			if (channelWriteMask & 0x2)	outBlend[2].y = 1.0f;
+			if (channelWriteMask & 0x4)	outBlend[2].z = 1.0f;
+			if (channelWriteMask & 0x8)	outBlend[2].w = 1.0f;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = 1.0f;
+			if (channelWriteMask & 0x2)	outBlend[3].y = 1.0f;
+			if (channelWriteMask & 0x4)	outBlend[3].z = 1.0f;
+			if (channelWriteMask & 0x8)	outBlend[3].w = 1.0f;
+		}
+		break;
+	case D3DBLEND_INVSRCCOLOR2   :
+#ifdef _DEBUG
+		DbgBreakPrint("Error: D3DBLEND_INVSRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+		__assume(0);
+#endif
+	case D3DBLEND_SRCCOLOR2      :
+#ifdef _DEBUG
+		DbgBreakPrint("Error: D3DBLEND_SRCCOLOR2 is not yet supported!"); // Not yet supported!
+#else
+		__assume(0);
+#endif
+	case D3DBLEND_SRCCOLOR       :
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = srcColor[0].x;
+			if (channelWriteMask & 0x2)	outBlend[0].y = srcColor[0].y;
+			if (channelWriteMask & 0x4)	outBlend[0].z = srcColor[0].z;
+			if (channelWriteMask & 0x8)	outBlend[0].w = srcColor[0].w;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = srcColor[1].x;
+			if (channelWriteMask & 0x2)	outBlend[1].y = srcColor[1].y;
+			if (channelWriteMask & 0x4)	outBlend[1].z = srcColor[1].z;
+			if (channelWriteMask & 0x8)	outBlend[1].w = srcColor[1].w;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = srcColor[2].x;
+			if (channelWriteMask & 0x2)	outBlend[2].y = srcColor[2].y;
+			if (channelWriteMask & 0x4)	outBlend[2].z = srcColor[2].z;
+			if (channelWriteMask & 0x8)	outBlend[2].w = srcColor[2].w;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = srcColor[3].x;
+			if (channelWriteMask & 0x2)	outBlend[3].y = srcColor[3].y;
+			if (channelWriteMask & 0x4)	outBlend[3].z = srcColor[3].z;
+			if (channelWriteMask & 0x8)	outBlend[3].w = srcColor[3].w;
+		}
+		break;
+	case D3DBLEND_INVSRCCOLOR    :
+	{
+		__m128 invSrcColor4[4];
+		if (pixelWriteMask & 0x1) invSrcColor4[0] = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(srcColor[0]) );
+		if (pixelWriteMask & 0x2) invSrcColor4[1] = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(srcColor[1]) );
+		if (pixelWriteMask & 0x4) invSrcColor4[2] = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(srcColor[2]) );
+		if (pixelWriteMask & 0x8) invSrcColor4[3] = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(srcColor[3]) );
+
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = invSrcColor4[0].m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[0].y = invSrcColor4[0].m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[0].z = invSrcColor4[0].m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[0].w = invSrcColor4[0].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = invSrcColor4[1].m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[1].y = invSrcColor4[1].m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[1].z = invSrcColor4[1].m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[1].w = invSrcColor4[1].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = invSrcColor4[2].m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[2].y = invSrcColor4[2].m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[2].z = invSrcColor4[2].m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[2].w = invSrcColor4[2].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = invSrcColor4[3].m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[3].y = invSrcColor4[3].m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[3].z = invSrcColor4[3].m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[3].w = invSrcColor4[3].m128_f32[3];
+		}
+	}
+		break;
+	case D3DBLEND_BOTHSRCALPHA   :
+	case D3DBLEND_SRCALPHA       :
+	{
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = srcColor[0].w;
+			if (channelWriteMask & 0x2)	outBlend[0].y = srcColor[0].w;
+			if (channelWriteMask & 0x4)	outBlend[0].z = srcColor[0].w;
+			if (channelWriteMask & 0x8)	outBlend[0].w = srcColor[0].w;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = srcColor[1].w;
+			if (channelWriteMask & 0x2)	outBlend[1].y = srcColor[1].w;
+			if (channelWriteMask & 0x4)	outBlend[1].z = srcColor[1].w;
+			if (channelWriteMask & 0x8)	outBlend[1].w = srcColor[1].w;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = srcColor[2].w;
+			if (channelWriteMask & 0x2)	outBlend[2].y = srcColor[2].w;
+			if (channelWriteMask & 0x4)	outBlend[2].z = srcColor[2].w;
+			if (channelWriteMask & 0x8)	outBlend[2].w = srcColor[2].w;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = srcColor[3].w;
+			if (channelWriteMask & 0x2)	outBlend[3].y = srcColor[3].w;
+			if (channelWriteMask & 0x4)	outBlend[3].z = srcColor[3].w;
+			if (channelWriteMask & 0x8)	outBlend[3].w = srcColor[3].w;
+		}
+	}
+		break;
+	case D3DBLEND_BOTHINVSRCALPHA:
+	case D3DBLEND_INVSRCALPHA    :
+	{
+		__m128 alphaVec;
+		if (pixelWriteMask & 0x1) alphaVec.m128_f32[0] = srcColor[0].w;
+		if (pixelWriteMask & 0x2) alphaVec.m128_f32[1] = srcColor[1].w;
+		if (pixelWriteMask & 0x4) alphaVec.m128_f32[2] = srcColor[2].w;
+		if (pixelWriteMask & 0x8) alphaVec.m128_f32[3] = srcColor[3].w;
+		const __m128 invAlphaVec = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, alphaVec);
+
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = invAlphaVec.m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[0].y = invAlphaVec.m128_f32[0];
+			if (channelWriteMask & 0x4)	outBlend[0].z = invAlphaVec.m128_f32[0];
+			if (channelWriteMask & 0x8)	outBlend[0].w = invAlphaVec.m128_f32[0];
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = invAlphaVec.m128_f32[1];
+			if (channelWriteMask & 0x2)	outBlend[1].y = invAlphaVec.m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[1].z = invAlphaVec.m128_f32[1];
+			if (channelWriteMask & 0x8)	outBlend[1].w = invAlphaVec.m128_f32[1];
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = invAlphaVec.m128_f32[2];
+			if (channelWriteMask & 0x2)	outBlend[2].y = invAlphaVec.m128_f32[2];
+			if (channelWriteMask & 0x4)	outBlend[2].z = invAlphaVec.m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[2].w = invAlphaVec.m128_f32[2];
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = invAlphaVec.m128_f32[3];
+			if (channelWriteMask & 0x2)	outBlend[3].y = invAlphaVec.m128_f32[3];
+			if (channelWriteMask & 0x4)	outBlend[3].z = invAlphaVec.m128_f32[3];
+			if (channelWriteMask & 0x8)	outBlend[3].w = invAlphaVec.m128_f32[3];
+		}
+	}
+		break;
+	case D3DBLEND_DESTALPHA      :
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = dstColor[0].w;
+			if (channelWriteMask & 0x2)	outBlend[0].y = dstColor[0].w;
+			if (channelWriteMask & 0x4)	outBlend[0].z = dstColor[0].w;
+			if (channelWriteMask & 0x8)	outBlend[0].w = dstColor[0].w;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = dstColor[1].w;
+			if (channelWriteMask & 0x2)	outBlend[1].y = dstColor[1].w;
+			if (channelWriteMask & 0x4)	outBlend[1].z = dstColor[1].w;
+			if (channelWriteMask & 0x8)	outBlend[1].w = dstColor[1].w;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = dstColor[2].w;
+			if (channelWriteMask & 0x2)	outBlend[2].y = dstColor[2].w;
+			if (channelWriteMask & 0x4)	outBlend[2].z = dstColor[2].w;
+			if (channelWriteMask & 0x8)	outBlend[2].w = dstColor[2].w;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = dstColor[3].w;
+			if (channelWriteMask & 0x2)	outBlend[3].y = dstColor[3].w;
+			if (channelWriteMask & 0x4)	outBlend[3].z = dstColor[3].w;
+			if (channelWriteMask & 0x8)	outBlend[3].w = dstColor[3].w;
+		}
+		break;
+	case D3DBLEND_INVDESTALPHA   :
+	{
+		__m128 alphaVec;
+		if (pixelWriteMask & 0x1) alphaVec.m128_f32[0] = dstColor[0].w;
+		if (pixelWriteMask & 0x2) alphaVec.m128_f32[1] = dstColor[1].w;
+		if (pixelWriteMask & 0x4) alphaVec.m128_f32[2] = dstColor[2].w;
+		if (pixelWriteMask & 0x8) alphaVec.m128_f32[3] = dstColor[3].w;
+		const __m128 invAlphaVec = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, alphaVec);
+
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = invAlphaVec.m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[0].y = invAlphaVec.m128_f32[0];
+			if (channelWriteMask & 0x4)	outBlend[0].z = invAlphaVec.m128_f32[0];
+			if (channelWriteMask & 0x8)	outBlend[0].w = invAlphaVec.m128_f32[0];
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = invAlphaVec.m128_f32[1];
+			if (channelWriteMask & 0x2)	outBlend[1].y = invAlphaVec.m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[1].z = invAlphaVec.m128_f32[1];
+			if (channelWriteMask & 0x8)	outBlend[1].w = invAlphaVec.m128_f32[1];
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = invAlphaVec.m128_f32[2];
+			if (channelWriteMask & 0x2)	outBlend[2].y = invAlphaVec.m128_f32[2];
+			if (channelWriteMask & 0x4)	outBlend[2].z = invAlphaVec.m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[2].w = invAlphaVec.m128_f32[2];
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = invAlphaVec.m128_f32[3];
+			if (channelWriteMask & 0x2)	outBlend[3].y = invAlphaVec.m128_f32[3];
+			if (channelWriteMask & 0x4)	outBlend[3].z = invAlphaVec.m128_f32[3];
+			if (channelWriteMask & 0x8)	outBlend[3].w = invAlphaVec.m128_f32[3];
+		}
+	}
+		break;
+	case D3DBLEND_DESTCOLOR      :
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = dstColor[0].x;
+			if (channelWriteMask & 0x2)	outBlend[0].y = dstColor[0].y;
+			if (channelWriteMask & 0x4)	outBlend[0].z = dstColor[0].z;
+			if (channelWriteMask & 0x8)	outBlend[0].w = dstColor[0].w;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = dstColor[1].x;
+			if (channelWriteMask & 0x2)	outBlend[1].y = dstColor[1].y;
+			if (channelWriteMask & 0x4)	outBlend[1].z = dstColor[1].z;
+			if (channelWriteMask & 0x8)	outBlend[1].w = dstColor[1].w;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = dstColor[2].x;
+			if (channelWriteMask & 0x2)	outBlend[2].y = dstColor[2].y;
+			if (channelWriteMask & 0x4)	outBlend[2].z = dstColor[2].z;
+			if (channelWriteMask & 0x8)	outBlend[2].w = dstColor[2].w;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = dstColor[3].x;
+			if (channelWriteMask & 0x2)	outBlend[3].y = dstColor[3].y;
+			if (channelWriteMask & 0x4)	outBlend[3].z = dstColor[3].z;
+			if (channelWriteMask & 0x8)	outBlend[3].w = dstColor[3].w;
+		}
+		break;
+	case D3DBLEND_INVDESTCOLOR   :
+	{
+		__m128 invDstColor4[4];
+		if (pixelWriteMask & 0x1) invDstColor4[0] = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(dstColor[0]) );
+		if (pixelWriteMask & 0x2) invDstColor4[1] = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(dstColor[1]) );
+		if (pixelWriteMask & 0x4) invDstColor4[2] = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(dstColor[2]) );
+		if (pixelWriteMask & 0x8) invDstColor4[3] = _mm_sub_ps(*(const __m128* const)&staticColorWhiteOpaque, *(const __m128* const)&(dstColor[3]) );
+
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = invDstColor4[0].m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[0].y = invDstColor4[0].m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[0].z = invDstColor4[0].m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[0].w = invDstColor4[0].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = invDstColor4[1].m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[1].y = invDstColor4[1].m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[1].z = invDstColor4[1].m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[1].w = invDstColor4[1].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = invDstColor4[2].m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[2].y = invDstColor4[2].m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[2].z = invDstColor4[2].m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[2].w = invDstColor4[2].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = invDstColor4[3].m128_f32[0];
+			if (channelWriteMask & 0x2)	outBlend[3].y = invDstColor4[3].m128_f32[1];
+			if (channelWriteMask & 0x4)	outBlend[3].z = invDstColor4[3].m128_f32[2];
+			if (channelWriteMask & 0x8)	outBlend[3].w = invDstColor4[3].m128_f32[3];
+		}
+	}
+		break;
+	case D3DBLEND_SRCALPHASAT    :
+	{
+		// TODO: Low-priorty SIMDify this (nobody uses this blend state anyway)
+		for (unsigned x = 0; x < 4; ++x)
+		{
+			if (pixelWriteMask & (1 << x) )
+			{
+				const float as = srcColor[x].w;
+				const float invad = 1.0f - dstColor[x].w;
+				const float f = as < invad ? as : invad;
+				if (channelWriteMask & 0x1)
+					outBlend[x].x = f;
+				if (channelWriteMask & 0x2)
+					outBlend[x].y = f;
+				if (channelWriteMask & 0x4)
+					outBlend[x].z = f;
+				if (channelWriteMask & 0x8)
+					outBlend[x].w = 1.0f;
+			}
+		}
+	}
+		break;
+	case D3DBLEND_BLENDFACTOR    :
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = currentState.currentRenderStates.cachedBlendFactor.x;
+			if (channelWriteMask & 0x2)	outBlend[0].y = currentState.currentRenderStates.cachedBlendFactor.y;
+			if (channelWriteMask & 0x4)	outBlend[0].z = currentState.currentRenderStates.cachedBlendFactor.z;
+			if (channelWriteMask & 0x8)	outBlend[0].w = currentState.currentRenderStates.cachedBlendFactor.w;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = currentState.currentRenderStates.cachedBlendFactor.x;
+			if (channelWriteMask & 0x2)	outBlend[1].y = currentState.currentRenderStates.cachedBlendFactor.y;
+			if (channelWriteMask & 0x4)	outBlend[1].z = currentState.currentRenderStates.cachedBlendFactor.z;
+			if (channelWriteMask & 0x8)	outBlend[1].w = currentState.currentRenderStates.cachedBlendFactor.w;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = currentState.currentRenderStates.cachedBlendFactor.x;
+			if (channelWriteMask & 0x2)	outBlend[2].y = currentState.currentRenderStates.cachedBlendFactor.y;
+			if (channelWriteMask & 0x4)	outBlend[2].z = currentState.currentRenderStates.cachedBlendFactor.z;
+			if (channelWriteMask & 0x8)	outBlend[2].w = currentState.currentRenderStates.cachedBlendFactor.w;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = currentState.currentRenderStates.cachedBlendFactor.x;
+			if (channelWriteMask & 0x2)	outBlend[3].y = currentState.currentRenderStates.cachedBlendFactor.y;
+			if (channelWriteMask & 0x4)	outBlend[3].z = currentState.currentRenderStates.cachedBlendFactor.z;
+			if (channelWriteMask & 0x8)	outBlend[3].w = currentState.currentRenderStates.cachedBlendFactor.w;
+		}
+		break;
+	case D3DBLEND_INVBLENDFACTOR :
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outBlend[0].x = currentState.currentRenderStates.cachedInvBlendFactor.x;
+			if (channelWriteMask & 0x2)	outBlend[0].y = currentState.currentRenderStates.cachedInvBlendFactor.y;
+			if (channelWriteMask & 0x4)	outBlend[0].z = currentState.currentRenderStates.cachedInvBlendFactor.z;
+			if (channelWriteMask & 0x8)	outBlend[0].w = currentState.currentRenderStates.cachedInvBlendFactor.w;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outBlend[1].x = currentState.currentRenderStates.cachedInvBlendFactor.x;
+			if (channelWriteMask & 0x2)	outBlend[1].y = currentState.currentRenderStates.cachedInvBlendFactor.y;
+			if (channelWriteMask & 0x4)	outBlend[1].z = currentState.currentRenderStates.cachedInvBlendFactor.z;
+			if (channelWriteMask & 0x8)	outBlend[1].w = currentState.currentRenderStates.cachedInvBlendFactor.w;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outBlend[2].x = currentState.currentRenderStates.cachedInvBlendFactor.x;
+			if (channelWriteMask & 0x2)	outBlend[2].y = currentState.currentRenderStates.cachedInvBlendFactor.y;
+			if (channelWriteMask & 0x4)	outBlend[2].z = currentState.currentRenderStates.cachedInvBlendFactor.z;
+			if (channelWriteMask & 0x8)	outBlend[2].w = currentState.currentRenderStates.cachedInvBlendFactor.w;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outBlend[3].x = currentState.currentRenderStates.cachedInvBlendFactor.x;
+			if (channelWriteMask & 0x2)	outBlend[3].y = currentState.currentRenderStates.cachedInvBlendFactor.y;
+			if (channelWriteMask & 0x4)	outBlend[3].z = currentState.currentRenderStates.cachedInvBlendFactor.z;
+			if (channelWriteMask & 0x8)	outBlend[3].w = currentState.currentRenderStates.cachedInvBlendFactor.w;
+		}
+		break;
+	}
+}
+
 template <const unsigned char channelWriteMask>
 void IDirect3DDevice9Hook::AlphaBlend(D3DXVECTOR4& outVec, const D3DBLENDOP blendOp, const D3DXVECTOR4& srcBlend, const D3DXVECTOR4& dstBlend, const D3DXVECTOR4& srcColor, const D3DXVECTOR4& dstColor) const
 {
+	const __m128 combinedSrc = _mm_mul_ps(*(const __m128* const)&srcBlend, *(const __m128* const)&srcColor);
+	const __m128 combinedDst = _mm_mul_ps(*(const __m128* const)&dstBlend, *(const __m128* const)&dstColor);
+
 	// Simple SIMD version
 	if ( (channelWriteMask & 0x7) == 0x7)
 	{
-		__m128 combinedSrc, combinedDst;
-		combinedSrc = _mm_mul_ps(*(const __m128* const)&srcBlend, *(const __m128* const)&srcColor);
-		combinedDst = _mm_mul_ps(*(const __m128* const)&dstBlend, *(const __m128* const)&dstColor);
-
 		switch (blendOp)
 		{
 		default:
@@ -4317,42 +4894,14 @@ void IDirect3DDevice9Hook::AlphaBlend(D3DXVECTOR4& outVec, const D3DBLENDOP blen
 			*(__m128* const)&outVec = _mm_sub_ps(combinedDst, combinedSrc);
 			return;
 		case D3DBLENDOP_MIN        :
-		{
-			const __m128 cmpMask = _mm_cmplt_ps(combinedSrc, combinedDst);
-			*(__m128* const)&outVec = _mm_blendv_ps(combinedSrc, combinedDst, cmpMask);
-		}
+			*(__m128* const)&outVec = _mm_min_ps(combinedSrc, combinedDst);
 			return;
 		case D3DBLENDOP_MAX        :
-		{
-			const __m128 cmpMask = _mm_cmpgt_ps(combinedSrc, combinedDst);
-			*(__m128* const)&outVec = _mm_blendv_ps(combinedSrc, combinedDst, cmpMask);
-		}
+			*(__m128* const)&outVec = _mm_max_ps(combinedSrc, combinedDst);
 			return;
 		}
 
 		return;
-	}
-
-	float4 combinedSrc, combinedDst;
-	if (channelWriteMask & 0x1)
-	{
-		mul(combinedSrc.x, srcBlend.x, srcColor.x);
-		mul(combinedDst.x, dstBlend.x, dstColor.x);
-	}
-	if (channelWriteMask & 0x2)
-	{
-		mul(combinedSrc.y, srcBlend.y, srcColor.y);
-		mul(combinedDst.y, dstBlend.y, dstColor.y);
-	}
-	if (channelWriteMask & 0x4)
-	{
-		mul(combinedSrc.z, srcBlend.z, srcColor.z);
-		mul(combinedDst.z, dstBlend.z, dstColor.z);
-	}
-	if (channelWriteMask & 0x8)
-	{
-		mul(combinedSrc.w, srcBlend.w, srcColor.w);
-		mul(combinedDst.w, dstBlend.w, dstColor.w);
 	}
 
 	switch (blendOp)
@@ -4364,54 +4913,339 @@ void IDirect3DDevice9Hook::AlphaBlend(D3DXVECTOR4& outVec, const D3DBLENDOP blen
 		__assume(0);
 #endif
 	case D3DBLENDOP_ADD        :
+	{
+		const __m128 sum = _mm_add_ps(combinedSrc, combinedDst);
 		if (channelWriteMask & 0x1)
-			outVec.x = combinedSrc.x + combinedDst.x;
+			outVec.x = sum.m128_f32[0];
 		if (channelWriteMask & 0x2)
-			outVec.y = combinedSrc.y + combinedDst.y;
+			outVec.y = sum.m128_f32[1];
 		if (channelWriteMask & 0x4)
-			outVec.z = combinedSrc.z + combinedDst.z;
+			outVec.z = sum.m128_f32[2];
 		if (channelWriteMask & 0x8)
-			outVec.w = combinedSrc.w + combinedDst.w;
+			outVec.w = sum.m128_f32[3];
+	}
 		break;
 	case D3DBLENDOP_SUBTRACT   :
+	{
+		const __m128 difference = _mm_sub_ps(combinedSrc, combinedDst);
 		if (channelWriteMask & 0x1)
-			outVec.x = combinedSrc.x - combinedDst.x;
+			outVec.x = difference.m128_f32[0];
 		if (channelWriteMask & 0x2)
-			outVec.y = combinedSrc.y - combinedDst.y;
+			outVec.y = difference.m128_f32[1];
 		if (channelWriteMask & 0x4)
-			outVec.z = combinedSrc.z - combinedDst.z;
+			outVec.z = difference.m128_f32[2];
 		if (channelWriteMask & 0x8)
-			outVec.w = combinedSrc.w - combinedDst.w;
+			outVec.w = difference.m128_f32[3];
+	}
 		break;
 	case D3DBLENDOP_REVSUBTRACT:
+	{
+		const __m128 revDifference = _mm_sub_ps(combinedDst, combinedSrc);
 		if (channelWriteMask & 0x1)
-			outVec.x = combinedDst.x - combinedSrc.x;
+			outVec.x = revDifference.m128_f32[0];
 		if (channelWriteMask & 0x2)
-			outVec.y = combinedDst.y - combinedSrc.y;
+			outVec.y = revDifference.m128_f32[1];
 		if (channelWriteMask & 0x4)
-			outVec.z = combinedDst.z - combinedSrc.z;
+			outVec.z = revDifference.m128_f32[2];
 		if (channelWriteMask & 0x8)
-			outVec.w = combinedDst.w - combinedSrc.w;
+			outVec.w = revDifference.m128_f32[3];
+	}
 		break;
 	case D3DBLENDOP_MIN        :
+	{
+		const __m128 vecMin = _mm_min_ps(combinedSrc, combinedDst);
 		if (channelWriteMask & 0x1)
-			outVec.x = combinedSrc.x < combinedDst.x ? combinedSrc.x : combinedDst.x;
+			outVec.x = vecMin.m128_f32[0];
 		if (channelWriteMask & 0x2)
-			outVec.y = combinedSrc.y < combinedDst.y ? combinedSrc.y : combinedDst.y;
+			outVec.y = vecMin.m128_f32[1];
 		if (channelWriteMask & 0x4)
-			outVec.z = combinedSrc.z < combinedDst.z ? combinedSrc.z : combinedDst.z;
+			outVec.z = vecMin.m128_f32[2];
 		if (channelWriteMask & 0x8)
-			outVec.w = combinedSrc.w < combinedDst.w ? combinedSrc.w : combinedDst.w;
+			outVec.w = vecMin.m128_f32[3];
+	}
 		break;
 	case D3DBLENDOP_MAX        :
+	{
+		const __m128 vecMax = _mm_max_ps(combinedSrc, combinedDst);
 		if (channelWriteMask & 0x1)
-			outVec.x = combinedSrc.x > combinedDst.x ? combinedSrc.x : combinedDst.x;
+			outVec.x = vecMax.m128_f32[0];
 		if (channelWriteMask & 0x2)
-			outVec.y = combinedSrc.y > combinedDst.y ? combinedSrc.y : combinedDst.y;
+			outVec.y = vecMax.m128_f32[1];
 		if (channelWriteMask & 0x4)
-			outVec.z = combinedSrc.z > combinedDst.z ? combinedSrc.z : combinedDst.z;
+			outVec.z = vecMax.m128_f32[2];
 		if (channelWriteMask & 0x8)
-			outVec.w = combinedSrc.w > combinedDst.w ? combinedSrc.w : combinedDst.w;
+			outVec.w = vecMax.m128_f32[3];
+	}
+		break;
+	}
+}
+
+template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::AlphaBlend4(D3DXVECTOR4 (&outVec)[4], const D3DBLENDOP blendOp, const D3DXVECTOR4 (&srcBlend)[4], const D3DXVECTOR4 (&dstBlend)[4], const D3DXVECTOR4 (&srcColor)[4], const D3DXVECTOR4 (&dstColor)[4]) const
+{
+	if (pixelWriteMask == 0x0)
+	{
+#ifdef _DEBUG
+		__debugbreak(); // Don't call this function if you aren't going to write any pixels out!
+#endif
+		return;
+	}
+
+	__m128 combinedSrc[4];
+	if (pixelWriteMask & 0x1) combinedSrc[0] = _mm_mul_ps(*(const __m128* const)&(srcBlend[0]), *(const __m128* const)&(srcColor[0]) );
+	if (pixelWriteMask & 0x2) combinedSrc[1] = _mm_mul_ps(*(const __m128* const)&(srcBlend[1]), *(const __m128* const)&(srcColor[1]) );
+	if (pixelWriteMask & 0x4) combinedSrc[2] = _mm_mul_ps(*(const __m128* const)&(srcBlend[2]), *(const __m128* const)&(srcColor[2]) );
+	if (pixelWriteMask & 0x8) combinedSrc[3] = _mm_mul_ps(*(const __m128* const)&(srcBlend[3]), *(const __m128* const)&(srcColor[3]) );
+
+	__m128 combinedDst[4];
+	if (pixelWriteMask & 0x1) combinedDst[0] = _mm_mul_ps(*(const __m128* const)&(dstBlend[0]), *(const __m128* const)&(dstColor[0]) );
+	if (pixelWriteMask & 0x2) combinedDst[1] = _mm_mul_ps(*(const __m128* const)&(dstBlend[1]), *(const __m128* const)&(dstColor[1]) );		
+	if (pixelWriteMask & 0x4) combinedDst[2] = _mm_mul_ps(*(const __m128* const)&(dstBlend[2]), *(const __m128* const)&(dstColor[2]) );
+	if (pixelWriteMask & 0x8) combinedDst[3] = _mm_mul_ps(*(const __m128* const)&(dstBlend[3]), *(const __m128* const)&(dstColor[3]) );
+
+	// Simple SIMD version
+	if ( (channelWriteMask & 0x7) == 0x7)
+	{
+		switch (blendOp)
+		{
+		default:
+#ifdef _DEBUG
+			DbgBreakPrint("Error: Invalid D3DBLENDOP passed to alpha blending unit");
+#else
+			__assume(0);
+#endif
+		case D3DBLENDOP_ADD        :
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outVec[0]) = _mm_add_ps(combinedSrc[0], combinedDst[0]);
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outVec[1]) = _mm_add_ps(combinedSrc[1], combinedDst[1]);
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outVec[2]) = _mm_add_ps(combinedSrc[2], combinedDst[2]);
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outVec[3]) = _mm_add_ps(combinedSrc[3], combinedDst[3]);
+			return;
+		case D3DBLENDOP_SUBTRACT   :
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outVec[0]) = _mm_sub_ps(combinedSrc[0], combinedDst[0]);
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outVec[1]) = _mm_sub_ps(combinedSrc[1], combinedDst[1]);
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outVec[2]) = _mm_sub_ps(combinedSrc[2], combinedDst[2]);
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outVec[3]) = _mm_sub_ps(combinedSrc[3], combinedDst[3]);
+			return;
+		case D3DBLENDOP_REVSUBTRACT:
+			if (pixelWriteMask& 0x1) *(__m128* const)&(outVec[0]) = _mm_sub_ps(combinedDst[0], combinedSrc[0]);
+			if (pixelWriteMask& 0x2) *(__m128* const)&(outVec[1]) = _mm_sub_ps(combinedDst[1], combinedSrc[1]);
+			if (pixelWriteMask& 0x4) *(__m128* const)&(outVec[2]) = _mm_sub_ps(combinedDst[2], combinedSrc[2]);
+			if (pixelWriteMask& 0x8) *(__m128* const)&(outVec[3]) = _mm_sub_ps(combinedDst[3], combinedSrc[3]);
+			return;
+		case D3DBLENDOP_MIN        :
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outVec[0]) = _mm_min_ps(combinedSrc[0], combinedDst[0]);
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outVec[1]) = _mm_min_ps(combinedSrc[1], combinedDst[1]);
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outVec[2]) = _mm_min_ps(combinedSrc[2], combinedDst[2]);
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outVec[3]) = _mm_min_ps(combinedSrc[3], combinedDst[3]);
+			return;
+		case D3DBLENDOP_MAX        :
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outVec[0]) = _mm_max_ps(combinedSrc[0], combinedDst[0]);
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outVec[1]) = _mm_max_ps(combinedSrc[1], combinedDst[1]);
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outVec[2]) = _mm_max_ps(combinedSrc[2], combinedDst[2]);
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outVec[3]) = _mm_max_ps(combinedSrc[3], combinedDst[3]);
+			return;
+		}
+
+		return;
+	}
+
+	switch (blendOp)
+	{
+	default:
+#ifdef _DEBUG
+		DbgBreakPrint("Error: Invalid D3DBLENDOP passed to alpha blending unit");
+#else
+		__assume(0);
+#endif
+	case D3DBLENDOP_ADD        :
+	{
+		__m128 sum4[4];
+		if (pixelWriteMask & 0x1) sum4[0] = _mm_add_ps(combinedSrc[0], combinedDst[0]);
+		if (pixelWriteMask & 0x2) sum4[1] = _mm_add_ps(combinedSrc[1], combinedDst[1]);
+		if (pixelWriteMask & 0x4) sum4[2] = _mm_add_ps(combinedSrc[2], combinedDst[2]);
+		if (pixelWriteMask & 0x8) sum4[3] = _mm_add_ps(combinedSrc[3], combinedDst[3]);
+
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outVec[0].x = sum4[0].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[0].y = sum4[0].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[0].z = sum4[0].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[0].w = sum4[0].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outVec[1].x = sum4[1].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[1].y = sum4[1].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[1].z = sum4[1].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[1].w = sum4[1].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outVec[2].x = sum4[2].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[2].y = sum4[2].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[2].z = sum4[2].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[2].w = sum4[2].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outVec[3].x = sum4[3].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[3].y = sum4[3].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[3].z = sum4[3].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[3].w = sum4[3].m128_f32[3];
+		}
+	}
+		break;
+	case D3DBLENDOP_SUBTRACT   :
+	{
+		__m128 difference4[4];
+		if (pixelWriteMask & 0x1) difference4[0] = _mm_sub_ps(combinedSrc[0], combinedDst[0]);
+		if (pixelWriteMask & 0x2) difference4[1] = _mm_sub_ps(combinedSrc[1], combinedDst[1]);
+		if (pixelWriteMask & 0x4) difference4[2] = _mm_sub_ps(combinedSrc[2], combinedDst[2]);
+		if (pixelWriteMask & 0x8) difference4[3] = _mm_sub_ps(combinedSrc[3], combinedDst[3]);
+
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outVec[0].x = difference4[0].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[0].y = difference4[0].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[0].z = difference4[0].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[0].w = difference4[0].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outVec[1].x = difference4[1].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[1].y = difference4[1].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[1].z = difference4[1].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[1].w = difference4[1].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outVec[2].x = difference4[2].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[2].y = difference4[2].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[2].z = difference4[2].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[2].w = difference4[2].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outVec[3].x = difference4[3].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[3].y = difference4[3].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[3].z = difference4[3].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[3].w = difference4[3].m128_f32[3];
+		}
+	}
+		break;
+	case D3DBLENDOP_REVSUBTRACT:
+	{
+		__m128 revDifference4[4];
+		if (pixelWriteMask & 0x1) revDifference4[0] = _mm_sub_ps(combinedDst[0], combinedSrc[0]);
+		if (pixelWriteMask & 0x2) revDifference4[1] = _mm_sub_ps(combinedDst[1], combinedSrc[1]);
+		if (pixelWriteMask & 0x4) revDifference4[2] = _mm_sub_ps(combinedDst[2], combinedSrc[2]);
+		if (pixelWriteMask & 0x8) revDifference4[3] = _mm_sub_ps(combinedDst[3], combinedSrc[3]);
+
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outVec[0].x = revDifference4[0].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[0].y = revDifference4[0].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[0].z = revDifference4[0].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[0].w = revDifference4[0].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outVec[1].x = revDifference4[1].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[1].y = revDifference4[1].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[1].z = revDifference4[1].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[1].w = revDifference4[1].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outVec[2].x = revDifference4[2].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[2].y = revDifference4[2].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[2].z = revDifference4[2].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[2].w = revDifference4[2].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outVec[3].x = revDifference4[3].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[3].y = revDifference4[3].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[3].z = revDifference4[3].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[3].w = revDifference4[3].m128_f32[3];
+		}
+	}
+		break;
+	case D3DBLENDOP_MIN        :
+	{
+		__m128 minVec4[4];
+		if (pixelWriteMask & 0x1) minVec4[0] = _mm_min_ps(combinedSrc[0], combinedDst[0]);
+		if (pixelWriteMask & 0x2) minVec4[1] = _mm_min_ps(combinedSrc[1], combinedDst[1]);
+		if (pixelWriteMask & 0x4) minVec4[2] = _mm_min_ps(combinedSrc[2], combinedDst[2]);
+		if (pixelWriteMask & 0x8) minVec4[3] = _mm_min_ps(combinedSrc[3], combinedDst[3]);
+
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outVec[0].x = minVec4[0].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[0].y = minVec4[0].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[0].z = minVec4[0].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[0].w = minVec4[0].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outVec[1].x = minVec4[1].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[1].y = minVec4[1].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[1].z = minVec4[1].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[1].w = minVec4[1].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outVec[2].x = minVec4[2].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[2].y = minVec4[2].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[2].z = minVec4[2].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[2].w = minVec4[2].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outVec[3].x = minVec4[3].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[3].y = minVec4[3].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[3].z = minVec4[3].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[3].w = minVec4[3].m128_f32[3];
+		}
+	}
+		break;
+	case D3DBLENDOP_MAX        :
+	{
+		__m128 maxVec4[4];
+		if (pixelWriteMask & 0x1) minVec4[0] = _mm_max_ps(combinedSrc[0], combinedDst[0]);
+		if (pixelWriteMask & 0x2) minVec4[1] = _mm_max_ps(combinedSrc[1], combinedDst[1]);
+		if (pixelWriteMask & 0x4) minVec4[2] = _mm_max_ps(combinedSrc[2], combinedDst[2]);
+		if (pixelWriteMask & 0x8) minVec4[3] = _mm_max_ps(combinedSrc[3], combinedDst[3]);
+
+		if (pixelWriteMask & 0x1)
+		{
+			if (channelWriteMask & 0x1)	outVec[0].x = maxVec4[0].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[0].y = maxVec4[0].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[0].z = maxVec4[0].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[0].w = maxVec4[0].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (channelWriteMask & 0x1)	outVec[1].x = maxVec4[1].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[1].y = maxVec4[1].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[1].z = maxVec4[1].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[1].w = maxVec4[1].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (channelWriteMask & 0x1)	outVec[2].x = maxVec4[2].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[2].y = maxVec4[2].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[2].z = maxVec4[2].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[2].w = maxVec4[2].m128_f32[3];
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (channelWriteMask & 0x1)	outVec[3].x = maxVec4[3].m128_f32[0];
+			if (channelWriteMask & 0x2)	outVec[3].y = maxVec4[3].m128_f32[1];
+			if (channelWriteMask & 0x4)	outVec[3].z = maxVec4[3].m128_f32[2];
+			if (channelWriteMask & 0x8)	outVec[3].w = maxVec4[3].m128_f32[3];
+		}
+	}
 		break;
 	}
 }
@@ -4419,46 +5253,6 @@ void IDirect3DDevice9Hook::AlphaBlend(D3DXVECTOR4& outVec, const D3DBLENDOP blen
 // Apply a 4x4 dithering algorithm when writing to surfaces with lower precision than 8 bits per pixel:
 static inline void DitherColor(const unsigned x, const unsigned y, D3DXVECTOR4& ditheredColor, const IDirect3DSurface9Hook* const surface)
 {
-	static const float uniform2bit[4][4] =
-	{
-		{ (0.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (8.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (2.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (10.0f / 16.0f - 8.0f / 16.0f) / 4.0f },
-		{ (12.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (4.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (14.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (6.0f / 16.0f - 8.0f / 16.0f) / 4.0f },
-		{ (3.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (11.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (1.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (9.0f / 16.0f - 8.0f / 16.0f) / 4.0f },
-		{ (15.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (7.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (13.0f / 16.0f - 8.0f / 16.0f) / 4.0f, (5.0f / 16.0f - 8.0f / 16.0f) / 4.0f }
-	};
-
-	static const float uniform3bit[4][4] =
-	{
-		{ (0.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (8.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (2.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (10.0f / 16.0f - 8.0f / 16.0f) / 8.0f },
-		{ (12.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (4.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (14.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (6.0f / 16.0f - 8.0f / 16.0f) / 8.0f },
-		{ (3.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (11.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (1.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (9.0f / 16.0f - 8.0f / 16.0f) / 8.0f },
-		{ (15.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (7.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (13.0f / 16.0f - 8.0f / 16.0f) / 8.0f, (5.0f / 16.0f - 8.0f / 16.0f) / 8.0f }
-	};
-
-	static const float uniform4bit[4][4] =
-	{
-		{ (0.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (8.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (2.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (10.0f / 16.0f - 8.0f / 16.0f) / 16.0f },
-		{ (12.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (4.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (14.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (6.0f / 16.0f - 8.0f / 16.0f) / 16.0f },
-		{ (3.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (11.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (1.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (9.0f / 16.0f - 8.0f / 16.0f) / 16.0f },
-		{ (15.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (7.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (13.0f / 16.0f - 8.0f / 16.0f) / 16.0f, (5.0f / 16.0f - 8.0f / 16.0f) / 16.0f }
-	};
-
-	static const float uniform5bit[4][4] =
-	{
-		{ (0.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (8.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (2.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (10.0f / 16.0f - 8.0f / 16.0f) / 32.0f },
-		{ (12.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (4.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (14.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (6.0f / 16.0f - 8.0f / 16.0f) / 32.0f },
-		{ (3.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (11.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (1.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (9.0f / 16.0f - 8.0f / 16.0f) / 32.0f },
-		{ (15.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (7.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (13.0f / 16.0f - 8.0f / 16.0f) / 32.0f, (5.0f / 16.0f - 8.0f / 16.0f) / 32.0f }
-	};
-
-	static const float uniform6bit[4][4] =
-	{
-		{ (0.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (8.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (2.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (10.0f / 16.0f - 8.0f / 16.0f) / 64.0f },
-		{ (12.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (4.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (14.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (6.0f / 16.0f - 8.0f / 16.0f) / 64.0f },
-		{ (3.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (11.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (1.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (9.0f / 16.0f - 8.0f / 16.0f) / 64.0f },
-		{ (15.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (7.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (13.0f / 16.0f - 8.0f / 16.0f) / 64.0f, (5.0f / 16.0f - 8.0f / 16.0f) / 64.0f }
-	};
-
 	const unsigned xMod = x & 0x3;
 	const unsigned yMod = y & 0x3;
 
@@ -4467,10 +5261,6 @@ static inline void DitherColor(const unsigned x, const unsigned y, D3DXVECTOR4& 
 	default:
 		return;
 	case D3DFMT_R5G6B5               :
-		ditheredColor.x += uniform5bit[xMod][yMod];
-		ditheredColor.y += uniform6bit[xMod][yMod];
-		ditheredColor.z += uniform5bit[xMod][yMod];
-		break;
 	case D3DFMT_A1R5G5B5             : // Don't dither the 1 bit, it won't look good
 	case D3DFMT_X1R5G5B5             :
 		ditheredColor.x += uniform5bit[xMod][yMod];
@@ -4478,6 +5268,7 @@ static inline void DitherColor(const unsigned x, const unsigned y, D3DXVECTOR4& 
 		ditheredColor.z += uniform5bit[xMod][yMod];
 		break;
 	case D3DFMT_A4R4G4B4             :
+	case D3DFMT_A4L4                 :
 		ditheredColor.x += uniform4bit[xMod][yMod];
 		ditheredColor.y += uniform4bit[xMod][yMod];
 		ditheredColor.z += uniform4bit[xMod][yMod];
@@ -4493,16 +5284,110 @@ static inline void DitherColor(const unsigned x, const unsigned y, D3DXVECTOR4& 
 		ditheredColor.y += uniform4bit[xMod][yMod];
 		ditheredColor.z += uniform4bit[xMod][yMod];
 		break;
+	}
+}
+
+static const unsigned noAlphaMaskDWORDs[4] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000 };
+static const __m128 noAlphaMask = *(const __m128* const)noAlphaMaskDWORDs;
+static const unsigned and3maskDWORDs[4] = { 0x3, 0x3, 0x3, 0x3 };
+static const __m128i and3mask = *(const __m128i* const)and3maskDWORDs;
+// Apply a 4x4 dithering algorithm when writing to surfaces with lower precision than 8 bits per pixel:
+static inline void DitherColor4(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&ditheredColor)[4], const IDirect3DSurface9Hook* const surface)
+{
+	const __m128i xMod4 = _mm_and_si128(x4, and3mask);
+	const __m128i yMod4 = _mm_and_si128(y4, and3mask);
+
+	const __m128i addressOffsetIndices = _mm_add_epi32(xMod4, _mm_slli_epi32(yMod4, 2) ); // Shift left by 2 (same as multiplying by 4, the array width)
+
+	switch (surface->GetInternalFormat() )
+	{
+	default:
+		return;
+	case D3DFMT_R5G6B5               :
+	case D3DFMT_A1R5G5B5             : // Don't dither the 1 bit, it won't look good
+	case D3DFMT_X1R5G5B5             :
+	{
+		const __m128 uniform5bit4 = _mm_i32gather_ps(&uniform5bit[0][0], addressOffsetIndices, 4);
+		const __m128 uniform6bit4 = _mm_i32gather_ps(&uniform6bit[0][0], addressOffsetIndices, 4);
+
+		const __m128 blended5566[4] = 
+		{
+			_mm_shuffle_ps(uniform5bit4, uniform6bit4, _MM_SHUFFLE(0, 0, 0, 0) ),
+			_mm_shuffle_ps(uniform5bit4, uniform6bit4, _MM_SHUFFLE(1, 1, 1, 1) ),
+			_mm_shuffle_ps(uniform5bit4, uniform6bit4, _MM_SHUFFLE(2, 2, 2, 2) ),
+			_mm_shuffle_ps(uniform5bit4, uniform6bit4, _MM_SHUFFLE(3, 3, 3, 3) )
+		};
+
+		const __m128 blended5655[4] = 
+		{
+			_mm_shuffle_ps(blended5566[0], blended5566[0], _MM_SHUFFLE(0, 2, 0, 0) ),
+			_mm_shuffle_ps(blended5566[1], blended5566[1], _MM_SHUFFLE(0, 2, 0, 0) ),
+			_mm_shuffle_ps(blended5566[2], blended5566[2], _MM_SHUFFLE(0, 2, 0, 0) ),
+			_mm_shuffle_ps(blended5566[3], blended5566[3], _MM_SHUFFLE(0, 2, 0, 0) )
+		};
+
+		const __m128 blended5650[4] = 
+		{
+			_mm_and_ps(blended5655[0], noAlphaMask),
+			_mm_and_ps(blended5655[1], noAlphaMask),
+			_mm_and_ps(blended5655[2], noAlphaMask),
+			_mm_and_ps(blended5655[3], noAlphaMask)
+		};
+
+		*(__m128* const)&(ditheredColor[0]) = _mm_add_ps(blended5650[0], *(const __m128* const)&(ditheredColor[0]) );
+		*(__m128* const)&(ditheredColor[1]) = _mm_add_ps(blended5650[1], *(const __m128* const)&(ditheredColor[1]) );
+		*(__m128* const)&(ditheredColor[2]) = _mm_add_ps(blended5650[2], *(const __m128* const)&(ditheredColor[2]) );
+		*(__m128* const)&(ditheredColor[3]) = _mm_add_ps(blended5650[3], *(const __m128* const)&(ditheredColor[3]) );
+	}
+		break;
+	case D3DFMT_A4R4G4B4             :
 	case D3DFMT_A4L4                 :
-		ditheredColor.x += uniform4bit[xMod][yMod];
-		ditheredColor.y += uniform4bit[xMod][yMod];
-		ditheredColor.z += uniform4bit[xMod][yMod];
-		ditheredColor.w += uniform4bit[xMod][yMod];
+	case D3DFMT_X4R4G4B4             :
+	{
+		const __m128 uniform4bit4 = _mm_i32gather_ps(&uniform4bit[0][0], addressOffsetIndices, 4);
+		__m128 ditherVectors[4];
+		ditherVectors[0] = _mm_shuffle_ps(uniform4bit4, uniform4bit4, _MM_SHUFFLE(0, 0, 0, 0) );
+		ditherVectors[1] = _mm_shuffle_ps(uniform4bit4, uniform4bit4, _MM_SHUFFLE(1, 1, 1, 1) );
+		ditherVectors[2] = _mm_shuffle_ps(uniform4bit4, uniform4bit4, _MM_SHUFFLE(2, 2, 2, 2) );
+		ditherVectors[3] = _mm_shuffle_ps(uniform4bit4, uniform4bit4, _MM_SHUFFLE(3, 3, 3, 3) );
+
+		*(__m128* const)&(ditheredColor[0]) = _mm_add_ps(ditherVectors[0], *(const __m128* const)&(ditheredColor[0]) );
+		*(__m128* const)&(ditheredColor[1]) = _mm_add_ps(ditherVectors[1], *(const __m128* const)&(ditheredColor[1]) );
+		*(__m128* const)&(ditheredColor[2]) = _mm_add_ps(ditherVectors[2], *(const __m128* const)&(ditheredColor[2]) );
+		*(__m128* const)&(ditheredColor[3]) = _mm_add_ps(ditherVectors[3], *(const __m128* const)&(ditheredColor[3]) );
+	}
+		break;
+	case D3DFMT_A8R3G3B2             :
+	{
+		const __m128 uniform3bit4 = _mm_i32gather_ps(&uniform3bit[0][0], addressOffsetIndices, 4);
+		const __m128 uniform2bit4 = _mm_i32gather_ps(&uniform2bit[0][0], addressOffsetIndices, 4);
+
+		const __m128 blended3322[4] = 
+		{
+			_mm_shuffle_ps(uniform3bit4, uniform2bit4, _MM_SHUFFLE(0, 0, 0, 0) ),
+			_mm_shuffle_ps(uniform3bit4, uniform2bit4, _MM_SHUFFLE(1, 1, 1, 1) ),
+			_mm_shuffle_ps(uniform3bit4, uniform2bit4, _MM_SHUFFLE(2, 2, 2, 2) ),
+			_mm_shuffle_ps(uniform3bit4, uniform2bit4, _MM_SHUFFLE(3, 3, 3, 3) )
+		};
+
+		const __m128 blended3320[4] = 
+		{
+			_mm_and_ps(blended3322[0], noAlphaMask),
+			_mm_and_ps(blended3322[1], noAlphaMask),
+			_mm_and_ps(blended3322[2], noAlphaMask),
+			_mm_and_ps(blended3322[3], noAlphaMask)
+		};
+
+		*(__m128* const)&(ditheredColor[0]) = _mm_add_ps(blended3320[0], *(const __m128* const)&(ditheredColor[0]) );
+		*(__m128* const)&(ditheredColor[1]) = _mm_add_ps(blended3320[1], *(const __m128* const)&(ditheredColor[1]) );
+		*(__m128* const)&(ditheredColor[2]) = _mm_add_ps(blended3320[2], *(const __m128* const)&(ditheredColor[2]) );
+		*(__m128* const)&(ditheredColor[3]) = _mm_add_ps(blended3320[3], *(const __m128* const)&(ditheredColor[3]) );
+	}
 		break;
 	}
 }
 
-template <const unsigned char writeMask>
+template <const unsigned char channelWriteMask>
 void IDirect3DDevice9Hook::ROPBlendWriteMask(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const
 {
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable)
@@ -4525,42 +5410,42 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask(IDirect3DSurface9Hook* const outSur
 		if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable) // Have to run alpha blending twice for separate alpha
 		{
 			D3DXVECTOR4 dstColor, finalColor;
-			outSurface->GetPixelVec<writeMask, false>(x, y, dstColor);
+			outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
 
 			D3DXVECTOR4 srcBlendColor, dstBlendColor;
-			LoadBlend<writeMask & 0x7>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
-			LoadBlend<writeMask & 0x7>(dstBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
-			AlphaBlend<writeMask & 0x7>(finalColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlendColor, dstBlendColor, value, dstColor);
+			LoadBlend<channelWriteMask & 0x7>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
+			LoadBlend<channelWriteMask & 0x7>(dstBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
+			AlphaBlend<channelWriteMask & 0x7>(finalColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlendColor, dstBlendColor, value, dstColor);
 
-			if (writeMask & 0x8)
+			if (channelWriteMask & 0x8)
 			{
 				D3DXVECTOR4 srcBlendAlpha, dstBlendAlpha, finalAlpha;
-				LoadBlend<writeMask & 0x8>(srcBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlendAlpha, value, dstColor);
-				LoadBlend<writeMask & 0x8>(dstBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlendAlpha, value, dstColor);
-				AlphaBlend<writeMask & 0x8>(finalAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOpAlpha, srcBlendAlpha, dstBlendAlpha, value, dstColor);
+				LoadBlend<channelWriteMask & 0x8>(srcBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlendAlpha, value, dstColor);
+				LoadBlend<channelWriteMask & 0x8>(dstBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlendAlpha, value, dstColor);
+				AlphaBlend<channelWriteMask & 0x8>(finalAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOpAlpha, srcBlendAlpha, dstBlendAlpha, value, dstColor);
 				finalColor.w = finalAlpha.w;
 			}
 
 			if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
 				DitherColor(x, y, finalColor, outSurface);
 
-			outSurface->SetPixelVec<writeMask>(x, y, finalColor);
+			outSurface->SetPixelVec<channelWriteMask>(x, y, finalColor);
 		}
 		else // Simple alpha blending without separate alpha
 		{
 			__declspec(align(16) ) D3DXVECTOR4 dstColor;
-			outSurface->GetPixelVec<writeMask, false>(x, y, dstColor);
+			outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
 
 			__declspec(align(16) ) D3DXVECTOR4 srcBlend;
 			__declspec(align(16) ) D3DXVECTOR4 dstBlend;
-			LoadBlend<writeMask>(srcBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
-			LoadBlend<writeMask>(dstBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
-			AlphaBlend<writeMask>(dstColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlend, dstBlend, value, dstColor);
+			LoadBlend<channelWriteMask>(srcBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
+			LoadBlend<channelWriteMask>(dstBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
+			AlphaBlend<channelWriteMask>(dstColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlend, dstBlend, value, dstColor);
 
 			if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
 				DitherColor(x, y, dstColor, outSurface);
 
-			outSurface->SetPixelVec<writeMask>(x, y, dstColor);
+			outSurface->SetPixelVec<channelWriteMask>(x, y, dstColor);
 		}
 	}
 	else // Super simple - no alpha blending at all!
@@ -4569,10 +5454,136 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask(IDirect3DSurface9Hook* const outSur
 		{
 			D3DXVECTOR4 ditheredColor = value;
 			DitherColor(x, y, ditheredColor, outSurface);
-			outSurface->SetPixelVec<writeMask>(x, y, ditheredColor);
+			outSurface->SetPixelVec<channelWriteMask>(x, y, ditheredColor);
 		}
 		else
-			outSurface->SetPixelVec<writeMask>(x, y, value);
+			outSurface->SetPixelVec<channelWriteMask>(x, y, value);
+	}
+}
+
+static const unsigned char pixelBitCount[16] =
+{
+	0, // 0x0
+	1, // 0x1
+	1, // 0x2
+	2, // 0x3
+	1, // 0x4
+	2, // 0x5
+	2, // 0x6
+	3, // 0x7
+	1, // 0x8
+	2, // 0x9
+	2, // 0xA
+	3, // 0xB
+	2, // 0xC
+	3, // 0xD
+	3, // 0xE
+	4 // 0xF
+};
+
+template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::ROPBlendWriteMask4(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&value)[4]) const
+{
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable)
+	{
+		// Alpha blend skip:
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
+			currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+		{
+			DWORD skipAlphaValue = 0x00000000;
+			if (pixelWriteMask & 0x1)
+				skipAlphaValue |= *(const DWORD* const)&value[0].w;
+			if (pixelWriteMask & 0x2)
+				skipAlphaValue |= *(const DWORD* const)&value[1].w;
+			if (pixelWriteMask & 0x4)
+				skipAlphaValue |= *(const DWORD* const)&value[2].w;
+			if (pixelWriteMask & 0x8)
+				skipAlphaValue |= *(const DWORD* const)&value[3].w;
+
+			if (!(skipAlphaValue & 0x7FFFFFFF) )
+				return;
+		}
+		// Additive blend skip
+		else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
+			currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
+		{
+			__m128 valueBits = _mm_setzero_ps();
+			if (pixelWriteMask & 0x1)
+				valueBits = _mm_or_ps(*(const __m128* const)&(value[0]), valueBits);
+			if (pixelWriteMask & 0x2)
+				valueBits = _mm_or_ps(*(const __m128* const)&(value[1]), valueBits);
+			if (pixelWriteMask & 0x4)
+				valueBits = _mm_or_ps(*(const __m128* const)&(value[2]), valueBits);
+			if (pixelWriteMask & 0x8)
+				valueBits = _mm_or_ps(*(const __m128* const)&(value[3]), valueBits);
+
+			const DWORD skipColorValue = valueBits.m128_u32[0] | valueBits.m128_u32[1] | valueBits.m128_u32[2];
+			if (!(skipColorValue & 0x7FFFFFFF) )
+				return;
+		}
+
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable) // Have to run alpha blending twice for separate alpha
+		{
+			__declspec(align(16) ) D3DXVECTOR4 dstColor[4];
+			__declspec(align(16) ) D3DXVECTOR4 finalColor[4];
+
+			outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
+
+			__declspec(align(16) ) D3DXVECTOR4 srcBlendColor[4];
+			__declspec(align(16) ) D3DXVECTOR4 dstBlendColor[4];
+			LoadBlend4<channelWriteMask & 0x7>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
+			LoadBlend4<channelWriteMask & 0x7>(dstBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
+			AlphaBlend4<channelWriteMask & 0x7>(finalColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlendColor, dstBlendColor, value, dstColor);
+
+			if (channelWriteMask & 0x8)
+			{
+				__declspec(align(16) ) D3DXVECTOR4 srcBlendAlpha[4];
+				__declspec(align(16) ) D3DXVECTOR4 dstBlendAlpha[4];
+				__declspec(align(16) ) D3DXVECTOR4 finalAlpha[4];
+				LoadBlend4<channelWriteMask & 0x8, pixelWriteMask>(srcBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlendAlpha, value, dstColor);
+				LoadBlend4<channelWriteMask & 0x8, pixelWriteMask>(dstBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlendAlpha, value, dstColor);
+				AlphaBlend4<channelWriteMask & 0x8, pixelWriteMask>(finalAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOpAlpha, srcBlendAlpha, dstBlendAlpha, value, dstColor);
+				finalColor.w = finalAlpha.w;
+			}
+
+			if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+				DitherColor4(x4, y4, finalColor, outSurface);
+
+			outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, finalColor);
+		}
+		else // Simple alpha blending without separate alpha
+		{
+			__declspec(align(16) ) D3DXVECTOR4 dstColor[4];
+			outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
+
+			__declspec(align(16) ) D3DXVECTOR4 srcBlend[4];
+			__declspec(align(16) ) D3DXVECTOR4 dstBlend[4];
+			LoadBlend4<channelWriteMask, pixelWriteMask>(srcBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
+			LoadBlend4<channelWriteMask, pixelWriteMask>(dstBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
+			AlphaBlend4<channelWriteMask, pixelWriteMask>(dstColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlend, dstBlend, value, dstColor);
+
+			if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+				DitherColor4(x4, y4, dstColor, outSurface);
+
+			outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, dstColor);
+		}
+	}
+	else // Super simple - no alpha blending at all!
+	{
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+		{
+			D3DXVECTOR4 ditheredColor[4] = 
+			{
+				value[0],
+				value[1],
+				value[2],
+				value[3]
+			};
+			DitherColor4(x4, y4, ditheredColor, outSurface);
+			outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, ditheredColor);
+		}
+		else
+			outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, value);
 	}
 }
 
@@ -5229,7 +6240,6 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 
 /*
 Last big chunks before pixel4 is ready:
-ROPBlendWriteMask
 StencilOperation
 InterpolateStreamIntoRegisters/InterpolateShaderIntoRegisters
 Interpreter engine

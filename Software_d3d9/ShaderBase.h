@@ -2,6 +2,7 @@
 
 #include "GlobalToggles.h"
 #include "DebuggableEnums.h"
+#include <intrin.h> // For intrinsics
 
 #pragma pack(push)
 

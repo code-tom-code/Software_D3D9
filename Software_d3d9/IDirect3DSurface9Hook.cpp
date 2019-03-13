@@ -11,6 +11,9 @@ static const __m128 d16divisor = { 1.0f / 65535.0f, 1.0f / 65535.0f, 1.0f / 6553
 static const __m128 d24divisor = { 1.0f / 16777215.0f, 1.0f / 16777215.0f, 1.0f / 16777215.0f, 1.0f / 16777215.0f };
 static const __m128 d32divisor = { 1.0f / 4294967295.0f, 1.0f / 4294967295.0f, 1.0f / 4294967295.0f, 1.0f / 4294967295.0f };
 
+static const unsigned oneInt4_DWORD[4] = { 0x1, 0x1, 0x1, 0x1 };
+static const __m128i oneInt4 = *(const __m128i* const)oneInt4_DWORD;
+
 static inline const bool IsCompressedFormat(const D3DFORMAT format)
 {
 	switch (format)
@@ -1339,7 +1342,13 @@ void IDirect3DSurface9Hook::UpdateCachedValuesOnCreate()
 	InternalWidthM1F = (const float)InternalWidthM1;
 	InternalHeightM1F = (const float)InternalHeightM1;
 
-	InternalWidthSplatted = _mm_shuffle_epi32(_mm_loadu_si32(&InternalWidth), _MM_SHUFFLE(0, 0, 0, 0) );
+	InternalWidthSplatted = _mm_set1_epi32(InternalWidth);
+	InternalWidthSplattedF = _mm_cvtepi32_ps(InternalWidthSplatted);
+	InternalHeightSplattedF = _mm_cvtepi32_ps(_mm_set1_epi32(InternalHeight) );
+	InternalWidthM1SplattedF = _mm_set1_ps(InternalWidthM1F);
+	InternalHeightM1SplattedF = _mm_set1_ps(InternalHeightM1F);
+	InternalWidthM1Splatted = _mm_set1_epi32(InternalWidthM1);
+	InternalHeightM1Splatted = _mm_set1_epi32(InternalHeightM1);
 }
 
 void IDirect3DSurface9Hook::CreateOffscreenPlainSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DPOOL _Pool)
@@ -2125,29 +2134,29 @@ static inline void GammaCorrectSample(D3DXVECTOR4& outColor)
 		outColor.z = powf(outColor.z, gamma2_2);
 }
 
-template <const unsigned char writeMask>
+template <const unsigned char writeMask, const unsigned char pixelWriteMask>
 static inline void GammaCorrectSample4(D3DXVECTOR4 (&outColor4)[4])
 {
 	if (writeMask & 0x1)
 	{
-		outColor4[0].x = powf(outColor4[0].x, gamma2_2);
-		outColor4[1].x = powf(outColor4[1].x, gamma2_2);
-		outColor4[2].x = powf(outColor4[2].x, gamma2_2);
-		outColor4[3].x = powf(outColor4[3].x, gamma2_2);
+		if (pixelWriteMask & 0x1) outColor4[0].x = powf(outColor4[0].x, gamma2_2);
+		if (pixelWriteMask & 0x2) outColor4[1].x = powf(outColor4[1].x, gamma2_2);
+		if (pixelWriteMask & 0x4) outColor4[2].x = powf(outColor4[2].x, gamma2_2);
+		if (pixelWriteMask & 0x8) outColor4[3].x = powf(outColor4[3].x, gamma2_2);
 	}
 	if (writeMask & 0x2)
 	{
-		outColor4[0].y = powf(outColor4[0].y, gamma2_2);
-		outColor4[1].y = powf(outColor4[1].y, gamma2_2);
-		outColor4[2].y = powf(outColor4[2].y, gamma2_2);
-		outColor4[3].y = powf(outColor4[3].y, gamma2_2);
+		if (pixelWriteMask & 0x1) outColor4[0].y = powf(outColor4[0].y, gamma2_2);
+		if (pixelWriteMask & 0x2) outColor4[1].y = powf(outColor4[1].y, gamma2_2);
+		if (pixelWriteMask & 0x4) outColor4[2].y = powf(outColor4[2].y, gamma2_2);
+		if (pixelWriteMask & 0x8) outColor4[3].y = powf(outColor4[3].y, gamma2_2);
 	}
 	if (writeMask & 0x4)
 	{
-		outColor4[0].z = powf(outColor4[0].z, gamma2_2);
-		outColor4[1].z = powf(outColor4[1].z, gamma2_2);
-		outColor4[2].z = powf(outColor4[2].z, gamma2_2);
-		outColor4[3].z = powf(outColor4[3].z, gamma2_2);
+		if (pixelWriteMask & 0x1) outColor4[0].z = powf(outColor4[0].z, gamma2_2);
+		if (pixelWriteMask & 0x2) outColor4[1].z = powf(outColor4[1].z, gamma2_2);
+		if (pixelWriteMask & 0x4) outColor4[2].z = powf(outColor4[2].z, gamma2_2);
+		if (pixelWriteMask & 0x8) outColor4[3].z = powf(outColor4[3].z, gamma2_2);
 	}
 }
 
@@ -2182,41 +2191,77 @@ static inline void GammaCorrectSample(D3DXVECTOR4& outColor)
 	}
 }
 
-template <const unsigned char writeMask>
+template <const unsigned char writeMask, const unsigned char pixelWriteMask>
 static inline void GammaCorrectSample4(D3DXVECTOR4 (&outColor4)[4])
 {
 	if (writeMask & 0x1)
 	{
-		if (outColor4[0].x > 0.04045) outColor4[0].x = powf( (outColor4[0].x + 0.055f) * inv1055, gamma2_4);
-		else outColor4[0].x = outColor4[0].x * inv1292;
-		if (outColor4[1].x > 0.04045) outColor4[1].x = powf( (outColor4[1].x + 0.055f) * inv1055, gamma2_4);
-		else outColor4[1].x = outColor4[1].x * inv1292;
-		if (outColor4[2].x > 0.04045) outColor4[2].x = powf( (outColor4[2].x + 0.055f) * inv1055, gamma2_4);
-		else outColor4[2].x = outColor4[2].x * inv1292;
-		if (outColor4[3].x > 0.04045) outColor4[3].x = powf( (outColor4[3].x + 0.055f) * inv1055, gamma2_4);
-		else outColor4[3].x = outColor4[3].x * inv1292;
+		if (pixelWriteMask & 0x1)
+		{
+			if (outColor4[0].x > 0.04045) outColor4[0].x = powf( (outColor4[0].x + 0.055f) * inv1055, gamma2_4);
+			else outColor4[0].x = outColor4[0].x * inv1292;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (outColor4[1].x > 0.04045) outColor4[1].x = powf( (outColor4[1].x + 0.055f) * inv1055, gamma2_4);
+			else outColor4[1].x = outColor4[1].x * inv1292;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (outColor4[2].x > 0.04045) outColor4[2].x = powf( (outColor4[2].x + 0.055f) * inv1055, gamma2_4);
+			else outColor4[2].x = outColor4[2].x * inv1292;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (outColor4[3].x > 0.04045) outColor4[3].x = powf( (outColor4[3].x + 0.055f) * inv1055, gamma2_4);
+			else outColor4[3].x = outColor4[3].x * inv1292;
+		}
 	}
 	if (writeMask & 0x2)
 	{
-		if (outColor4[0].y > 0.04045) outColor4[0].y = powf( (outColor4[0].y + 0.055f) * inv1055, gamma2_4);
-		else outColor4[0].y = outColor4[0].y * inv1292;
-		if (outColor4[1].y > 0.04045) outColor4[1].y = powf( (outColor4[1].y + 0.055f) * inv1055, gamma2_4);
-		else outColor4[1].y = outColor4[1].y * inv1292;
-		if (outColor4[2].y > 0.04045) outColor4[2].y = powf( (outColor4[2].y + 0.055f) * inv1055, gamma2_4);
-		else outColor4[2].y = outColor4[2].y * inv1292;
-		if (outColor4[3].y > 0.04045) outColor4[3].y = powf( (outColor4[3].y + 0.055f) * inv1055, gamma2_4);
-		else outColor4[3].y = outColor4[3].y * inv1292;
+		if (pixelWriteMask & 0x1)
+		{
+			if (outColor4[0].y > 0.04045) outColor4[0].y = powf( (outColor4[0].y + 0.055f) * inv1055, gamma2_4);
+			else outColor4[0].y = outColor4[0].y * inv1292;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (outColor4[1].y > 0.04045) outColor4[1].y = powf( (outColor4[1].y + 0.055f) * inv1055, gamma2_4);
+			else outColor4[1].y = outColor4[1].y * inv1292;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (outColor4[2].y > 0.04045) outColor4[2].y = powf( (outColor4[2].y + 0.055f) * inv1055, gamma2_4);
+			else outColor4[2].y = outColor4[2].y * inv1292;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (outColor4[3].y > 0.04045) outColor4[3].y = powf( (outColor4[3].y + 0.055f) * inv1055, gamma2_4);
+			else outColor4[3].y = outColor4[3].y * inv1292;
+		}
 	}
 	if (writeMask & 0x4)
 	{
-		if (outColor4[0].z > 0.04045) outColor4[0].z = powf( (outColor4[0].z + 0.055f) * inv1055, gamma2_4);
-		else outColor4[0].z = outColor4[0].z * inv1292;
-		if (outColor4[1].z > 0.04045) outColor4[1].z = powf( (outColor4[1].z + 0.055f) * inv1055, gamma2_4);
-		else outColor4[1].z = outColor4[1].z * inv1292;
-		if (outColor4[2].z > 0.04045) outColor4[2].z = powf( (outColor4[2].z + 0.055f) * inv1055, gamma2_4);
-		else outColor4[2].z = outColor4[2].z * inv1292;
-		if (outColor4[3].z > 0.04045) outColor4[3].z = powf( (outColor4[3].z + 0.055f) * inv1055, gamma2_4);
-		else outColor4[3].z = outColor4[3].z * inv1292;
+		if (pixelWriteMask & 0x1)
+		{
+			if (outColor4[0].z > 0.04045) outColor4[0].z = powf( (outColor4[0].z + 0.055f) * inv1055, gamma2_4);
+			else outColor4[0].z = outColor4[0].z * inv1292;
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			if (outColor4[1].z > 0.04045) outColor4[1].z = powf( (outColor4[1].z + 0.055f) * inv1055, gamma2_4);
+			else outColor4[1].z = outColor4[1].z * inv1292;
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			if (outColor4[2].z > 0.04045) outColor4[2].z = powf( (outColor4[2].z + 0.055f) * inv1055, gamma2_4);
+			else outColor4[2].z = outColor4[2].z * inv1292;
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			if (outColor4[3].z > 0.04045) outColor4[3].z = powf( (outColor4[3].z + 0.055f) * inv1055, gamma2_4);
+			else outColor4[3].z = outColor4[3].z * inv1292;
+		}
 	}
 }
 
@@ -2306,12 +2351,18 @@ void IDirect3DSurface9Hook::GetPixelVec(const unsigned x, const unsigned y, D3DX
 	}
 }
 
-template <const unsigned char writeMask, const bool sRGBSurface>
-void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned (&y4)[4], D3DXVECTOR4 (&outColor4)[4]) const
+template <const unsigned char writeMask, const bool sRGBSurface, const unsigned char pixelWriteMask/* = 0xF*/>
+void IDirect3DSurface9Hook::GetPixelVec4(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const
 {
-	const __m128i x4vec = *(const __m128i* const)x4;
-	const __m128i y4vec = *(const __m128i* const)y4;
-	const __m128i pixelIndex = _mm_add_epi32(_mm_mullo_epi32(y4vec, InternalWidthSplatted), x4vec);
+	if (pixelWriteMask == 0x0)
+	{
+#ifdef _DEBUG
+		__debugbreak(); // Don't call this function if you don't intend to actually get any pixels!
+#endif
+		return;
+	}
+
+	const __m128i pixelIndex = _mm_add_epi32(_mm_mullo_epi32(y4, InternalWidthSplatted), x4);
 	switch (InternalFormat)
 	{
 	default:
@@ -2329,13 +2380,13 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 		ColorDWORDToFloat4_4<(writeMask == 0xF) ? 0xF : (writeMask & 0x7)>(ldrColor4, outColor4);
 
 		// Set the W components to 1.0f:
-		*(__m128* const)&outColor4[0] = _mm_blend_ps(*(__m128* const)&outColor4[0], oneVecF, 1 << 3);
-		*(__m128* const)&outColor4[1] = _mm_blend_ps(*(__m128* const)&outColor4[1], oneVecF, 1 << 3);
-		*(__m128* const)&outColor4[2] = _mm_blend_ps(*(__m128* const)&outColor4[2], oneVecF, 1 << 3);
-		*(__m128* const)&outColor4[3] = _mm_blend_ps(*(__m128* const)&outColor4[3], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x1) *(__m128* const)&outColor4[0] = _mm_blend_ps(*(__m128* const)&outColor4[0], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x2) *(__m128* const)&outColor4[1] = _mm_blend_ps(*(__m128* const)&outColor4[1], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x4) *(__m128* const)&outColor4[2] = _mm_blend_ps(*(__m128* const)&outColor4[2], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x8) *(__m128* const)&outColor4[3] = _mm_blend_ps(*(__m128* const)&outColor4[3], oneVecF, 1 << 3);
 
 		if (sRGBSurface)
-			GammaCorrectSample4<writeMask & 0x7>(outColor4);
+			GammaCorrectSample4<writeMask & 0x7, pixelWriteMask>(outColor4);
 	}
 		break;
 	case D3DFMT_A8R8G8B8:
@@ -2344,7 +2395,7 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 		const __m128i ldrColor4 = _mm_i32gather_epi32( (const int* const)pixels, pixelIndex, 4);
 		ColorDWORDToFloat4_4<writeMask>(ldrColor4, outColor4);
 		if (sRGBSurface)
-			GammaCorrectSample4<writeMask & 0x7>(outColor4);
+			GammaCorrectSample4<writeMask & 0x7, pixelWriteMask>(outColor4);
 	}
 		break;
 	case D3DFMT_A16B16G16R16:
@@ -2360,7 +2411,7 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 
 		ColorA16B16G16R16ToFloat4_4<writeMask>(pixel4, outColor4);
 		if (sRGBSurface)
-			GammaCorrectSample4<writeMask & 0x7>(outColor4);
+			GammaCorrectSample4<writeMask & 0x7, pixelWriteMask>(outColor4);
 	}
 		break;
 	case D3DFMT_A16B16G16R16F:
@@ -2409,14 +2460,14 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 	{
 		const unsigned char* const pixels = (const unsigned char* const)surfaceBytesRaw;
 		__m128i pixelsSSE;
-		pixelsSSE.m128i_u8[0] = pixels[pixelIndex.m128i_u32[0] ];
-		pixelsSSE.m128i_u8[1] = pixels[pixelIndex.m128i_u32[1] ];
-		pixelsSSE.m128i_u8[2] = pixels[pixelIndex.m128i_u32[2] ];
-		pixelsSSE.m128i_u8[3] = pixels[pixelIndex.m128i_u32[3] ];
+		if (pixelWriteMask & 0x1) pixelsSSE.m128i_u8[0] = pixels[pixelIndex.m128i_u32[0] ];
+		if (pixelWriteMask & 0x2) pixelsSSE.m128i_u8[1] = pixels[pixelIndex.m128i_u32[1] ];
+		if (pixelWriteMask & 0x4) pixelsSSE.m128i_u8[2] = pixels[pixelIndex.m128i_u32[2] ];
+		if (pixelWriteMask & 0x8) pixelsSSE.m128i_u8[3] = pixels[pixelIndex.m128i_u32[3] ];
 
 		L8ToFloat4_4<writeMask>(pixelsSSE, outColor4);
 		if (sRGBSurface)
-			GammaCorrectSample4<writeMask & 0x7>(outColor4);
+			GammaCorrectSample4<writeMask & 0x7, pixelWriteMask>(outColor4);
 	}
 	break;
 	case D3DFMT_DXT1:
@@ -2429,7 +2480,7 @@ void IDirect3DSurface9Hook::GetPixelVec4(const unsigned (&x4)[4], const unsigned
 		const __m128i ldrColor4 = _mm_i32gather_epi32( (const int* const)rawPixels, pixelIndex, 4);
 		ColorDWORDToFloat4_4<writeMask>(ldrColor4, outColor4);
 		if (sRGBSurface)
-			GammaCorrectSample4<writeMask & 0x7>(outColor4);
+			GammaCorrectSample4<writeMask & 0x7, pixelWriteMask>(outColor4);
 	}
 		break;
 
@@ -3288,24 +3339,11 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal(const float x, const float y, 
 		const unsigned cuBotright = cuTopright;
 		const unsigned cvBotright = cvBotleft;
 
-		__declspec(align(16) ) const unsigned cu4[4] =
-		{
-			(const unsigned)cuTopleft,
-			cuTopright,
-			cuBotleft,
-			cuBotright
-		};
-
-		__declspec(align(16) ) const unsigned cv4[4] =
-		{
-			(const unsigned)cvTopleft,
-			cvTopright,
-			cvBotleft,
-			cvBotright
-		};
+		__declspec(align(16) ) const __m128i x4 = _mm_set_epi32(cuBotright, cuBotleft, cuTopright, cuTopleft);
+		__declspec(align(16) ) const __m128i y4 = _mm_set_epi32(cvBotright, cvBotleft, cvTopright, cvTopleft);
 
 		__declspec(align(16) ) D3DXVECTOR4 bilinearSamples[4];
-		GetPixelVec4<writeMask, sRGBSurface>(cu4, cv4, bilinearSamples);
+		GetPixelVec4<writeMask, sRGBSurface, 0xF>(x4, y4, bilinearSamples);
 
 		D3DXVECTOR4 topHorizLerp, botHorizLerp;
 		const float xLerp = u - cuTopleft;
@@ -3329,7 +3367,7 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal(const float x, const float y, 
 	}
 }
 
-template <const unsigned char writeMask, const bool sRGBSurface>
+template <const unsigned char writeMask, const bool sRGBSurface, const unsigned pixelWriteMask>
 void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const float (&y4)[4], const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4 (&outColor4)[4]) const
 {
 	// Keep the simple case simple
@@ -3338,62 +3376,27 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const f
 		D3DXVECTOR4 broadcastPixel;
 		GetPixelVec<writeMask, sRGBSurface>(0, 0, broadcastPixel);
 
-		outColor4[0] = broadcastPixel;
-		outColor4[1] = broadcastPixel;
-		outColor4[2] = broadcastPixel;
-		outColor4[3] = broadcastPixel;
+		if (pixelWriteMask & 0x1) outColor4[0] = broadcastPixel;
+		if (pixelWriteMask & 0x2) outColor4[1] = broadcastPixel;
+		if (pixelWriteMask & 0x4) outColor4[2] = broadcastPixel;
+		if (pixelWriteMask & 0x8) outColor4[3] = broadcastPixel;
 		return;
 	}
 
-#ifdef _DEBUG
-	if (x4[0] > 1.0f || x4[0] < 0.0f)
-		__debugbreak();
-	if (x4[1] > 1.0f || x4[1] < 0.0f)
-		__debugbreak();
-	if (x4[2] > 1.0f || x4[2] < 0.0f)
-		__debugbreak();
-	if (x4[3] > 1.0f || x4[3] < 0.0f)
-		__debugbreak();
-	if (y4[0] > 1.0f || y4[0] < 0.0f)
-		__debugbreak();
-	if (y4[1] > 1.0f || y4[1] < 0.0f)
-		__debugbreak();
-	if (y4[2] > 1.0f || y4[2] < 0.0f)
-		__debugbreak();
-	if (y4[3] > 1.0f || y4[3] < 0.0f)
-		__debugbreak();
-#endif
-	float u4[4] =
-	{
-		x4[0] * InternalWidth,
-		x4[1] * InternalWidth,
-		x4[2] * InternalWidth,
-		x4[3] * InternalWidth
-	};
+	const __m128 x4vec = *(const __m128* const)x4;
+	const __m128 y4vec = *(const __m128* const)y4;
 
-	float v4[4] =
-	{
-		y4[0] * InternalHeight,
-		y4[1] * InternalHeight,
-		y4[2] * InternalHeight,
-		y4[3] * InternalHeight
-	};
+	__m128 u4 = _mm_mul_ps(x4vec, InternalWidthSplattedF);
+	__m128 v4 = _mm_mul_ps(y4vec, InternalHeightSplattedF);
 
-	const unsigned WidthM1 = InternalWidthM1;
-	const unsigned HeightM1 = InternalHeightM1;
+	// if (u4 > InternalWidthM1F) u4 = InternalWidthM1F
+	u4 = _mm_min_ps(u4, InternalWidthM1SplattedF);
 
-	const float maxU = InternalWidthM1F;
-	const float maxV = InternalHeightM1F;
+	// if (v4 > InternalHeightM1F) u4 = InternalHeightM1F
+	v4 = _mm_min_ps(v4, InternalHeightM1SplattedF);
 
-	if (u4[0] > maxU) u4[0] = maxU;
-	if (u4[1] > maxU) u4[1] = maxU;
-	if (u4[2] > maxU) u4[2] = maxU;
-	if (u4[3] > maxU) u4[3] = maxU;
-
-	if (v4[0] > maxV) v4[0] = maxV;
-	if (v4[1] > maxV) v4[1] = maxV;
-	if (v4[2] > maxV) v4[2] = maxV;
-	if (v4[3] > maxV) v4[3] = maxV;
+	const __m128i u4i = _mm_cvtps_epi32(u4);
+	const __m128i v4i = _mm_cvtps_epi32(v4);
 
 	switch (texf)
 	{
@@ -3412,121 +3415,37 @@ void IDirect3DSurface9Hook::SampleSurfaceInternal4(const float (&x4)[4], const f
 		// D3DXVECTOR4 topleft, topright, botleft, botright;
 		__declspec(align(16) ) D3DXVECTOR4 topleft4[4];
 
-		__declspec(align(16) ) const unsigned cuTopleft4[4] =
-		{
-			(const unsigned)u4[0],
-			(const unsigned)u4[1],
-			(const unsigned)u4[2],
-			(const unsigned)u4[3]
-		};
+		GetPixelVec4<writeMask, sRGBSurface, pixelWriteMask>(u4i, v4i, topleft4);
 
-		__declspec(align(16) ) const unsigned cvTopleft4[4] =
-		{
-			(const unsigned)v4[0],
-			(const unsigned)v4[1],
-			(const unsigned)v4[2],
-			(const unsigned)v4[3]
-		};
-
-		GetPixelVec4<writeMask, sRGBSurface>(cuTopleft4, cvTopleft4, topleft4);
-
-		__declspec(align(16) ) unsigned cuTopright4[4] =
-		{
-			(const unsigned)(cuTopleft4[0] + 1),
-			(const unsigned)(cuTopleft4[1] + 1),
-			(const unsigned)(cuTopleft4[2] + 1),
-			(const unsigned)(cuTopleft4[3] + 1)
-		};
-
-		if (cuTopright4[0] > WidthM1) cuTopright4[0] = WidthM1;
-		if (cuTopright4[1] > WidthM1) cuTopright4[1] = WidthM1;
-		if (cuTopright4[2] > WidthM1) cuTopright4[2] = WidthM1;
-		if (cuTopright4[3] > WidthM1) cuTopright4[3] = WidthM1;
+		const __m128i u4iRight = _mm_min_epi32(_mm_add_epi32(u4i, oneInt4), InternalWidthM1Splatted);
 
 		__declspec(align(16) ) D3DXVECTOR4 topright4[4];
-		GetPixelVec4<writeMask, sRGBSurface>(cuTopright4, cvTopleft4, topright4);
+		GetPixelVec4<writeMask, sRGBSurface, pixelWriteMask>(u4iRight, v4i, topright4);
 
-		__declspec(align(16) ) unsigned cvBotleft4[4] =
-		{
-			(const unsigned)(cvTopleft4[0] + 1),
-			(const unsigned)(cvTopleft4[1] + 1),
-			(const unsigned)(cvTopleft4[2] + 1),
-			(const unsigned)(cvTopleft4[3] + 1)
-		};
-
-		if (cvBotleft4[0] > HeightM1) cvBotleft4[0] = HeightM1;
-		if (cvBotleft4[1] > HeightM1) cvBotleft4[1] = HeightM1;
-		if (cvBotleft4[2] > HeightM1) cvBotleft4[2] = HeightM1;
-		if (cvBotleft4[3] > HeightM1) cvBotleft4[3] = HeightM1;
+		const __m128i v4iBottom = _mm_min_epi32(_mm_add_epi32(v4i, oneInt4), InternalHeightM1Splatted);
 
 		__declspec(align(16) ) D3DXVECTOR4 botleft4[4];
-		GetPixelVec4<writeMask, sRGBSurface>(cuTopleft4, cvBotleft4, botleft4);
+		GetPixelVec4<writeMask, sRGBSurface, pixelWriteMask>(u4i, v4iBottom, botleft4);
 
 		__declspec(align(16) ) D3DXVECTOR4 botright4[4];
-		GetPixelVec4<writeMask, sRGBSurface>(cuTopright4, cvBotleft4, botright4);
+		GetPixelVec4<writeMask, sRGBSurface, pixelWriteMask>(u4iRight, v4iBottom, botright4);
+
+		const __m128 xLerp4 = _mm_sub_ps(u4, _mm_cvtepi32_ps(u4i) );
 
 		D3DXVECTOR4 topHorizLerp4[4];
-		const float xLerp4[4] =
-		{
-			u4[0] - cuTopleft4[0],
-			u4[1] - cuTopleft4[1],
-			u4[2] - cuTopleft4[2],
-			u4[3] - cuTopleft4[3]
-		};
-
-		lrp<writeMask>(topHorizLerp4[0], topleft4[0], topright4[0], xLerp4[0]);
-		lrp<writeMask>(topHorizLerp4[1], topleft4[1], topright4[1], xLerp4[1]);
-		lrp<writeMask>(topHorizLerp4[2], topleft4[2], topright4[2], xLerp4[2]);
-		lrp<writeMask>(topHorizLerp4[3], topleft4[3], topright4[3], xLerp4[3]);
+		lrp4<writeMask, pixelWriteMask>(topHorizLerp4, xLerp4, topleft4, topright4);
 
 		D3DXVECTOR4 botHorizLerp4[4];
-		lrp<writeMask>(botHorizLerp4[0], botleft4[0], botright4[0], xLerp4[0]);
-		lrp<writeMask>(botHorizLerp4[1], botleft4[1], botright4[1], xLerp4[1]);
-		lrp<writeMask>(botHorizLerp4[2], botleft4[2], botright4[2], xLerp4[2]);
-		lrp<writeMask>(botHorizLerp4[3], botleft4[3], botright4[3], xLerp4[3]);
+		lrp4<writeMask, pixelWriteMask>(botHorizLerp4, xLerp4, botleft4, botright4);
 
-		const float yLerp4[4] =
-		{
-			v4[0] - cvTopleft4[0],
-			v4[1] - cvTopleft4[1],
-			v4[2] - cvTopleft4[2],
-			v4[3] - cvTopleft4[3]
-		};
-		lrp<writeMask>(outColor4[0], topHorizLerp4[0], botHorizLerp4[0], yLerp4[0]);
-		lrp<writeMask>(outColor4[1], topHorizLerp4[1], botHorizLerp4[1], yLerp4[1]);
-		lrp<writeMask>(outColor4[2], topHorizLerp4[2], botHorizLerp4[2], yLerp4[2]);
-		lrp<writeMask>(outColor4[3], topHorizLerp4[3], botHorizLerp4[3], yLerp4[3]);
-
-#ifdef _DEBUG
-		if (xLerp4[0] > 1.0f || xLerp4[0] < 0.0f) __debugbreak();
-		if (xLerp4[1] > 1.0f || xLerp4[1] < 0.0f) __debugbreak();
-		if (xLerp4[2] > 1.0f || xLerp4[2] < 0.0f) __debugbreak();
-		if (xLerp4[3] > 1.0f || xLerp4[3] < 0.0f) __debugbreak();
-		if (yLerp4[0] > 1.0f || yLerp4[0] < 0.0f) __debugbreak();
-		if (yLerp4[1] > 1.0f || yLerp4[1] < 0.0f) __debugbreak();
-		if (yLerp4[2] > 1.0f || yLerp4[2] < 0.0f) __debugbreak();
-		if (yLerp4[3] > 1.0f || yLerp4[3] < 0.0f) __debugbreak();
-#endif
+		const __m128 yLerp4 = _mm_sub_ps(v4, _mm_cvtepi32_ps(v4i) );
+		lrp4<writeMask, pixelWriteMask>(outColor4, yLerp4, topHorizLerp4, botHorizLerp4);
 	}
 		break;
 	case D3DTEXF_NONE           :
 	case D3DTEXF_POINT          :
 	{
-		__declspec(align(16) ) const unsigned u4i[4] =
-		{
-			(const unsigned)u4[0],
-			(const unsigned)u4[1],
-			(const unsigned)u4[2],
-			(const unsigned)u4[3]
-		};
-		__declspec(align(16) ) const unsigned v4i[4] =
-		{
-			(const unsigned)v4[0],
-			(const unsigned)v4[1],
-			(const unsigned)v4[2],
-			(const unsigned)v4[3]
-		};
-		GetPixelVec4<writeMask, sRGBSurface>(u4i, v4i, outColor4);
+		GetPixelVec4<writeMask, sRGBSurface, pixelWriteMask>(u4i, v4i, outColor4);
 	}
 		break;
 	}
@@ -3580,9 +3499,9 @@ void IDirect3DSurface9Hook::SampleSurface4(const float (&x4)[4], const float (&y
 {
 	// TODO: Appropriately use magfilter and minfilter here, instead of always using the magfilter
 	if (samplerState.stateUnion.namedStates.sRGBTexture)
-		SampleSurfaceInternal4<writeMask, true>(x4, y4, samplerState.stateUnion.namedStates.magFilter, outColor4);
+		SampleSurfaceInternal4<writeMask, true, 0xF>(x4, y4, samplerState.stateUnion.namedStates.magFilter, outColor4);
 	else
-		SampleSurfaceInternal4<writeMask, false>(x4, y4, samplerState.stateUnion.namedStates.magFilter, outColor4);
+		SampleSurfaceInternal4<writeMask, false, 0xF>(x4, y4, samplerState.stateUnion.namedStates.magFilter, outColor4);
 }
 
 #define DUMP_SURF_DIR "TexDump"

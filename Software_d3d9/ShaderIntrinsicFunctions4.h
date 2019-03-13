@@ -460,36 +460,136 @@ static INTRINSIC_INLINE void log4(D3DXVECTOR4 (&dst)[4], const float (&src_repli
 }
 
 // lerp: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/lrp---vs
-template <const unsigned char writeMask = 0xF>
+template <const unsigned char channelWriteMask = 0xF, const unsigned char pixelWriteMask = 0xF>
 static INTRINSIC_INLINE void lrp4(D3DXVECTOR4 (&dst)[4], const D3DXVECTOR4 (&src0)[4], const D3DXVECTOR4 (&src1)[4], const D3DXVECTOR4 (&src2)[4])
-{	
-	if (writeMask & 0x1)
+{
+	__m128 amount4[4];
+	if (pixelWriteMask & 0x1) amount4[0] = *(const __m128* const)&(src0[0]);
+	if (pixelWriteMask & 0x2) amount4[1] = *(const __m128* const)&(src0[1]);
+	if (pixelWriteMask & 0x4) amount4[2] = *(const __m128* const)&(src0[2]);
+	if (pixelWriteMask & 0x8) amount4[3] = *(const __m128* const)&(src0[3]);
+
+	__m128 src1vec[4];
+	if (pixelWriteMask & 0x1) src1vec[0] = *(const __m128* const)&(src1[0]);
+	if (pixelWriteMask & 0x2) src1vec[1] = *(const __m128* const)&(src1[1]);
+	if (pixelWriteMask & 0x4) src1vec[2] = *(const __m128* const)&(src1[2]);
+	if (pixelWriteMask & 0x8) src1vec[3] = *(const __m128* const)&(src1[3]);
+
+	__m128 src2vec[4];
+	if (pixelWriteMask & 0x1) src2vec[0] = *(const __m128* const)&(src2[0]);
+	if (pixelWriteMask & 0x2) src2vec[1] = *(const __m128* const)&(src2[1]);
+	if (pixelWriteMask & 0x4) src2vec[2] = *(const __m128* const)&(src2[2]);
+	if (pixelWriteMask & 0x8) src2vec[3] = *(const __m128* const)&(src2[3]);
+
+	if (channelWriteMask == 0xF)
 	{
-		dst[0].x = src0[0].x * (src1[0].x - src2[0].x) + src2[0].x;
-		dst[1].x = src0[1].x * (src1[1].x - src2[1].x) + src2[1].x;
-		dst[2].x = src0[2].x * (src1[2].x - src2[2].x) + src2[2].x;
-		dst[3].x = src0[3].x * (src1[3].x - src2[3].x) + src2[3].x;
+		if (pixelWriteMask & 0x1) *(__m128* const)&(dst[0]) = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[0], src1vec[0]), amount4[0]), src1vec[0]);
+		if (pixelWriteMask & 0x2) *(__m128* const)&(dst[1]) = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[1], src1vec[1]), amount4[1]), src1vec[1]);
+		if (pixelWriteMask & 0x4) *(__m128* const)&(dst[2]) = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[2], src1vec[2]), amount4[2]), src1vec[2]);
+		if (pixelWriteMask & 0x8) *(__m128* const)&(dst[3]) = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[3], src1vec[3]), amount4[3]), src1vec[3]);
+		return;
 	}
-	if (writeMask & 0x2)	
+
+	__m128 result[4];
+	if (pixelWriteMask & 0x1) result[0] = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[0], src1vec[0]), amount4[0]), src1vec[0]);
+	if (pixelWriteMask & 0x2) result[1] = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[1], src1vec[1]), amount4[1]), src1vec[1]);
+	if (pixelWriteMask & 0x4) result[2] = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[2], src1vec[2]), amount4[2]), src1vec[2]);
+	if (pixelWriteMask & 0x8) result[3] = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[3], src1vec[3]), amount4[3]), src1vec[3]);
+
+	if (channelWriteMask & 0x1)
 	{
-		dst[0].y = src0[0].y * (src1[0].y - src2[0].y) + src2[0].y;
-		dst[1].y = src0[1].y * (src1[1].y - src2[1].y) + src2[1].y;
-		dst[2].y = src0[2].y * (src1[2].y - src2[2].y) + src2[2].y;
-		dst[3].y = src0[3].y * (src1[3].y - src2[3].y) + src2[3].y;
+		if (pixelWriteMask & 0x1) dst[0].x = result[0].m128_f32[0];
+		if (pixelWriteMask & 0x2) dst[1].x = result[1].m128_f32[0];
+		if (pixelWriteMask & 0x4) dst[2].x = result[2].m128_f32[0];
+		if (pixelWriteMask & 0x8) dst[3].x = result[3].m128_f32[0];
 	}
-	if (writeMask & 0x4)
+	if (channelWriteMask & 0x2)	
 	{
-		dst[0].z = src0[0].z * (src1[0].z - src2[0].z) + src2[0].z;
-		dst[1].z = src0[1].z * (src1[1].z - src2[1].z) + src2[1].z;
-		dst[2].z = src0[2].z * (src1[2].z - src2[2].z) + src2[2].z;
-		dst[3].z = src0[3].z * (src1[3].z - src2[3].z) + src2[3].z;
+		if (pixelWriteMask & 0x1) dst[0].y = result[0].m128_f32[1];
+		if (pixelWriteMask & 0x2) dst[1].y = result[1].m128_f32[1];
+		if (pixelWriteMask & 0x4) dst[2].y = result[2].m128_f32[1];
+		if (pixelWriteMask & 0x8) dst[3].y = result[3].m128_f32[1];
 	}
-	if (writeMask & 0x8)
+	if (channelWriteMask & 0x4)
 	{
-		dst[0].w = src0[0].w * (src1[0].w - src2[0].w) + src2[0].w;
-		dst[1].w = src0[1].w * (src1[1].w - src2[1].w) + src2[1].w;
-		dst[2].w = src0[2].w * (src1[2].w - src2[2].w) + src2[2].w;
-		dst[3].w = src0[3].w * (src1[3].w - src2[3].w) + src2[3].w;
+		if (pixelWriteMask & 0x1) dst[0].z = result[0].m128_f32[2];
+		if (pixelWriteMask & 0x2) dst[1].z = result[1].m128_f32[2];
+		if (pixelWriteMask & 0x4) dst[2].z = result[2].m128_f32[2];
+		if (pixelWriteMask & 0x8) dst[3].z = result[3].m128_f32[2];
+	}
+	if (channelWriteMask & 0x8)
+	{
+		if (pixelWriteMask & 0x1) dst[0].w = result[0].m128_f32[3];
+		if (pixelWriteMask & 0x2) dst[1].w = result[1].m128_f32[3];
+		if (pixelWriteMask & 0x4) dst[2].w = result[2].m128_f32[3];
+		if (pixelWriteMask & 0x8) dst[3].w = result[3].m128_f32[3];
+	}
+}
+
+// lerp: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/lrp---vs
+template <const unsigned char channelWriteMask = 0xF, const unsigned char pixelWriteMask = 0xF>
+static inline void lrp4(D3DXVECTOR4 (&dst)[4], const __m128 src0, const D3DXVECTOR4 (&src1)[4], const D3DXVECTOR4 (&src2)[4])
+{
+	__m128 amount4[4];
+	if (pixelWriteMask & 0x1) amount4[0] = _mm_shuffle_ps(src0, src0, _MM_SHUFFLE(0, 0, 0, 0) );
+	if (pixelWriteMask & 0x2) amount4[1] = _mm_shuffle_ps(src0, src0, _MM_SHUFFLE(1, 1, 1, 1) );
+	if (pixelWriteMask & 0x4) amount4[2] = _mm_shuffle_ps(src0, src0, _MM_SHUFFLE(2, 2, 2, 2) );
+	if (pixelWriteMask & 0x8) amount4[3] = _mm_shuffle_ps(src0, src0, _MM_SHUFFLE(3, 3, 3, 3) );
+
+	__m128 src1vec[4];
+	if (pixelWriteMask & 0x1) src1vec[0] = *(const __m128* const)&(src1[0]);
+	if (pixelWriteMask & 0x2) src1vec[1] = *(const __m128* const)&(src1[1]);
+	if (pixelWriteMask & 0x4) src1vec[2] = *(const __m128* const)&(src1[2]);
+	if (pixelWriteMask & 0x8) src1vec[3] = *(const __m128* const)&(src1[3]);
+
+	__m128 src2vec[4];
+	if (pixelWriteMask & 0x1) src2vec[0] = *(const __m128* const)&(src2[0]);
+	if (pixelWriteMask & 0x2) src2vec[1] = *(const __m128* const)&(src2[1]);
+	if (pixelWriteMask & 0x4) src2vec[2] = *(const __m128* const)&(src2[2]);
+	if (pixelWriteMask & 0x8) src2vec[3] = *(const __m128* const)&(src2[3]);
+
+	if (channelWriteMask == 0xF)
+	{
+		if (pixelWriteMask & 0x1) *(__m128* const)&(dst[0]) = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[0], src1vec[0]), amount4[0]), src1vec[0]);
+		if (pixelWriteMask & 0x2) *(__m128* const)&(dst[1]) = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[1], src1vec[1]), amount4[1]), src1vec[1]);
+		if (pixelWriteMask & 0x4) *(__m128* const)&(dst[2]) = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[2], src1vec[2]), amount4[2]), src1vec[2]);
+		if (pixelWriteMask & 0x8) *(__m128* const)&(dst[3]) = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[3], src1vec[3]), amount4[3]), src1vec[3]);
+		return;
+	}
+
+	__m128 result[4];
+	if (pixelWriteMask & 0x1) result[0] = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[0], src1vec[0]), amount4[0]), src1vec[0]);
+	if (pixelWriteMask & 0x2) result[1] = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[1], src1vec[1]), amount4[1]), src1vec[1]);
+	if (pixelWriteMask & 0x4) result[2] = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[2], src1vec[2]), amount4[2]), src1vec[2]);
+	if (pixelWriteMask & 0x8) result[3] = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec[3], src1vec[3]), amount4[3]), src1vec[3]);
+
+	if (channelWriteMask & 0x1)
+	{
+		if (pixelWriteMask & 0x1) dst[0].x = result[0].m128_f32[0];
+		if (pixelWriteMask & 0x2) dst[1].x = result[1].m128_f32[0];
+		if (pixelWriteMask & 0x4) dst[2].x = result[2].m128_f32[0];
+		if (pixelWriteMask & 0x8) dst[3].x = result[3].m128_f32[0];
+	}
+	if (channelWriteMask & 0x2)	
+	{
+		if (pixelWriteMask & 0x1) dst[0].y = result[0].m128_f32[1];
+		if (pixelWriteMask & 0x2) dst[1].y = result[1].m128_f32[1];
+		if (pixelWriteMask & 0x4) dst[2].y = result[2].m128_f32[1];
+		if (pixelWriteMask & 0x8) dst[3].y = result[3].m128_f32[1];
+	}
+	if (channelWriteMask & 0x4)
+	{
+		if (pixelWriteMask & 0x1) dst[0].z = result[0].m128_f32[2];
+		if (pixelWriteMask & 0x2) dst[1].z = result[1].m128_f32[2];
+		if (pixelWriteMask & 0x4) dst[2].z = result[2].m128_f32[2];
+		if (pixelWriteMask & 0x8) dst[3].z = result[3].m128_f32[2];
+	}
+	if (channelWriteMask & 0x8)
+	{
+		if (pixelWriteMask & 0x1) dst[0].w = result[0].m128_f32[3];
+		if (pixelWriteMask & 0x2) dst[1].w = result[1].m128_f32[3];
+		if (pixelWriteMask & 0x4) dst[2].w = result[2].m128_f32[3];
+		if (pixelWriteMask & 0x8) dst[3].w = result[3].m128_f32[3];
 	}
 }
 

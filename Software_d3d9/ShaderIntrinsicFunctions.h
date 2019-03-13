@@ -318,29 +318,51 @@ static INTRINSIC_INLINE void log(float& dst, const float src_replicateSwizzleCom
 // lerp: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/lrp---vs
 template <const unsigned char writeMask = 0xF>
 static INTRINSIC_INLINE void lrp(D3DXVECTOR4& dst, const D3DXVECTOR4& src0, const D3DXVECTOR4& src1, const D3DXVECTOR4& src2)
-{	
-	if (writeMask & 0x1)
-		dst.x = src0.x * (src1.x - src2.x) + src2.x;
-	if (writeMask & 0x2)
-		dst.y = src0.y * (src1.y - src2.y) + src2.y;
-	if (writeMask & 0x4)
-		dst.z = src0.z * (src1.z - src2.z) + src2.z;
-	if (writeMask & 0x8)
-		dst.w = src0.w * (src1.w - src2.w) + src2.w;
+{
+	const __m128 amount4 = *(const __m128* const)&src0;
+	const __m128 src1vec = *(const __m128* const)&src1;
+	const __m128 src2vec = *(const __m128* const)&src2;
+	__m128& outVec = *(__m128* const)&dst;
+
+	if ( (writeMask & 0x7) == 0x7)
+		outVec = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec, src1vec), amount4), src1vec);
+	else
+	{
+		const __m128 result = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src2vec, src1vec), amount4), src1vec);
+		if (writeMask & 0x1)
+			dst.x = result.m128_f32[0];
+		if (writeMask & 0x2)
+			dst.y = result.m128_f32[1];
+		if (writeMask & 0x4)
+			dst.z = result.m128_f32[2];
+		if (writeMask & 0x8)
+			dst.w = result.m128_f32[3];
+	}
 }
 
 // lerp: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/lrp---vs
 template <const unsigned char writeMask = 0xF>
 static INTRINSIC_INLINE void lrp(D3DXVECTOR4& dst, const D3DXVECTOR4& src0, const D3DXVECTOR4& src1, const float amount)
 {
-	if (writeMask & 0x1)
-		dst.x = amount * (src1.x - src0.x) + src0.x;
-	if (writeMask & 0x2)
-		dst.y = amount * (src1.y - src0.y) + src0.y;
-	if (writeMask & 0x4)
-		dst.z = amount * (src1.z - src0.z) + src0.z;
-	if (writeMask & 0x8)
-		dst.w = amount * (src1.w - src0.w) + src0.w;
+	const __m128 amount4 = _mm_set1_ps(amount);
+	const __m128 src0vec = *(const __m128* const)&src0;
+	const __m128 src1vec = *(const __m128* const)&src1;
+	__m128& outVec = *(__m128* const)&dst;
+
+	if (writeMask == 0xF)
+		outVec = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src1vec, src0vec), amount4), src0vec);
+	else
+	{
+		const __m128 result = _mm_add_ps(_mm_mul_ps(_mm_sub_ps(src1vec, src0vec), amount4), src0vec);
+		if (writeMask & 0x1)
+			dst.x = result.m128_f32[0];
+		if (writeMask & 0x2)
+			dst.y = result.m128_f32[1];
+		if (writeMask & 0x4)
+			dst.z = result.m128_f32[2];
+		if (writeMask & 0x8)
+			dst.w = result.m128_f32[3];
+	}
 }
 
 // lerp: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/lrp---vs
