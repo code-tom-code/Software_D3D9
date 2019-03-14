@@ -1081,19 +1081,14 @@ public:
 	const bool CurrentPipelineCanEarlyZTest(void) const;
 
 	// Assumes pre-transformed vertices from a vertex declaration + raw vertex stream
-	template <const bool rasterizerUsesEarlyZTest>
-	void RasterizeTriangleFromStream(PShaderEngine* const pShaderEngine, const DeclarationSemanticMapping& vertexDeclMapping, CONST D3DXVECTOR4* const v0, CONST D3DXVECTOR4* const v1, CONST D3DXVECTOR4* const v2, 
-		const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const;
-
-	// Assumes pre-transformed vertices from a vertex declaration + raw vertex stream
 	void RasterizeLineFromStream(const DeclarationSemanticMapping& vertexDeclMapping, CONST BYTE* const v0, CONST BYTE* const v1) const;
 
 	// Assumes pre-transformed vertex from a vertex declaration + raw vertex stream
 	void RasterizePointFromStream(const DeclarationSemanticMapping& vertexDeclMapping, CONST BYTE* const v0) const;
 
-	// Assumes pre-transformed vertices from a processed vertex shader
-	template <const bool rasterizerUsesEarlyZTest>
-	void RasterizeTriangleFromShader(PShaderEngine* const pShaderEngine, const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
+	// Assumes pre-transformed vertices (from a processed vertex shader or from a vertex declaration + pretransformed vertex stream)
+	template <const bool rasterizerUsesEarlyZTest, const bool shadeFromShader>
+	void RasterizeTriangle(PShaderEngine* const pShaderEngine, const void* const mappingData, const void* const v0, const void* const v1, const void* const v2,
 		const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const;
 
 	// Assumes pre-transformed vertices from a processed vertex shader
@@ -1153,6 +1148,7 @@ public:
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 	void CreateNewPixelShadeJob(const unsigned x, const unsigned y, const int barycentricA, const int barycentricB, const int barycentricC, const primitivePixelJobData* const primitiveData) const;
+	void CreateNewPixelShadeJob4(const unsigned x, const unsigned y, const int (&barycentricA)[4], const int (&barycentricB)[4], const int (&barycentricC)[4], const primitivePixelJobData* const primitiveData) const;
 #endif
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
@@ -1163,6 +1159,8 @@ public:
 
 	// TODO: Find another way to do this other than mutable
 	mutable primitivePixelJobData allPrimitiveJobData[1024 * 1024];
+
+	template <const bool shadeFromShader>
 	const primitivePixelJobData* const GetNewPrimitiveJobData(const void* const v0, const void* const v1, const void* const v2, const float barycentricNormalizeFactor, const UINT primitiveID, const bool VFace,
 		const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const;
 

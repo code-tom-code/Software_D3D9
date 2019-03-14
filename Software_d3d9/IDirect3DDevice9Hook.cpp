@@ -250,20 +250,20 @@ static inline void TriangleRasterJob1(slist_item& job, _threadItem* const myPtr)
 	{
 		const slist_item::_jobData::_triangleRasterizeJobData::_triangleRasterizeVerticesUnion::_triangleRasterizeFromShader& rasterFromShader = triangleRasterizeJobData.rasterVertices.triangleRasterizeFromShader;
 		if (drawCallData.rasterizerUsesEarlyZTest)
-			devHook->RasterizeTriangleFromShader<true>(&myPtr->threadPS_2_0, *drawCallData.vStoPSMapping, *rasterFromShader.v0, *rasterFromShader.v1, *rasterFromShader.v2,
+			devHook->RasterizeTriangle<true, true>(&myPtr->threadPS_2_0, drawCallData.vStoPSMapping, rasterFromShader.v0, rasterFromShader.v1, rasterFromShader.v2,
 				drawCallData.fWidth, drawCallData.fHeight, triangleRasterizeJobData.primitiveID, triangleRasterizeJobData.vertIndex0, triangleRasterizeJobData.vertIndex1, triangleRasterizeJobData.vertIndex2);
 		else
-			devHook->RasterizeTriangleFromShader<false>(&myPtr->threadPS_2_0, *drawCallData.vStoPSMapping, *rasterFromShader.v0, *rasterFromShader.v1, *rasterFromShader.v2,
+			devHook->RasterizeTriangle<false, true>(&myPtr->threadPS_2_0, drawCallData.vStoPSMapping, rasterFromShader.v0, rasterFromShader.v1, rasterFromShader.v2,
 				drawCallData.fWidth, drawCallData.fHeight, triangleRasterizeJobData.primitiveID, triangleRasterizeJobData.vertIndex0, triangleRasterizeJobData.vertIndex1, triangleRasterizeJobData.vertIndex2);
 	}
 	else
 	{
 		const slist_item::_jobData::_triangleRasterizeJobData::_triangleRasterizeVerticesUnion::_triangleRasterizeFromStream& rasterFromStream = triangleRasterizeJobData.rasterVertices.triangleRasterizeFromStream;
 		if (drawCallData.rasterizerUsesEarlyZTest)
-			devHook->RasterizeTriangleFromStream<true>(&myPtr->threadPS_2_0, *drawCallData.vertexDeclMapping, rasterFromStream.v0, rasterFromStream.v1, rasterFromStream.v2,
+			devHook->RasterizeTriangle<true, false>(&myPtr->threadPS_2_0, drawCallData.vertexDeclMapping, rasterFromStream.v0, rasterFromStream.v1, rasterFromStream.v2,
 				drawCallData.fWidth, drawCallData.fHeight, triangleRasterizeJobData.primitiveID, triangleRasterizeJobData.vertIndex0, triangleRasterizeJobData.vertIndex1, triangleRasterizeJobData.vertIndex2);
 		else
-			devHook->RasterizeTriangleFromStream<false>(&myPtr->threadPS_2_0, *drawCallData.vertexDeclMapping, rasterFromStream.v0, rasterFromStream.v1, rasterFromStream.v2,
+			devHook->RasterizeTriangle<false, false>(&myPtr->threadPS_2_0, drawCallData.vertexDeclMapping, rasterFromStream.v0, rasterFromStream.v1, rasterFromStream.v2,
 				drawCallData.fWidth, drawCallData.fHeight, triangleRasterizeJobData.primitiveID, triangleRasterizeJobData.vertIndex0, triangleRasterizeJobData.vertIndex1, triangleRasterizeJobData.vertIndex2);
 	}
 }
@@ -3082,6 +3082,42 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 
 	++workStatus.numJobs;
 }
+
+void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const unsigned x, const unsigned y, const int (&barycentricA)[4], const int (&barycentricB)[4], const int (&barycentricC)[4], const primitivePixelJobData* const primitiveData) const
+{
+	slist_item* const newItem = GetNewWorkerJob<true>();
+	newItem->jobType = pixelShade4Job;
+	slist_item::_jobData::_pixelJobData& pixelJobData = newItem->jobData.pixelJobData;
+#ifdef _DEBUG
+	if (!primitiveData)
+	{
+		__debugbreak();
+	}
+#endif
+	pixelJobData.primitiveData = primitiveData;
+	pixelJobData.x[0] = x;
+	pixelJobData.x[1] = x + 1;
+	pixelJobData.x[2] = x;
+	pixelJobData.x[3] = x + 1;
+	pixelJobData.y[0] = y;
+	pixelJobData.y[1] = y;
+	pixelJobData.y[2] = y + 1;
+	pixelJobData.y[3] = y + 1;
+	pixelJobData.barycentricCoords[0].a = barycentricA[0];
+	pixelJobData.barycentricCoords[0].b = barycentricB[0];
+	pixelJobData.barycentricCoords[0].c = barycentricC[0];
+	pixelJobData.barycentricCoords[1].a = barycentricA[1];
+	pixelJobData.barycentricCoords[1].b = barycentricB[1];
+	pixelJobData.barycentricCoords[1].c = barycentricC[1];
+	pixelJobData.barycentricCoords[2].a = barycentricA[2];
+	pixelJobData.barycentricCoords[2].b = barycentricB[2];
+	pixelJobData.barycentricCoords[2].c = barycentricC[2];
+	pixelJobData.barycentricCoords[3].a = barycentricA[3];
+	pixelJobData.barycentricCoords[3].b = barycentricB[3];
+	pixelJobData.barycentricCoords[3].c = barycentricC[3];
+
+	++workStatus.numJobs;
+}
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
@@ -3117,6 +3153,7 @@ void IDirect3DDevice9Hook::CreateNewTriangleRasterJob(const UINT primitiveID, co
 
 #endif // #ifdef MULTITHREAD_SHADING
 
+template <const bool shadeFromShader>
 const primitivePixelJobData* const IDirect3DDevice9Hook::GetNewPrimitiveJobData(const void* const v0, const void* const v1, const void* const v2, const float barycentricNormalizeFactor, const UINT primitiveID, const bool VFace,
 	const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const
 {
@@ -3129,7 +3166,7 @@ const primitivePixelJobData* const IDirect3DDevice9Hook::GetNewPrimitiveJobData(
 
 	primitivePixelJobData& newPrimitiveData = allPrimitiveJobData[primitiveID];
 
-	if (currentDrawCallData.pixelData.useShaderVerts)
+	if (shadeFromShader)
 	{
 		primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& thisShadeFromShader = newPrimitiveData.pixelShadeVertexData.shadeFromShader;
 		thisShadeFromShader.v0 = static_cast<const VS_2_0_OutputRegisters* const>(v0);
@@ -6687,186 +6724,6 @@ void IDirect3DDevice9Hook::RasterizePointFromStream(const DeclarationSemanticMap
 	// Do nothing, point rasterization is not yet implemented
 }
 
-// Assumes pre-transformed vertices from a vertex declaration + raw vertex stream
-template <const bool rasterizerUsesEarlyZTest>
-void IDirect3DDevice9Hook::RasterizeTriangleFromStream(PShaderEngine* const pShaderEngine, const DeclarationSemanticMapping& vertexDeclMapping, CONST D3DXVECTOR4* const v0, CONST D3DXVECTOR4* const v1, CONST D3DXVECTOR4* const v2, 
-	const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const
-{
-	const D3DXVECTOR4& pos0 = *v0;
-	const D3DXVECTOR4& pos1 = *v1;
-	const D3DXVECTOR4& pos2 = *v2;
-
-	// Near plane culling:
-	// TODO: Replace with real triangle clipping!
-	if (pos0.z < 0.0f || pos0.z > 1.0f)
-		return;
-	if (pos1.z < 0.0f || pos1.z > 1.0f)
-		return;
-	if (pos2.z < 0.0f || pos2.z > 1.0f)
-		return;
-
-	// Compute screenspace bounds for this triangle:
-	D3DXVECTOR2 topleft(pos0.x, pos0.y);
-	D3DXVECTOR2 botright(topleft);
-	if (pos1.x < topleft.x)
-		topleft.x = pos1.x;
-	if (pos2.x < topleft.x)
-		topleft.x = pos2.x;
-	if (pos1.y < topleft.y)
-		topleft.y = pos1.y;
-	if (pos2.y < topleft.y)
-		topleft.y = pos2.y;
-	if (pos1.x > botright.x)
-		botright.x = pos1.x;
-	if (pos2.x > botright.x)
-		botright.x = pos2.x;
-	if (pos1.y > botright.y)
-		botright.y = pos1.y;
-	if (pos2.y > botright.y)
-		botright.y = pos2.y;
-
-	// Cull triangles that intersect the guard band:
-	// TODO: Replace with real triangle clipping!
-	if (topleft.x < -8192.0f || topleft.x > 8192.0f)
-		return;
-	if (topleft.y < -8192.0f || topleft.y > 8192.0f)
-		return;
-	if (botright.x < -8192.0f || botright.x > 8192.0f)
-		return;
-	if (botright.y < -8192.0f || botright.y > 8192.0f)
-		return;
-
-	// Clip screenspace bounds to the screen size:
-	if (topleft.x < 0)
-		topleft.x = 0;
-	if (topleft.y < 0)
-		topleft.y = 0;
-	if (botright.x > fWidth)
-		botright.x = fWidth;
-	if (botright.y > fHeight)
-		botright.y = fHeight;
-
-	// Clip to the scissor rect, if enabled
-	if (currentState.currentRenderStates.renderStatesUnion.namedStates.scissorTestEnable)
-	{
-		if (topleft.x < currentState.currentScissorRect.fleft)
-			topleft.x = currentState.currentScissorRect.fleft;
-		if (topleft.y < currentState.currentScissorRect.ftop)
-			topleft.y = currentState.currentScissorRect.ftop;
-		if (botright.x > currentState.currentScissorRect.fright)
-			botright.x = currentState.currentScissorRect.fright;
-		if (botright.y > currentState.currentScissorRect.fbottom)
-			botright.y = currentState.currentScissorRect.fbottom;
-	}
-
-	topleft.x *= SUBPIXEL_ACCURACY_BIASMULTF;
-	topleft.y *= SUBPIXEL_ACCURACY_BIASMULTF;
-	botright.x *= SUBPIXEL_ACCURACY_BIASMULTF;
-	botright.y *= SUBPIXEL_ACCURACY_BIASMULTF;
-
-	int2 i0, i1, i2;
-	i0.x = (const int)(pos0.x * SUBPIXEL_ACCURACY_BIASMULTF);
-	i0.y = (const int)(pos0.y * SUBPIXEL_ACCURACY_BIASMULTF);
-	i1.x = (const int)(pos1.x * SUBPIXEL_ACCURACY_BIASMULTF);
-	i1.y = (const int)(pos1.y * SUBPIXEL_ACCURACY_BIASMULTF);
-	i2.x = (const int)(pos2.x * SUBPIXEL_ACCURACY_BIASMULTF);
-	i2.y = (const int)(pos2.y * SUBPIXEL_ACCURACY_BIASMULTF);
-
-	const int xMin = (const int)topleft.x;
-	const int yMin = (const int)topleft.y;
-	const int xMax = (const int)botright.x;
-	const int yMax = (const int)botright.y;
-
-	// Early out on zero-area triangles
-	if (!(yMin <= yMax && xMin < xMax) )
-		return;
-
-	// Cull zero or negative-area triangles (with our default triangle winding being CW, this will also cull CCW triangles):
-	const int maxNumPixels = (yMax - yMin) * (xMax - xMin);
-	if (maxNumPixels < 1)
-		return;
-
-	const int twiceTriangleArea = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, i2.x, i2.y);
-	const float barycentricNormalizeFactor = 1.0f / twiceTriangleArea;
-
-	const int barycentricXDelta0 = i0.y - i1.y;
-	const int barycentricXDelta1 = i1.y - i2.y;
-	const int barycentricXDelta2 = i2.y - i0.y;
-
-	const int barycentricYDelta0 = i1.x - i0.x;
-	const int barycentricYDelta1 = i2.x - i1.x;
-	const int barycentricYDelta2 = i0.x - i2.x;
-
-	// Correct for top-left rule. Source: https://fgiesen.wordpress.com/2013/02/08/triangle-rasterization-in-practice/
-	const char topleftEdgeBias0 = isTopLeftEdge(i1, i2) ? 0 : -1;
-	const char topleftEdgeBias1 = isTopLeftEdge(i2, i0) ? 0 : -1;
-	const char topleftEdgeBias2 = isTopLeftEdge(i0, i1) ? 0 : -1;
-
-	int row0 = computeEdgeSidedness(i1.x, i1.y, i2.x, i2.y, xMin, yMin) + topleftEdgeBias0;
-	int row1 = computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin) + topleftEdgeBias1;
-	int row2 = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin) + topleftEdgeBias2;
-
-	unsigned earlyZTestDepthValue;
-	const IDirect3DSurface9Hook* depthStencil;
-	if (rasterizerUsesEarlyZTest)
-	{
-		depthStencil = currentState.currentDepthStencil;
-
-		// TODO: Don't assume less-than test for Z CMPFUNC
-		float minDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
-		minDepthValue = minDepthValue < pos2.z ? minDepthValue : pos2.z;
-
-		earlyZTestDepthValue = depthStencil->GetRawDepthValueFromFloatDepth(minDepthValue);
-	}
-
-	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData(v0, v1, v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
-	for (int y = yMin; y <= yMax; y += SUBPIXEL_ACCURACY_BIASMULT)
-	{
-		// Reset at the next row:
-		int currentBarycentric0 = row0;
-		int currentBarycentric1 = row1;
-		int currentBarycentric2 = row2;
-
-		for (int x = xMin; x < xMax; x += SUBPIXEL_ACCURACY_BIASMULT)
-		{
-			// Is our test-pixel inside all three triangle edges?
-			if ( (currentBarycentric0 | currentBarycentric1 | currentBarycentric2) >= 0)
-			{
-				if (rasterizerUsesEarlyZTest)
-				{
-					const unsigned compareRawDepth = depthStencil->GetRawDepth(x, y);
-
-					// TODO: Don't assume less-than test for Z CMPFUNC
-					if (compareRawDepth < earlyZTestDepthValue)
-					{
-						currentBarycentric0 += barycentricXDelta1;
-						currentBarycentric1 += barycentricXDelta2;
-						currentBarycentric2 += barycentricXDelta0;
-						continue;
-					}
-				}
-#if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
-#else // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-				ShadePixelFromStream(pShaderEngine, vertexDeclMapping, x, y, 
-					D3DXVECTOR3( (currentBarycentric0 - topleftEdgeBias0) * barycentricNormalizeFactor, 
-						(currentBarycentric1 - topleftEdgeBias1) * barycentricNormalizeFactor, 
-						(currentBarycentric2 - topleftEdgeBias2) * barycentricNormalizeFactor), 
-					currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2);
-#endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-			}
-
-			currentBarycentric0 += barycentricXDelta1;
-			currentBarycentric1 += barycentricXDelta2;
-			currentBarycentric2 += barycentricXDelta0;
-		}
-
-		row0 += barycentricYDelta1;
-		row1 += barycentricYDelta2;
-		row2 += barycentricYDelta0;
-	}
-}
-
 // Assumes pre-transformed vertices from a processed vertex shader
 void IDirect3DDevice9Hook::RasterizeLineFromShader(const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1) const
 {
@@ -6895,14 +6752,13 @@ void IDirect3DDevice9Hook::RasterizePointFromShader(const VStoPSMapping& vs_psMa
 	// Do nothing, point rasterization is not yet implemented
 }
 
-// Assumes pre-transformed vertices from a processed vertex shader
-template <const bool rasterizerUsesEarlyZTest>
-void IDirect3DDevice9Hook::RasterizeTriangleFromShader(PShaderEngine* const pShaderEngine, const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
+template <const bool rasterizerUsesEarlyZTest, const bool shadeFromShader>
+void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine, const void* const mappingData, const void* const v0, const void* const v1, const void* const v2,
 	const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const
 {
-	const D3DXVECTOR4& pos0 = currentState.currentVertexShader->GetPosition(v0);
-	const D3DXVECTOR4& pos1 = currentState.currentVertexShader->GetPosition(v1);
-	const D3DXVECTOR4& pos2 = currentState.currentVertexShader->GetPosition(v2);
+	const D3DXVECTOR4& pos0 = shadeFromShader ? currentState.currentVertexShader->GetPosition(*(const VS_2_0_OutputRegisters* const)v0) : *(const D3DXVECTOR4* const)v0;
+	const D3DXVECTOR4& pos1 = shadeFromShader ? currentState.currentVertexShader->GetPosition(*(const VS_2_0_OutputRegisters* const)v1) : *(const D3DXVECTOR4* const)v1;
+	const D3DXVECTOR4& pos2 = shadeFromShader ? currentState.currentVertexShader->GetPosition(*(const VS_2_0_OutputRegisters* const)v2) : *(const D3DXVECTOR4* const)v2;
 
 	// Near plane culling:
 	// TODO: Replace with real triangle clipping!
@@ -7027,7 +6883,7 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(PShaderEngine* const pSha
 		earlyZTestDepthValue = depthStencil->GetRawDepthValueFromFloatDepth(minDepthValue);
 	}
 
-	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData(&v0, &v1, &v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
+	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData<shadeFromShader>(v0, v1, v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
 	for (int y = yMin; y <= yMax; y += SUBPIXEL_ACCURACY_BIASMULT)
 	{
 		// Reset at the next row:
@@ -7057,15 +6913,23 @@ void IDirect3DDevice9Hook::RasterizeTriangleFromShader(PShaderEngine* const pSha
 				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
 #else // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 
+				// TODO: This is a whole lot of non-SIMD maths happening here, that should really get fixed...
+				const __m128 barycentricFactors = _mm_set_ps(0.0f, (currentBarycentric2 - topleftEdgeBias2) * barycentricNormalizeFactor, (currentBarycentric1 - topleftEdgeBias1) * barycentricNormalizeFactor, (currentBarycentric0 - topleftEdgeBias0) * barycentricNormalizeFactor);
+
 #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 				LARGE_INTEGER pixelStartTime;
 				QueryPerformanceCounter(&pixelStartTime);
 #endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
-				ShadePixelFromShader(pShaderEngine, vs_psMapping, x, y, 
-					D3DXVECTOR3( (currentBarycentric0 - topleftEdgeBias0) * barycentricNormalizeFactor, 
-						(currentBarycentric1 - topleftEdgeBias1) * barycentricNormalizeFactor, 
-						(currentBarycentric2 - topleftEdgeBias2) * barycentricNormalizeFactor), 
-					currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, v0, v1, v2);
+				if (shadeFromShader)
+				{
+					ShadePixelFromShader(pShaderEngine, *(const VStoPSMapping* const)mappingData, x, y, 
+						barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2);
+				}
+				else
+				{
+					ShadePixelFromStream(pShaderEngine, *(const DeclarationSemanticMapping* const)mappingData, x, y, 
+						barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2);
+				}
 
 #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 				LARGE_INTEGER pixelEndTime;
@@ -7323,14 +7187,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, false, v0, v1, v2);
 #else
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
 #endif
 				break;
 			case D3DCULL_CW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i2, i1, false, v0, v2, v1);
 #else
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
 #endif
 				break;
 			case D3DCULL_NONE:
@@ -7338,8 +7202,8 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, false, v0, v1, v2);
 				CreateNewTriangleRasterJob(primitiveID + primCount /*hack*/, i0, i2, i1, false, v0, v2, v1);
 #else
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*hack*/, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*hack*/, i0, i2, i1);
 #endif
 				break;
 			}
@@ -7373,14 +7237,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, false, v0, v1, v2);
 #else
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
 #endif
 				break;
 			case D3DCULL_CW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i2, i1, false, v0, v2, v1);
 #else
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
 #endif
 				break;
 			case D3DCULL_NONE:
@@ -7388,8 +7252,8 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, false, v0, v1, v2);
 				CreateNewTriangleRasterJob(primitiveID + primCount /*hack*/, i0, i2, i1, false, v0, v2, v1);
 #else
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*hack*/, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*hack*/, i0, i2, i1);
 #endif
 				break;
 			}
@@ -7422,14 +7286,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, false, v0, v1, v2);
 #else
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
 #endif
 				break;
 			case D3DCULL_CW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i2, i1, false, v0, v2, v1);
 #else
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID, i0, i2, i1);
 #endif
 				break;
 			case D3DCULL_NONE:
@@ -7437,8 +7301,8 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, false, v0, v1, v2);
 				CreateNewTriangleRasterJob(primitiveID + primCount /*TODO: Hack*/, i0, i2, i1, false, v0, v2, v1);
 #else
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
-				RasterizeTriangleFromStream<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*TODO: Hack*/, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v1, (const D3DXVECTOR4* const)v2, fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, false>(&deviceMainPShaderEngine, &vertexDeclMapping, (const D3DXVECTOR4* const)v0, (const D3DXVECTOR4* const)v2, (const D3DXVECTOR4* const)v1, fWidth, fHeight, primitiveID + primCount /*TODO: Hack*/, i0, i2, i1);
 #endif
 				break;
 			}
@@ -7526,14 +7390,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
 #else
-				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
 #endif
 				break;
 			case D3DCULL_CW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i2, i1, true, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1]);
 #else
-				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
 #endif
 				break;
 			case D3DCULL_NONE:
@@ -7541,8 +7405,8 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
 				CreateNewTriangleRasterJob(primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1, true, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1]);
 #else
-				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
-				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
 #endif
 				break;
 			}
@@ -7581,14 +7445,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 					CreateNewTriangleRasterJob(primitiveID, i0, i2, i1, true, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1]);
 #else
-					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
+					RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
 #endif
 					break;
 				case D3DCULL_CW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 					CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
 #else
-					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
+					RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
 #endif
 					break;
 				case D3DCULL_NONE:
@@ -7596,8 +7460,8 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 					CreateNewTriangleRasterJob(primitiveID, i0, i2, i1, true, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1]);
 					CreateNewTriangleRasterJob(primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
 #else
-					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
-					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i1, i2);
+					RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
+					RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i1, i2);
 #endif
 					break;
 				}
@@ -7610,14 +7474,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 					CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
 #else
-					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
+					RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
 #endif
 					break;
 				case D3DCULL_CW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 					CreateNewTriangleRasterJob(primitiveID, i0, i2, i1, true, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1]);
 #else
-					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
+					RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
 #endif
 					break;
 				case D3DCULL_NONE:
@@ -7625,8 +7489,8 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 					CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
 					CreateNewTriangleRasterJob(primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1, true, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1]);
 #else
-					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
-					RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
+					RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
+					RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
 #endif
 					break;
 				}
@@ -7664,14 +7528,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
 #else
-				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
 #endif
 				break;
 			case D3DCULL_CW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i2, i1, true, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1]);
 #else
-				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1], fWidth, fHeight, primitiveID, i0, i2, i1);
 #endif
 				break;
 			case D3DCULL_NONE:
@@ -7679,8 +7543,8 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
 				CreateNewTriangleRasterJob(primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1, true, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1]);
 #else
-				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i1], processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
-				RasterizeTriangleFromShader<rasterizerUsesEarlyZTest>(&deviceMainPShaderEngine, vStoPSMapping, processedVertsBuffer[i0], processedVertsBuffer[i2], processedVertsBuffer[i1], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2], fWidth, fHeight, primitiveID, i0, i1, i2);
+				RasterizeTriangle<rasterizerUsesEarlyZTest, true>(&deviceMainPShaderEngine, &vStoPSMapping, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1], fWidth, fHeight, primitiveID + PrimitiveCount /*TODO: Hack*/, i0, i2, i1);
 #endif
 				break;
 			}
