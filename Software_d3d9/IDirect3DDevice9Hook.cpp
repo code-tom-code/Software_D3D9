@@ -207,7 +207,7 @@ static inline void PixelShadeJob1(slist_item& job, _threadItem* const myPtr)
 	}
 }
 
-/*static inline void PixelShadeJob4(slist_item& job, _threadItem* const myPtr)
+static inline void PixelShadeJob4(slist_item& job, _threadItem* const myPtr)
 {
 	const IDirect3DDevice9Hook* const devHook = myPtr->devHook;
 	const drawCallPixelJobData& drawCallData = devHook->currentDrawCallData.pixelData;
@@ -218,22 +218,25 @@ static inline void PixelShadeJob1(slist_item& job, _threadItem* const myPtr)
 
 	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
 
-	const D3DXVECTOR3 barycentricInterpolants(pixelJobData.barycentricA[0] * primitiveData->barycentricNormalizeFactor,
-		pixelJobData.barycentricB[0] * primitiveData->barycentricNormalizeFactor,
-		pixelJobData.barycentricC[0] * primitiveData->barycentricNormalizeFactor);
-	if (drawCallData.useShaderVerts)
+	// TODO: Actually shade in parallel, don't use a sequential FOR-loop here (need to fully implement ShadePixelFromShader4 and ShadePixelFromStream4)
+	for (unsigned x = 0; x < 4; ++x)
 	{
-		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
-		devHook->ShadePixelFromShader(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), pixelJobData.x[0], pixelJobData.y[0], 
-			barycentricInterpolants, drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
+		const __m128i barycentricCoordsVector = _mm_load_si128( (const __m128i* const)&pixelJobData.barycentricCoords[x]);
+		const __m128 barycentricCoordsVectorF = _mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordsVector), barycentricNormalizeFactor);
+		if (drawCallData.useShaderVerts)
+		{
+			const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
+			devHook->ShadePixelFromShader(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), pixelJobData.x[x], pixelJobData.y[x], 
+				barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
+		}
+		else
+		{
+			const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
+			devHook->ShadePixelFromStream(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), pixelJobData.x[x], pixelJobData.y[x], 
+				barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
+		}
 	}
-	else
-	{
-		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
-		devHook->ShadePixelFromStream(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), pixelJobData.x[0], pixelJobData.y[0], 
-			barycentricInterpolants, drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
-	}
-}*/
+}
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
@@ -373,9 +376,9 @@ static inline void WorkUntilNoMoreWork(void* const jobData)
 			PixelShadeJob1(*item, myPtr);
 			break;
 #ifdef RUN_SHADERS_IN_WARPS
-		/*case pixelShade4Job: // Important TODO: pixelShadeJob4
+		case pixelShade4Job:
 			PixelShadeJob4(*item, myPtr);
-			break;*/
+			break;
 #endif // #ifdef RUN_SHADERS_IN_WARPS
 
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
@@ -7449,7 +7452,13 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 	}
 
 #ifdef MULTITHREAD_SHADING
-	SynchronizeThreads<1>();
+	SynchronizeThreads<
+#if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+		4
+#else
+		1
+#endif
+	>();
 #endif
 }
 
@@ -7745,7 +7754,13 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 	//RefreshThreadpoolWork();
 	{
 		SIMPLE_NAME_SCOPE("SynchronizeThreads");
-		SynchronizeThreads<1>();
+		SynchronizeThreads<
+#if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+			4
+#else
+			1
+#endif
+		>();
 	}
 #endif
 }
