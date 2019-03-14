@@ -35,11 +35,14 @@ static const int SUBPIXEL_MIN_VALUE = MININT >> SUBPIXEL_ACCURACY_BITS;
 static const float SUBPIXEL_MAX_VALUEF = 8191.0f;//(const float)SUBPIXEL_MAX_VALUE;
 static const float SUBPIXEL_MIN_VALUEF = -8191.0f;//(const float)SUBPIXEL_MIN_VALUE;
 static const float SUBPIXEL_ACCURACY_BIASMULTF = (const float)SUBPIXEL_ACCURACY_BIASMULT;
+static const __m128 SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF = { SUBPIXEL_ACCURACY_BIASMULTF, SUBPIXEL_ACCURACY_BIASMULTF, SUBPIXEL_ACCURACY_BIASMULTF, SUBPIXEL_ACCURACY_BIASMULTF };
 static const D3DXVECTOR4 zeroVec(0.0f, 0.0f, 0.0f, 0.0f);
 static const D3DXVECTOR4 vertShaderInputRegisterDefault(0.0f, 0.0f, 0.0f, 1.0f);
 
 static const D3DXVECTOR4 staticColorWhiteOpaque(1.0f, 1.0f, 1.0f, 1.0f);
 static const D3DXVECTOR4 staticColorBlackTranslucent(0.0f, 0.0f, 0.0f, 0.0f);
+static const __m128 guardBandMin = { -8192.0f, -8192.0f, -8192.0f, -8192.0f };
+static const __m128 guardBandMax = { 8192.0f, 8192.0f, 8192.0f, 8192.0f };
 
 static const __m128 zeroMaskVec = { 0.0f, 0.0f, 0.0f, 0.0f };
 static const __m128i zeroMaskVecI = { 0 };
@@ -6690,7 +6693,6 @@ void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine
 
 static inline const bool isTopLeftEdge(const int2& v0, const int2& v1)
 {
-	//return (v1.y < v0.y) | (v0.x < v1.x);
 	const int dx = v1.x - v0.x;
 	const int dy = v1.y - v0.y;
 	return ( (dy < 0) || ( (dy == 0) && (dx < 0) ) );
@@ -6760,88 +6762,59 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	const D3DXVECTOR4& pos1 = shadeFromShader ? currentState.currentVertexShader->GetPosition(*(const VS_2_0_OutputRegisters* const)v1) : *(const D3DXVECTOR4* const)v1;
 	const D3DXVECTOR4& pos2 = shadeFromShader ? currentState.currentVertexShader->GetPosition(*(const VS_2_0_OutputRegisters* const)v2) : *(const D3DXVECTOR4* const)v2;
 
+	const __m128 pos0vec = *(const __m128* const)&pos0;
+	const __m128 pos1vec = *(const __m128* const)&pos1;
+	const __m128 pos2vec = *(const __m128* const)&pos2;
+
 	// Near plane culling:
 	// TODO: Replace with real triangle clipping!
-	if (pos0.z < 0.0f || pos0.z > 1.0f)
-		return;
-	if (pos1.z < 0.0f || pos1.z > 1.0f)
-		return;
-	if (pos2.z < 0.0f || pos2.z > 1.0f)
+	const __m128 zCullVec = { pos0vec.m128_f32[2], pos1vec.m128_f32[2], pos2vec.m128_f32[2], 0.0f };
+	// if (posN.z < 0.0f || posN.z > 1.0f) return;
+	if (_mm_movemask_ps(_mm_or_ps(_mm_cmplt_ps(zCullVec, *(const __m128* const)&zeroVec), _mm_cmpgt_ps(zCullVec, *(const __m128* const)&staticColorWhiteOpaque) ) ) & 0x7)
 		return;
 
 	// Compute screenspace bounds for this triangle:
-	D3DXVECTOR2 topleft(pos0.x, pos0.y);
-	D3DXVECTOR2 botright(topleft);
-	if (pos1.x < topleft.x)
-		topleft.x = pos1.x;
-	if (pos2.x < topleft.x)
-		topleft.x = pos2.x;
-	if (pos1.y < topleft.y)
-		topleft.y = pos1.y;
-	if (pos2.y < topleft.y)
-		topleft.y = pos2.y;
-	if (pos1.x > botright.x)
-		botright.x = pos1.x;
-	if (pos2.x > botright.x)
-		botright.x = pos2.x;
-	if (pos1.y > botright.y)
-		botright.y = pos1.y;
-	if (pos2.y > botright.y)
-		botright.y = pos2.y;
+	__m128 topleft = _mm_min_ps(_mm_min_ps(pos0vec, pos1vec), pos2vec);
+	__m128 botright = _mm_max_ps(_mm_max_ps(pos0vec, pos1vec), pos2vec);
+
+	__m128 bounds = _mm_shuffle_ps(topleft, botright, _MM_SHUFFLE(1, 0, 1, 0) );
 
 	// Cull triangles that intersect the guard band:
 	// TODO: Replace with real triangle clipping!
-	if (topleft.x < -8192.0f || topleft.x > 8192.0f)
-		return;
-	if (topleft.y < -8192.0f || topleft.y > 8192.0f)
-		return;
-	if (botright.x < -8192.0f || botright.x > 8192.0f)
-		return;
-	if (botright.y < -8192.0f || botright.y > 8192.0f)
+	if (_mm_movemask_ps(_mm_or_ps(_mm_cmplt_ps(bounds, guardBandMin), _mm_cmpgt_ps(bounds, guardBandMax) ) ) )
 		return;
 
 	// Clip screenspace bounds to the screen size:
-	if (topleft.x < 0)
-		topleft.x = 0;
-	if (topleft.y < 0)
-		topleft.y = 0;
-	if (botright.x > fWidth)
-		botright.x = fWidth;
-	if (botright.y > fHeight)
-		botright.y = fHeight;
+	topleft = _mm_max_ps(topleft, *(const __m128* const)&zeroVec);
+	botright = _mm_min_ps(botright, _mm_set_ps(0.0f, 0.0f, fHeight, fWidth) );
 
 	// Clip to the scissor rect, if enabled
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.scissorTestEnable)
 	{
-		if (topleft.x < currentState.currentScissorRect.fleft)
-			topleft.x = currentState.currentScissorRect.fleft;
-		if (topleft.y < currentState.currentScissorRect.ftop)
-			topleft.y = currentState.currentScissorRect.ftop;
-		if (botright.x > currentState.currentScissorRect.fright)
-			botright.x = currentState.currentScissorRect.fright;
-		if (botright.y > currentState.currentScissorRect.fbottom)
-			botright.y = currentState.currentScissorRect.fbottom;
+		topleft = _mm_max_ps(topleft, _mm_set_ps(0.0f, 0.0f, currentState.currentScissorRect.ftop, currentState.currentScissorRect.fleft) );
+		botright = _mm_min_ps(botright, _mm_set_ps(0.0f, 0.0f, currentState.currentScissorRect.fbottom, currentState.currentScissorRect.fright) );
 	}
 
-	topleft.x *= SUBPIXEL_ACCURACY_BIASMULTF;
-	topleft.y *= SUBPIXEL_ACCURACY_BIASMULTF;
-	botright.x *= SUBPIXEL_ACCURACY_BIASMULTF;
-	botright.y *= SUBPIXEL_ACCURACY_BIASMULTF;
+	bounds = _mm_shuffle_ps(topleft, botright, _MM_SHUFFLE(1, 0, 1, 0) );
+	bounds = _mm_mul_ps(bounds, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF);
 
+	const __m128i i0vec = _mm_cvtps_epi32(_mm_mul_ps(pos0vec, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF) );
+	const __m128i i1vec = _mm_cvtps_epi32(_mm_mul_ps(pos1vec, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF) );
+	const __m128i i2vec = _mm_cvtps_epi32(_mm_mul_ps(pos2vec, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF) );
 	int2 i0, i1, i2;
-	i0.x = (const int)(pos0.x * SUBPIXEL_ACCURACY_BIASMULTF);
-	i0.y = (const int)(pos0.y * SUBPIXEL_ACCURACY_BIASMULTF);
-	i1.x = (const int)(pos1.x * SUBPIXEL_ACCURACY_BIASMULTF);
-	i1.y = (const int)(pos1.y * SUBPIXEL_ACCURACY_BIASMULTF);
-	i2.x = (const int)(pos2.x * SUBPIXEL_ACCURACY_BIASMULTF);
-	i2.y = (const int)(pos2.y * SUBPIXEL_ACCURACY_BIASMULTF);
-
-	const int xMin = (const int)topleft.x;
-	const int yMin = (const int)topleft.y;
-	const int xMax = (const int)botright.x;
-	const int yMax = (const int)botright.y;
+	i0.x = i0vec.m128i_i32[0];
+	i0.y = i0vec.m128i_i32[1];
+	i1.x = i1vec.m128i_i32[0];
+	i1.y = i1vec.m128i_i32[1];
+	i2.x = i2vec.m128i_i32[0];
+	i2.y = i2vec.m128i_i32[1];
 
 	// Early out on zero area triangles
+	const __m128i intBounds = _mm_cvtps_epi32(bounds);
+	const int xMin = intBounds.m128i_i32[0];
+	const int yMin = intBounds.m128i_i32[1];
+	const int xMax = intBounds.m128i_i32[2];
+	const int yMax = intBounds.m128i_i32[3];
 	if (!(yMin <= yMax && xMin < xMax) )
 		return;
 
@@ -6853,22 +6826,25 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	const int twiceTriangleArea = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, i2.x, i2.y);
 	const float barycentricNormalizeFactor = 1.0f / twiceTriangleArea;
 
-	const int barycentricXDelta0 = i0.y - i1.y;
-	const int barycentricXDelta1 = i1.y - i2.y;
-	const int barycentricXDelta2 = i2.y - i0.y;
+	const __m128i y0011 = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(i0vec), _mm_castsi128_ps(i1vec), _MM_SHUFFLE(1, 1, 1, 1) ) ); // Shuffles to be: i0.y, i0.y, i1.y, i1.y
+	const __m128i y012 = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(y0011), _mm_castsi128_ps(i2vec), _MM_SHUFFLE(0, 1, 2, 0) ) ); // Shuffles to be: i0.y, i1.y, i2.y, i2.x
+	const __m128i y120 = _mm_shuffle_epi32(y012, _MM_SHUFFLE(0, 0, 2, 1) ); // Shuffles to be: i1.y, i2.y, i0.y, i0.y
+	const __m128i barycentricXDelta = _mm_shuffle_epi32(_mm_sub_epi32(y012, y120), _MM_SHUFFLE(0, 0, 2, 1) ); // Shuffles to be barycentricXDelta1, barycentricXDelta2, barycentricXDelta0
 
-	const int barycentricYDelta0 = i1.x - i0.x;
-	const int barycentricYDelta1 = i2.x - i1.x;
-	const int barycentricYDelta2 = i0.x - i2.x;
+	const __m128i x0011 = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(i0vec), _mm_castsi128_ps(i1vec), _MM_SHUFFLE(0, 0, 0, 0) ) ); // Shuffles to be: i0.x, i0.x, i1.x, i1.x
+	const __m128i x012 = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(x0011), _mm_castsi128_ps(i2vec), _MM_SHUFFLE(0, 0, 2, 0) ) ); // Shuffles to be: i0.x, i1.x, i2.x, i2.x
+	const __m128i x120 = _mm_shuffle_epi32(x012, _MM_SHUFFLE(0, 0, 2, 1) ); // Shuffles to be: i1.x, i2.x, i0.x, i0.x
+	const __m128i barycentricYDelta = _mm_shuffle_epi32(_mm_sub_epi32(x120, x012), _MM_SHUFFLE(0, 0, 2, 1) ); // Shuffles to be barycentricYDelta1, barycentricYDelta2, barycentricYDelta0
 
 	// Correct for top-left rule. Source: https://fgiesen.wordpress.com/2013/02/08/triangle-rasterization-in-practice/
 	const char topleftEdgeBias0 = isTopLeftEdge(i1, i2) ? 0 : -1;
 	const char topleftEdgeBias1 = isTopLeftEdge(i2, i0) ? 0 : -1;
 	const char topleftEdgeBias2 = isTopLeftEdge(i0, i1) ? 0 : -1;
 
-	int row0 = computeEdgeSidedness(i1.x, i1.y, i2.x, i2.y, xMin, yMin) + topleftEdgeBias0;
-	int row1 = computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin) + topleftEdgeBias1;
-	int row2 = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin) + topleftEdgeBias2;
+	const __m128i topleftEdgeBias = _mm_set_epi32(0, topleftEdgeBias2, topleftEdgeBias1, topleftEdgeBias0);
+
+	const __m128 barycentricNormalizeFactorSplattedF = _mm_set1_ps(barycentricNormalizeFactor);
+	__m128i rowReset = _mm_add_epi32(_mm_set_epi32(0, computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin), computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin), computeEdgeSidedness(i1.x, i1.y, i2.x, i2.y, xMin, yMin) ), topleftEdgeBias);
 
 	unsigned earlyZTestDepthValue;
 	const IDirect3DSurface9Hook* depthStencil;
@@ -6887,14 +6863,12 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	for (int y = yMin; y <= yMax; y += SUBPIXEL_ACCURACY_BIASMULT)
 	{
 		// Reset at the next row:
-		int currentBarycentric0 = row0;
-		int currentBarycentric1 = row1;
-		int currentBarycentric2 = row2;
+		__m128i currentBarycentric = rowReset;
 
 		for (int x = xMin; x < xMax; x += SUBPIXEL_ACCURACY_BIASMULT)
 		{
 			// Is our test-pixel inside all three triangle edges?
-			if ( (currentBarycentric0 | currentBarycentric1 | currentBarycentric2) >= 0)
+			if ( (_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpgt_epi32(currentBarycentric, oneMaskVec) ) ) & 0x7) == 0x7)
 			{
 				if (rasterizerUsesEarlyZTest)
 				{
@@ -6903,18 +6877,16 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 					// TODO: Don't assume less-than test for Z CMPFUNC
 					if (compareDepth < earlyZTestDepthValue)
 					{
-						currentBarycentric0 += barycentricXDelta1;
-						currentBarycentric1 += barycentricXDelta2;
-						currentBarycentric2 += barycentricXDelta0;
+						currentBarycentric = _mm_add_epi32(currentBarycentric, barycentricXDelta);
 						continue;
 					}
 				}
+				const __m128i barycentricAdjusted = _mm_sub_epi32(currentBarycentric, topleftEdgeBias);
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-				CreateNewPixelShadeJob(x, y, currentBarycentric0 - topleftEdgeBias0, currentBarycentric1 - topleftEdgeBias1, currentBarycentric2 - topleftEdgeBias2, primitiveData);
+				CreateNewPixelShadeJob(x, y, barycentricAdjusted.m128i_i32[0], barycentricAdjusted.m128i_i32[1], barycentricAdjusted.m128i_i32[2], primitiveData);
 #else // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 
-				// TODO: This is a whole lot of non-SIMD maths happening here, that should really get fixed...
-				const __m128 barycentricFactors = _mm_set_ps(0.0f, (currentBarycentric2 - topleftEdgeBias2) * barycentricNormalizeFactor, (currentBarycentric1 - topleftEdgeBias1) * barycentricNormalizeFactor, (currentBarycentric0 - topleftEdgeBias0) * barycentricNormalizeFactor);
+				const __m128 barycentricFactors = _mm_mul_ps(_mm_cvtepi32_ps(barycentricAdjusted), barycentricNormalizeFactorSplattedF);
 
 #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 				LARGE_INTEGER pixelStartTime;
@@ -6942,14 +6914,10 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 #endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 			}
 
-			currentBarycentric0 += barycentricXDelta1;
-			currentBarycentric1 += barycentricXDelta2;
-			currentBarycentric2 += barycentricXDelta0;
+			currentBarycentric = _mm_add_epi32(currentBarycentric, barycentricXDelta);
 		}
 
-		row0 += barycentricYDelta1;
-		row1 += barycentricYDelta2;
-		row2 += barycentricYDelta0;
+		rowReset = _mm_add_epi32(rowReset, barycentricYDelta);
 	}
 }
 
