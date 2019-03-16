@@ -1289,7 +1289,7 @@ static const __m128 ColorDWORDToFloat4Divisor = { 1.0f / 255.0f, 1.0f / 255.0f, 
 template <const unsigned char writeMask = 0xF>
 inline void ColorDWORDToFloat4(const D3DCOLOR inColor, D3DXVECTOR4& outColor)
 {
-	const __m128i colorbyte4 = _mm_set1_epi32(inColor);
+	const __m128i colorbyte4 = _mm_castps_si128(_mm_load_ss( (const float* const)&inColor) );
 	const __m128i coloruint4 = _mm_cvtepu8_epi32(colorbyte4);
 	const __m128 colorfloat4 = _mm_cvtepi32_ps(coloruint4);
 	const __m128 normalizedColorFloat4 = _mm_mul_ps(colorfloat4, ColorDWORDToFloat4Divisor);
@@ -1319,10 +1319,10 @@ inline void ColorDWORDToFloat4_4(const D3DCOLOR** const inColor4, D3DXVECTOR4* c
 {
 	const __m128i colorbyte4[4] = 
 	{
-		_mm_set1_epi32(*inColor4[0]),
-		_mm_set1_epi32(*inColor4[1]),
-		_mm_set1_epi32(*inColor4[2]),
-		_mm_set1_epi32(*inColor4[3])
+		_mm_castps_si128(_mm_load_ss( (const float* const)inColor4[0]) ),
+		_mm_castps_si128(_mm_load_ss( (const float* const)inColor4[1]) ),
+		_mm_castps_si128(_mm_load_ss( (const float* const)inColor4[2]) ),
+		_mm_castps_si128(_mm_load_ss( (const float* const)inColor4[3]) )
 	};
 
 	const __m128i coloruint4[4] = 
