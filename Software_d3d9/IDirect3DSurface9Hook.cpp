@@ -194,54 +194,59 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSurface9Hook::GetContain
 	return ret;
 }
 
-COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSurface9Hook::GetDesc(THIS_ D3DSURFACE_DESC *pDesc)
-{
-	if (!pDesc)
-		return D3DERR_INVALIDCALL;
-
 #ifdef _DEBUG
-	HRESULT ret = realObject->GetDesc(pDesc);
+void IDirect3DSurface9Hook::ValidateRealObjectDesc() const
+{
+	D3DSURFACE_DESC desc = {};
+	HRESULT ret = realObject->GetDesc(&desc);
 	if (FAILED(ret) )
 	{
 		// We should have caught this error, but didn't for some reason
 		__debugbreak();
 	}
 
-	if (pDesc != NULL)
+	if (desc.Width != InternalWidth)
 	{
-		if (pDesc->Width != InternalWidth)
-		{
-			__debugbreak();
-		}
-		if (pDesc->Height != InternalHeight)
-		{
-			__debugbreak();
-		}
-		if (pDesc->Format != InternalFormat)
-		{
-			__debugbreak();
-		}
-		if (pDesc->Pool != InternalPool)
-		{
-			__debugbreak();
-		}
-		if (pDesc->Usage != InternalUsage)
-		{
-			__debugbreak();
-		}
-		if (pDesc->Type != D3DRTYPE_SURFACE)
-		{
-			__debugbreak();
-		}
-		if (pDesc->MultiSampleType != InternalMultiSampleType)
-		{
-			__debugbreak();
-		}
-		if (pDesc->MultiSampleQuality != InternalMultiSampleQuality)
-		{
-			__debugbreak();
-		}
+		__debugbreak();
 	}
+	if (desc.Height != InternalHeight)
+	{
+		__debugbreak();
+	}
+	if (desc.Format != InternalFormat)
+	{
+		__debugbreak();
+	}
+	if (desc.Pool != InternalPool)
+	{
+		__debugbreak();
+	}
+	if (desc.Usage != InternalUsage)
+	{
+		__debugbreak();
+	}
+	if (desc.Type != D3DRTYPE_SURFACE)
+	{
+		__debugbreak();
+	}
+	if (desc.MultiSampleType != InternalMultiSampleType)
+	{
+		__debugbreak();
+	}
+	if (desc.MultiSampleQuality != InternalMultiSampleQuality)
+	{
+		__debugbreak();
+	}
+}
+#endif
+
+COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSurface9Hook::GetDesc(THIS_ D3DSURFACE_DESC *pDesc)
+{
+	if (!pDesc)
+		return D3DERR_INVALIDCALL;
+
+#ifdef _DEBUG
+	ValidateRealObjectDesc();
 #endif
 
 	pDesc->Width = InternalWidth;
@@ -1386,6 +1391,10 @@ void IDirect3DSurface9Hook::CreateOffscreenPlainSurface(UINT _Width, UINT _Heigh
 #ifdef WITH_SURFACE_HASHING
 	RecomputeSurfaceHash();
 #endif
+
+#ifdef _DEBUG
+	ValidateRealObjectDesc();
+#endif
 }
 
 void IDirect3DSurface9Hook::CreateDepthStencilSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DMULTISAMPLE_TYPE _MultiSample, DWORD _MultisampleQuality, BOOL _Discard)
@@ -1397,7 +1406,7 @@ void IDirect3DSurface9Hook::CreateDepthStencilSurface(UINT _Width, UINT _Height,
 	DiscardRT = _Discard;
 	LockableRT = FALSE;
 	InternalPool = D3DPOOL_DEFAULT;
-	InternalUsage = (const DebuggableUsage)(D3DUSAGE_RENDERTARGET | D3DUSAGE_DEPTHSTENCIL);
+	InternalUsage = (const DebuggableUsage)(D3DUSAGE_DEPTHSTENCIL); // Important not to mark this with the D3DUSAGE_RENDERTARGET Usage because that will get a Usage-mismatch with real D3D9!
 	UpdateCachedValuesOnCreate();
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
@@ -1422,6 +1431,10 @@ void IDirect3DSurface9Hook::CreateDepthStencilSurface(UINT _Width, UINT _Height,
 
 #ifdef WITH_SURFACE_HASHING
 	RecomputeSurfaceHash();
+#endif
+
+#ifdef _DEBUG
+	ValidateRealObjectDesc();
 #endif
 }
 
@@ -1459,6 +1472,10 @@ void IDirect3DSurface9Hook::CreateRenderTarget(UINT _Width, UINT _Height, D3DFOR
 
 #ifdef WITH_SURFACE_HASHING
 	RecomputeSurfaceHash();
+#endif
+
+#ifdef _DEBUG
+	ValidateRealObjectDesc();
 #endif
 }
 
@@ -1503,6 +1520,10 @@ void IDirect3DSurface9Hook::CreateTextureImplicitSurface(UINT _Width, UINT _Heig
 #ifdef WITH_SURFACE_HASHING
 	RecomputeSurfaceHash();
 #endif
+
+#ifdef _DEBUG
+	ValidateRealObjectDesc();
+#endif
 }
 
 void IDirect3DSurface9Hook::CreateDeviceImplicitSurface(const D3DPRESENT_PARAMETERS& d3dpp)
@@ -1545,6 +1566,10 @@ void IDirect3DSurface9Hook::CreateDeviceImplicitSurface(const D3DPRESENT_PARAMET
 #ifdef WITH_SURFACE_HASHING
 	RecomputeSurfaceHash();
 #endif
+
+#ifdef _DEBUG
+	ValidateRealObjectDesc();
+#endif
 }
 
 void IDirect3DSurface9Hook::CreateDeviceImplicitDepthStencil(const D3DPRESENT_PARAMETERS& d3dpp)
@@ -1585,6 +1610,10 @@ void IDirect3DSurface9Hook::CreateDeviceImplicitDepthStencil(const D3DPRESENT_PA
 
 #ifdef WITH_SURFACE_HASHING
 	RecomputeSurfaceHash();
+#endif
+
+#ifdef _DEBUG
+	ValidateRealObjectDesc();
 #endif
 }
 

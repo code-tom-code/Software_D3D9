@@ -158,6 +158,10 @@ public:
     virtual COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE GetDC(THIS_ HDC *phdc) override;
     virtual COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE ReleaseDC(THIS_ HDC hdc) override;
 
+#ifdef _DEBUG
+	void ValidateRealObjectDesc() const;
+#endif
+
 	static const unsigned GetSurfaceSizeBytes(const unsigned Width, const unsigned Height, const D3DFORMAT Format);
 	static const unsigned GetSurfacePitchBytes(const unsigned Width, const D3DFORMAT Format);
 
