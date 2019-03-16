@@ -17,6 +17,7 @@
 COM_DECLSPEC_NOTHROW UINT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetAvailableTextureMem(THIS)
 {
 	UINT ret = d3d9dev->GetAvailableTextureMem();
+	// TODO: Implement this...
 	return ret;
 }
 
@@ -115,6 +116,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetDisplayM
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetCreationParameters(THIS_ D3DDEVICE_CREATION_PARAMETERS *pParameters)
 {
 	HRESULT ret = d3d9dev->GetCreationParameters(pParameters);
+	// TODO: Implement this...
 	return ret;
 }
 
@@ -257,8 +259,29 @@ COM_DECLSPEC_NOTHROW void STDMETHODCALLTYPE IDirect3DDevice9Hook::GetGammaRamp(T
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetRenderTargetData(THIS_ IDirect3DSurface9* pRenderTarget, IDirect3DSurface9* pDestSurface)
 {
-	// TODO: Implement this
-	HRESULT ret = d3d9dev->GetRenderTargetData(pRenderTarget, pDestSurface);
+	IDirect3DSurface9Hook* renderTargetHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pRenderTarget);
+	if (renderTargetHookPtr)
+		pRenderTarget = renderTargetHookPtr->GetUnderlyingSurface();
+#ifdef _DEBUG
+	else if (pRenderTarget != NULL)
+	{
+		DbgBreakPrint("Error: GetRenderTargetData called with a non-hooked render target pointer");
+	}
+#endif
+	IDirect3DSurface9Hook* destHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pDestSurface);
+	if (destHookPtr)
+		pDestSurface = destHookPtr->GetUnderlyingSurface();
+#ifdef _DEBUG
+	else if (pDestSurface != NULL)
+	{
+		DbgBreakPrint("Error: GetRenderTargetData called with a non-hooked dest surface pointer");
+	}
+#endif
+	HRESULT ret = d3d9dev->GetRenderTargetData(renderTargetHookPtr ? renderTargetHookPtr->GetUnderlyingSurface() : NULL, destHookPtr ? destHookPtr->GetUnderlyingSurface() : NULL);
+	if (SUCCEEDED(ret) )
+	{
+		// TODO: Implement this...
+	}
 	return ret;
 }
 
