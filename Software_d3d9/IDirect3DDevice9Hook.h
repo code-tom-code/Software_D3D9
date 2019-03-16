@@ -1151,16 +1151,14 @@ public:
 #ifdef MULTITHREAD_SHADING
 	void CreateNewVertexShadeJob(VS_2_0_OutputRegisters* const * const outputRegs, const unsigned* const vertexIndices, const workerJobType jobWidth) const;
 
-#if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-	void CreateNewPixelShadeJob(const unsigned x, const unsigned y, const int barycentricA, const int barycentricB, const int barycentricC, const primitivePixelJobData* const primitiveData) const;
-	void CreateNewPixelShadeJob4(const unsigned x, const unsigned y, const __m128i barycentrics0, const __m128i barycentrics1, const __m128i barycentrics2, const __m128i barycentrics3, const primitivePixelJobData* const primitiveData) const;
-#endif
-
 #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 	void CreateNewTriangleRasterJob(const UINT primitiveID, const UINT vertID0, const UINT vertID1, const UINT vertID2, const bool rasterizeFromShader, const void* const vert0, const void* const vert1, const void* const vert2) const;
-#endif
+#endif // #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 
 #endif // #ifdef MULTITHREAD_SHADING
+
+	void CreateNewPixelShadeJob(const unsigned x, const unsigned y, const __m128i barycentricAdjusted, const primitivePixelJobData* const primitiveData) const;
+	void CreateNewPixelShadeJob4(const __m128i x4, const __m128i y4, const __m128i (&barycentricsAdjusted4)[4], const primitivePixelJobData* const primitiveData) const;
 
 	// TODO: Find another way to do this other than mutable
 	mutable primitivePixelJobData allPrimitiveJobData[1024 * 1024];

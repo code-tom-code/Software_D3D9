@@ -48,6 +48,13 @@ static const D3DXVECTOR4 staticColorBlackTranslucent(0.0f, 0.0f, 0.0f, 0.0f);
 static const __m128 guardBandMin = { -8192.0f, -8192.0f, -8192.0f, -8192.0f };
 static const __m128 guardBandMax = { 8192.0f, 8192.0f, 8192.0f, 8192.0f };
 
+static const unsigned sevenVecBytes[4] = { 0x7, 0x7, 0x7, 0x7 };
+static const __m128i sevenVec = *(const __m128i* const)sevenVecBytes;
+static const unsigned x4quadOffsetBytes[4] = { 0, 1, 0, 1 };
+static const __m128i x4quadOffset = *(const __m128i* const)x4quadOffsetBytes;
+static const unsigned y4quadOffsetBytes[4] = { 0, 0, 1, 1 };
+static const __m128i y4quadOffset = *(const __m128i* const)y4quadOffsetBytes;
+
 static const __m128 zeroMaskVec = { 0.0f, 0.0f, 0.0f, 0.0f };
 static const __m128i zeroMaskVecI = { 0 };
 static const unsigned oneMaskVecBytes[4] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
@@ -3068,65 +3075,6 @@ void IDirect3DDevice9Hook::CreateNewVertexShadeJob(VS_2_0_OutputRegisters* const
 	++workStatus.numJobs;
 }
 
-#if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsigned y, const int barycentricA, const int barycentricB, const int barycentricC, const primitivePixelJobData* const primitiveData) const
-{
-	slist_item* const newItem = GetNewWorkerJob<true>();
-	newItem->jobType = pixelShade1Job;
-	slist_item::_jobData::_pixelJobData& pixelJobData = newItem->jobData.pixelJobData;
-#ifdef _DEBUG
-	if (!primitiveData)
-	{
-		__debugbreak();
-	}
-#endif
-	pixelJobData.primitiveData = primitiveData;
-	pixelJobData.x[0] = x;
-	pixelJobData.y[0] = y;
-	pixelJobData.barycentricCoords[0].a = barycentricA;
-	pixelJobData.barycentricCoords[0].b = barycentricB;
-	pixelJobData.barycentricCoords[0].c = barycentricC;
-
-	++workStatus.numJobs;
-}
-
-/*void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const unsigned x, const unsigned y, const int (&barycentricA)[4], const int (&barycentricB)[4], const int (&barycentricC)[4], const primitivePixelJobData* const primitiveData) const
-{
-	slist_item* const newItem = GetNewWorkerJob<true>();
-	newItem->jobType = pixelShade4Job;
-	slist_item::_jobData::_pixelJobData& pixelJobData = newItem->jobData.pixelJobData;
-#ifdef _DEBUG
-	if (!primitiveData)
-	{
-		__debugbreak();
-	}
-#endif
-	pixelJobData.primitiveData = primitiveData;
-	pixelJobData.x[0] = x;
-	pixelJobData.x[1] = x + 1;
-	pixelJobData.x[2] = x;
-	pixelJobData.x[3] = x + 1;
-	pixelJobData.y[0] = y;
-	pixelJobData.y[1] = y;
-	pixelJobData.y[2] = y + 1;
-	pixelJobData.y[3] = y + 1;
-	pixelJobData.barycentricCoords[0].a = barycentricA[0];
-	pixelJobData.barycentricCoords[0].b = barycentricB[0];
-	pixelJobData.barycentricCoords[0].c = barycentricC[0];
-	pixelJobData.barycentricCoords[1].a = barycentricA[1];
-	pixelJobData.barycentricCoords[1].b = barycentricB[1];
-	pixelJobData.barycentricCoords[1].c = barycentricC[1];
-	pixelJobData.barycentricCoords[2].a = barycentricA[2];
-	pixelJobData.barycentricCoords[2].b = barycentricB[2];
-	pixelJobData.barycentricCoords[2].c = barycentricC[2];
-	pixelJobData.barycentricCoords[3].a = barycentricA[3];
-	pixelJobData.barycentricCoords[3].b = barycentricB[3];
-	pixelJobData.barycentricCoords[3].c = barycentricC[3];
-
-	++workStatus.numJobs;
-}*/
-#endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-
 #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 void IDirect3DDevice9Hook::CreateNewTriangleRasterJob(const UINT primitiveID, const UINT vertID0, const UINT vertID1, const UINT vertID2, const bool rasterizeFromShader, const void* const vert0, const void* const vert1, const void* const vert2) const
 {
@@ -3159,6 +3107,100 @@ void IDirect3DDevice9Hook::CreateNewTriangleRasterJob(const UINT primitiveID, co
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 
 #endif // #ifdef MULTITHREAD_SHADING
+
+void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsigned y, const __m128i barycentricAdjusted, const primitivePixelJobData* const primitiveData) const
+{
+#if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+	slist_item* const newItem = GetNewWorkerJob<true>();
+	newItem->jobType = pixelShade1Job;
+	slist_item::_jobData::_pixelJobData& pixelJobData = newItem->jobData.pixelJobData;
+#ifdef _DEBUG
+	if (!primitiveData)
+	{
+		__debugbreak();
+	}
+#endif
+	pixelJobData.primitiveData = primitiveData;
+	pixelJobData.x[0] = x;
+	pixelJobData.y[0] = y;
+	pixelJobData.barycentricCoords[0].a = barycentricAdjusted.m128i_i32[0];
+	pixelJobData.barycentricCoords[0].b = barycentricAdjusted.m128i_i32[1];
+	pixelJobData.barycentricCoords[0].c = barycentricAdjusted.m128i_i32[2];
+
+	++workStatus.numJobs;
+#else // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+	const __m128 barycentricFactors = _mm_mul_ps(_mm_cvtepi32_ps(barycentricAdjusted), _mm_set1_ps(primitiveData->barycentricNormalizeFactor) );
+
+#ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+	LARGE_INTEGER pixelStartTime;
+	QueryPerformanceCounter(&pixelStartTime);
+#endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+	if (currentDrawCallData.pixelData.useShaderVerts)
+	{
+		ShadePixelFromShader(&deviceMainPShaderEngine, *currentDrawCallData.pixelData.vs_to_ps_mappings.vs_psMapping, 
+			x, y, barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, 
+			*primitiveData->pixelShadeVertexData.shadeFromShader.v0, *primitiveData->pixelShadeVertexData.shadeFromShader.v1, *primitiveData->pixelShadeVertexData.shadeFromShader.v2);
+	}
+	else
+	{
+		ShadePixelFromStream(&deviceMainPShaderEngine, *currentDrawCallData.pixelData.vs_to_ps_mappings.vertexDeclMapping, 
+			x, y, barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, 
+			primitiveData->pixelShadeVertexData.shadeFromStream.v0, primitiveData->pixelShadeVertexData.shadeFromStream.v1, primitiveData->pixelShadeVertexData.shadeFromStream.v2);
+	}
+#ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+	LARGE_INTEGER pixelEndTime;
+	QueryPerformanceCounter(&pixelEndTime);
+
+	totalPixelShadeTicks += (pixelEndTime.QuadPart - pixelStartTime.QuadPart);
+	++numPixelShadeTasks;
+#endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
+
+#endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+}
+
+void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m128i y4, const __m128i (&barycentricsAdjusted4)[4], const primitivePixelJobData* const primitiveData) const
+{
+#if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+	slist_item* const newItem = GetNewWorkerJob<true>();
+	newItem->jobType = pixelShade4Job;
+	slist_item::_jobData::_pixelJobData& pixelJobData = newItem->jobData.pixelJobData;
+#ifdef _DEBUG
+	if (!primitiveData)
+	{
+		__debugbreak();
+	}
+#endif
+	pixelJobData.primitiveData = primitiveData;
+	pixelJobData.x[0] = x4.m128i_i32[0];
+	pixelJobData.x[1] = x4.m128i_i32[1];
+	pixelJobData.x[2] = x4.m128i_i32[0];
+	pixelJobData.x[3] = x4.m128i_i32[1];
+	pixelJobData.y[0] = y4.m128i_i32[0];
+	pixelJobData.y[1] = y4.m128i_i32[0];
+	pixelJobData.y[2] = y4.m128i_i32[2];
+	pixelJobData.y[3] = y4.m128i_i32[2];
+	pixelJobData.barycentricCoords[0].a = barycentricsAdjusted4[0].m128i_i32[0];
+	pixelJobData.barycentricCoords[0].b = barycentricsAdjusted4[0].m128i_i32[1];
+	pixelJobData.barycentricCoords[0].c = barycentricsAdjusted4[0].m128i_i32[2];
+	pixelJobData.barycentricCoords[1].a = barycentricsAdjusted4[1].m128i_i32[0];
+	pixelJobData.barycentricCoords[1].b = barycentricsAdjusted4[1].m128i_i32[1];
+	pixelJobData.barycentricCoords[1].c = barycentricsAdjusted4[1].m128i_i32[2];
+	pixelJobData.barycentricCoords[2].a = barycentricsAdjusted4[2].m128i_i32[0];
+	pixelJobData.barycentricCoords[2].b = barycentricsAdjusted4[2].m128i_i32[1];
+	pixelJobData.barycentricCoords[2].c = barycentricsAdjusted4[2].m128i_i32[2];
+	pixelJobData.barycentricCoords[3].a = barycentricsAdjusted4[3].m128i_i32[0];
+	pixelJobData.barycentricCoords[3].b = barycentricsAdjusted4[3].m128i_i32[1];
+	pixelJobData.barycentricCoords[3].c = barycentricsAdjusted4[3].m128i_i32[2];
+
+	++workStatus.numJobs;
+#else // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+	for (unsigned z = 0; z < 4; ++z)
+	{
+		// TODO: Replace this with ShadePixelFromShader4 and ShadePixelFromStream4 when they get coded
+		CreateNewPixelShadeJob(x4.m128i_i32[z], y4.m128i_i32[z], barycentricsAdjusted4[z], primitiveData);
+	}
+#endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+}
 
 template <const bool shadeFromShader>
 const primitivePixelJobData* const IDirect3DDevice9Hook::GetNewPrimitiveJobData(const void* const v0, const void* const v1, const void* const v2, const float barycentricNormalizeFactor, const UINT primitiveID, const bool VFace,
@@ -6875,14 +6917,14 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	const __m128 barycentricNormalizeFactorSplattedF = _mm_set1_ps(barycentricNormalizeFactor);
 	__m128i rowReset = _mm_add_epi32(_mm_set_epi32(0, computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin), computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin), computeEdgeSidedness(i1.x, i1.y, i2.x, i2.y, xMin, yMin) ), topleftEdgeBias);
 
-	unsigned earlyZTestDepthValue;
+	__m128i earlyZTestDepthValue4;
 	if (rasterizerUsesEarlyZTest)
 	{
 		// TODO: Don't assume less-than test for Z CMPFUNC
 		float minDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
 		minDepthValue = minDepthValue < pos2.z ? minDepthValue : pos2.z;
 
-		earlyZTestDepthValue = depthStencil->GetRawDepthValueFromFloatDepth(minDepthValue);
+		earlyZTestDepthValue4 = _mm_set1_epi32(depthStencil->GetRawDepthValueFromFloatDepth(minDepthValue) );
 	}
 
 	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData<shadeFromShader>(v0, v1, v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
@@ -6892,61 +6934,88 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 		__m128i currentBarycentric[4];
 		currentBarycentric[0] = rowReset;
 
+		const __m128i y4 = _mm_add_epi32(_mm_set1_epi32(y), y4quadOffset);
+
 		for (int x = xMin; x < xMax; x += SUBPIXEL_ACCURACY_BIASMULT2)
 		{
 			currentBarycentric[1] = _mm_add_epi32(currentBarycentric[0], barycentricXDelta);
 			currentBarycentric[2] = _mm_add_epi32(currentBarycentric[0], barycentricYDelta);
 			currentBarycentric[3] = _mm_add_epi32(currentBarycentric[2], barycentricXDelta);
 
-			// Is our test-pixel inside all three triangle edges?
-			for (unsigned z = 0; z < 4; ++z)
+			const __m128i masksVec = _mm_set_epi32(
+				_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpgt_epi32(currentBarycentric[3], oneMaskVec) ) ),
+				_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpgt_epi32(currentBarycentric[2], oneMaskVec) ) ),
+				_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpgt_epi32(currentBarycentric[1], oneMaskVec) ) ),
+				_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpgt_epi32(currentBarycentric[0], oneMaskVec) ) ) );
+
+			// At this stage, the mask determines which pixels are inside and which are outside of our triangle
+			unsigned unifiedMask4 = _mm_movemask_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(_mm_and_si128(masksVec, sevenVec), sevenVec) ) );
+			const __m128i x4 = _mm_add_epi32(_mm_set1_epi32(x), x4quadOffset);
+			if (rasterizerUsesEarlyZTest)
 			{
-				if ( (_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpgt_epi32(currentBarycentric[z], oneMaskVec) ) ) & 0x7) == 0x7)
+				if (unifiedMask4 == 0xF) // All pixels inside triangle
 				{
-					const int newX = x + (z & 0x1);
-					const int newY = y + ( (z & 0x2) >> 1);
-					if (rasterizerUsesEarlyZTest)
-					{
-						const unsigned compareDepth = depthStencil->GetRawDepth(newX, newY);
+					const __m128i depth4 = depthStencil->GetRawDepth4(x4, y4);
 
-						// TODO: Don't assume less-than test for Z CMPFUNC
-						if (compareDepth < earlyZTestDepthValue)
-						{
-							continue;
-						}
-					}
-					const __m128i barycentricAdjusted = _mm_sub_epi32(currentBarycentric[z], topleftEdgeBias);
-#if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-					CreateNewPixelShadeJob(newX, newY, barycentricAdjusted.m128i_i32[0], barycentricAdjusted.m128i_i32[1], barycentricAdjusted.m128i_i32[2], primitiveData);
-#else // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-
-					const __m128 barycentricFactors = _mm_mul_ps(_mm_cvtepi32_ps(barycentricAdjusted), barycentricNormalizeFactorSplattedF);
-
-#ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
-					LARGE_INTEGER pixelStartTime;
-					QueryPerformanceCounter(&pixelStartTime);
-#endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
-					if (shadeFromShader)
-					{
-						ShadePixelFromShader(pShaderEngine, *(const VStoPSMapping* const)mappingData, x, y, 
-							barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2);
-					}
-					else
-					{
-						ShadePixelFromStream(pShaderEngine, *(const DeclarationSemanticMapping* const)mappingData, x, y, 
-							barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2);
-					}
-
-#ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
-					LARGE_INTEGER pixelEndTime;
-					QueryPerformanceCounter(&pixelEndTime);
-
-					totalPixelShadeTicks += (pixelEndTime.QuadPart - pixelStartTime.QuadPart);
-					++numPixelShadeTasks;
-#endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
-
-#endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+					// TODO: Don't assume less-than test for Z CMPFUNC
+					const unsigned depthMask = _mm_movemask_ps(_mm_castsi128_ps(_mm_cmplt_epi32(earlyZTestDepthValue4, depth4) ) );
+					unifiedMask4 &= depthMask;
 				}
+				else if  (unifiedMask4 > 0) // At least one pixel inside triangle
+				{
+					__m128i depth4;
+					if (unifiedMask4 & 0x1)
+						depth4.m128i_u32[0] = depthStencil->GetRawDepth(x4.m128i_i32[0], y4.m128i_i32[0]);
+					if (unifiedMask4 & 0x2)
+						depth4.m128i_u32[1] = depthStencil->GetRawDepth(x4.m128i_i32[1], y4.m128i_i32[1]);
+					if (unifiedMask4 & 0x4)
+						depth4.m128i_u32[2] = depthStencil->GetRawDepth(x4.m128i_i32[2], y4.m128i_i32[2]);
+					if (unifiedMask4 & 0x8)
+						depth4.m128i_u32[3] = depthStencil->GetRawDepth(x4.m128i_i32[3], y4.m128i_i32[3]);
+
+					// TODO: Don't assume less-than test for Z CMPFUNC
+					const unsigned depthMask = _mm_movemask_ps(_mm_castsi128_ps(_mm_cmplt_epi32(earlyZTestDepthValue4, depth4) ) );
+					unifiedMask4 &= depthMask;
+				}
+			}
+
+			if (unifiedMask4 == 0xF) // All pixels inside triangle and pass early-Z
+			{
+				const __m128i barycentricsAdjusted4[4] =
+				{
+					_mm_sub_epi32(currentBarycentric[0], topleftEdgeBias),
+					_mm_sub_epi32(currentBarycentric[1], topleftEdgeBias), 
+					_mm_sub_epi32(currentBarycentric[2], topleftEdgeBias), 
+					_mm_sub_epi32(currentBarycentric[3], topleftEdgeBias)
+				};
+				CreateNewPixelShadeJob4(x4, y4, barycentricsAdjusted4, primitiveData);
+			}
+			else if (unifiedMask4 > 0) // At least one pixel inside triangle and pass early-Z
+			{
+				if (unifiedMask4 & 0x1)
+				{
+					const __m128i barycentricAdjusted = _mm_sub_epi32(currentBarycentric[0], topleftEdgeBias);
+					CreateNewPixelShadeJob(x4.m128i_i32[0], y4.m128i_i32[0], barycentricAdjusted, primitiveData);
+				}
+				if (unifiedMask4 & 0x2)
+				{
+					const __m128i barycentricAdjusted = _mm_sub_epi32(currentBarycentric[1], topleftEdgeBias);
+					CreateNewPixelShadeJob(x4.m128i_i32[1], y4.m128i_i32[1], barycentricAdjusted, primitiveData);
+				}
+				if (unifiedMask4 & 0x4)
+				{
+					const __m128i barycentricAdjusted = _mm_sub_epi32(currentBarycentric[2], topleftEdgeBias);
+					CreateNewPixelShadeJob(x4.m128i_i32[2], y4.m128i_i32[2], barycentricAdjusted, primitiveData);
+				}
+				if (unifiedMask4 & 0x8)
+				{
+					const __m128i barycentricAdjusted = _mm_sub_epi32(currentBarycentric[3], topleftEdgeBias);
+					CreateNewPixelShadeJob(x4.m128i_i32[3], y4.m128i_i32[3], barycentricAdjusted, primitiveData);
+				}
+			}
+			else
+			{
+				// No pixels inside triangle that passed early-Z, do nothing
 			}
 
 			currentBarycentric[0] = _mm_add_epi32(currentBarycentric[0], barycentricXDelta2);
