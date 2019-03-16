@@ -1013,12 +1013,12 @@ public:
 
 	// If indexBuffer is NULL, then synthesize an index buffer (0, 1, 2, 3, 4, etc...)
 	template <const bool useVertexBuffer, const bool useIndexBuffer>
-	void ProcessVerticesToBuffer(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, std::vector<VS_2_0_OutputRegisters>& outputVerts, const IDirect3DIndexBuffer9Hook* const indexBuffer, 
+	void ProcessVerticesToBuffer(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, const IDirect3DIndexBuffer9Hook* const indexBuffer, 
 		const D3DPRIMITIVETYPE PrimitiveType, const INT BaseVertexIndex, const UINT MinVertexIndex, const UINT startIndex, const UINT primCount, const void* const vertStreamBytes, const unsigned short vertStreamStride) const;
 
 	// If indexBuffer is NULL, then synthesize an index buffer (0, 1, 2, 3, 4, etc...)
 	template <const bool useVertexBuffer, const D3DFORMAT indexFormat>
-	void ProcessVerticesToBufferInner(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, std::vector<VS_2_0_OutputRegisters>& outputVerts, const BYTE* const indexBuffer,
+	void ProcessVerticesToBufferInner(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, const BYTE* const indexBuffer,
 		const D3DPRIMITIVETYPE PrimitiveType, const INT BaseVertexIndex, const UINT MinVertexIndex, const UINT startIndex, const UINT primCount, const void* const vertStreamBytes, const unsigned short vertStreamStride) const;
 
 	// Process a single vertex:
@@ -1039,7 +1039,7 @@ public:
 	void DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIVETYPE PrimitiveType, INT BaseVertexIndex, UINT startIndex, UINT primCount) const;
 
 	template <const bool rasterizerUsesEarlyZTest>
-	void DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType, const UINT PrimitiveCount, const std::vector<VS_2_0_OutputRegisters>& processedVerts) const;
+	void DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType, const UINT PrimitiveCount) const;
 
 	// Returns true for "should draw", or false for "should skip"
 	const bool TotalDrawCallSkipTest(void) const;
@@ -1273,8 +1273,10 @@ protected:
 	// Aligned and volatile here because this variable is accessed by multiple threads using Interlocked operations
 	volatile __declspec(align(16) ) DWORD numPixelsPassedZTest;
 
-	// Using one on the device here to avoid reallocation of output vertex buffers all the time
-	std::vector<VS_2_0_OutputRegisters>* processedVertexBuffer;
+	// Saving a pointer to a persistent buffer on the device here to avoid reallocation of output vertex buffers all the time
+	mutable VS_2_0_OutputRegisters* processedVertexBuffer;
+	mutable unsigned processedVertsUsed;
+	mutable unsigned processVertsAllocated;
 
 	// TODO: Render some stats with this loaded overlay font
 	IDirect3DTexture9Hook* overlayFontTexture;

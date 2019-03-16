@@ -3235,7 +3235,7 @@ static inline const UINT GetNumVertsUsed(const D3DPRIMITIVETYPE PrimitiveType, c
 }
 
 template <const bool useVertexBuffer, const D3DFORMAT indexFormat>
-void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, std::vector<VS_2_0_OutputRegisters>& outputVerts, const BYTE* const indexBuffer,
+void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, const BYTE* const indexBuffer,
 	const D3DPRIMITIVETYPE PrimitiveType, const INT BaseVertexIndex, const UINT MinVertexIndex, const UINT startIndex, const UINT primCount, const void* const vertStreamBytes, const unsigned short vertStreamStride) const
 {
 	const unsigned numOutputVerts = GetNumVertsUsed(PrimitiveType, primCount);
@@ -3246,15 +3246,20 @@ void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDec
 	}
 #endif
 
-#ifdef _DEBUG
-	outputVerts.clear();
-#endif
-	outputVerts.resize(numOutputVerts);
+	processedVertsUsed = 0;
+	if (numOutputVerts >= processVertsAllocated)
+	{
+		_mm_free(processedVertexBuffer);
+		processedVertexBuffer = NULL;
+		processedVertexBuffer = (VS_2_0_OutputRegisters* const)_mm_malloc(numOutputVerts * sizeof(VS_2_0_OutputRegisters), 16);
+		processVertsAllocated = numOutputVerts;
+	}
+	processedVertsUsed = numOutputVerts;
 
 	frameStats.numVertsProcessed += numOutputVerts;
 
-	VS_2_0_OutputRegisters* const startOutputBuffer = &outputVerts.front();
-	VS_2_0_OutputRegisters* outputBufferPtr = startOutputBuffer;
+	VS_2_0_OutputRegisters* const startOutputBuffer = processedVertexBuffer;
+	VS_2_0_OutputRegisters* outputBufferPtr = processedVertexBuffer;
 
 #ifdef _DEBUG
 	if ( ( ( (const size_t)outputBufferPtr) & 0xF) != 0)
@@ -3584,7 +3589,7 @@ void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDec
 }
 
 template <const bool useVertexBuffer, const bool useIndexBuffer>
-void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, std::vector<VS_2_0_OutputRegisters>& outputVerts, const IDirect3DIndexBuffer9Hook* const indexBuffer, 
+void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, const IDirect3DIndexBuffer9Hook* const indexBuffer, 
 	const D3DPRIMITIVETYPE PrimitiveType, const INT BaseVertexIndex, const UINT MinVertexIndex, const UINT startIndex, const UINT primCount, const void* const vertStreamBytes, const unsigned short vertStreamStride) const
 {
 	SIMPLE_FUNC_SCOPE();
@@ -3600,16 +3605,16 @@ void IDirect3DDevice9Hook::ProcessVerticesToBuffer(const IDirect3DVertexDeclarat
 			__assume(0);
 #endif
 		case D3DFMT_INDEX16:
-			ProcessVerticesToBufferInner<useVertexBuffer, D3DFMT_INDEX16>(decl, mapping, outputVerts, indexBuffer->GetBufferBytes(), PrimitiveType, BaseVertexIndex, MinVertexIndex, startIndex, primCount, vertStreamBytes, vertStreamStride);
+			ProcessVerticesToBufferInner<useVertexBuffer, D3DFMT_INDEX16>(decl, mapping, indexBuffer->GetBufferBytes(), PrimitiveType, BaseVertexIndex, MinVertexIndex, startIndex, primCount, vertStreamBytes, vertStreamStride);
 			break;
 		case D3DFMT_INDEX32:
-			ProcessVerticesToBufferInner<useVertexBuffer, D3DFMT_INDEX32>(decl, mapping, outputVerts, indexBuffer->GetBufferBytes(), PrimitiveType, BaseVertexIndex, MinVertexIndex, startIndex, primCount, vertStreamBytes, vertStreamStride);
+			ProcessVerticesToBufferInner<useVertexBuffer, D3DFMT_INDEX32>(decl, mapping, indexBuffer->GetBufferBytes(), PrimitiveType, BaseVertexIndex, MinVertexIndex, startIndex, primCount, vertStreamBytes, vertStreamStride);
 			break;
 		}
 	}
 	else
 	{
-		ProcessVerticesToBufferInner<useVertexBuffer, D3DFMT_UNKNOWN>(decl, mapping, outputVerts, NULL, PrimitiveType, BaseVertexIndex, MinVertexIndex, startIndex, primCount, vertStreamBytes, vertStreamStride);
+		ProcessVerticesToBufferInner<useVertexBuffer, D3DFMT_UNKNOWN>(decl, mapping, NULL, PrimitiveType, BaseVertexIndex, MinVertexIndex, startIndex, primCount, vertStreamBytes, vertStreamStride);
 	}
 }
 
@@ -3916,7 +3921,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimiti
 		SetFixedFunctionVertexShaderState(currentState, this);
 	}
 
-	processedVertexBuffer->clear();
+	processedVertsUsed = 0;
 	if (!currentState.currentVertexDecl)
 	{
 		DbgBreakPrint("Error: NULL vertex decl");
@@ -3935,7 +3940,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimiti
 	}
 #endif
 
-	ProcessVerticesToBuffer<true, false>(currentState.currentVertexDecl, vertexDeclMapping, *processedVertexBuffer, NULL, PrimitiveType, 0, 0, StartVertex, PrimitiveCount, NULL, 0);
+	ProcessVerticesToBuffer<true, false>(currentState.currentVertexDecl, vertexDeclMapping, NULL, PrimitiveType, 0, 0, StartVertex, PrimitiveCount, NULL, 0);
 
 #ifdef _DEBUG
 	if (currentState.currentPixelShader && !currentState.currentPixelShader->jitShaderMain)
@@ -3945,9 +3950,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimiti
 #endif
 
 	if (CurrentPipelineCanEarlyZTest() )
-		DrawPrimitiveUB<true>(PrimitiveType, PrimitiveCount, *processedVertexBuffer);
+		DrawPrimitiveUB<true>(PrimitiveType, PrimitiveCount);
 	else
-		DrawPrimitiveUB<false>(PrimitiveType, PrimitiveCount, *processedVertexBuffer);
+		DrawPrimitiveUB<false>(PrimitiveType, PrimitiveCount);
 
 	if (usePassthroughVertexShader)
 		SetVertexShader(NULL);
@@ -4047,7 +4052,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 
 	HRESULT ret = S_OK;
 
-	processedVertexBuffer->clear();
+	processedVertsUsed = 0;
 
 	if (!currentState.currentVertexDecl)
 	{
@@ -4067,7 +4072,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 	}
 #endif
 
-	ProcessVerticesToBuffer<true, true>(currentState.currentVertexDecl, vertexDeclMapping, *processedVertexBuffer, currentState.currentIndexBuffer, PrimitiveType, BaseVertexIndex, MinVertexIndex, startIndex, primCount, NULL, 0);
+	ProcessVerticesToBuffer<true, true>(currentState.currentVertexDecl, vertexDeclMapping, currentState.currentIndexBuffer, PrimitiveType, BaseVertexIndex, MinVertexIndex, startIndex, primCount, NULL, 0);
 
 #ifdef _DEBUG
 	if (currentState.currentPixelShader && !currentState.currentPixelShader->jitShaderMain)
@@ -4077,9 +4082,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 #endif
 
 	if (CurrentPipelineCanEarlyZTest() )
-		DrawPrimitiveUB<true>(PrimitiveType, primCount, *processedVertexBuffer);
+		DrawPrimitiveUB<true>(PrimitiveType, primCount);
 	else
-		DrawPrimitiveUB<false>(PrimitiveType, primCount, *processedVertexBuffer);
+		DrawPrimitiveUB<false>(PrimitiveType, primCount);
 
 	if (usePassthroughVertexShader)
 		SetVertexShader(NULL);
@@ -7325,7 +7330,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 }
 
 template <const bool rasterizerUsesEarlyZTest>
-void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType, const UINT PrimitiveCount, const std::vector<VS_2_0_OutputRegisters>& processedVerts) const
+void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType, const UINT PrimitiveCount) const
 {
 	SIMPLE_FUNC_SCOPE();
 #ifdef _DEBUG
@@ -7334,7 +7339,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 		DbgPrint("Warning: Uncached pixel shader detected");
 	}
 
-	if (processedVerts.empty() )
+	if (processedVertsUsed == 0)
 	{
 		__debugbreak();
 	}
@@ -7345,7 +7350,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 	}
 #endif
 
-	const VS_2_0_OutputRegisters* const processedVertsBuffer = &processedVerts.front();
+	const VS_2_0_OutputRegisters* const processedVertsBuffer = processedVertexBuffer;
 
 	VStoPSMapping vStoPSMapping;
 	vStoPSMapping.ClearSemanticMapping();
@@ -7364,7 +7369,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 	{
 #ifdef _DEBUG
 		const unsigned vertCount = PrimitiveCount * 3;
-		if (vertCount > processedVerts.size() )
+		if (vertCount > processedVertsUsed)
 		{
 			__debugbreak();
 		}
@@ -7415,7 +7420,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 	{
 		const unsigned vertCount = PrimitiveCount + 2;
 #ifdef _DEBUG
-		if (vertCount > processedVerts.size() )
+		if (vertCount > processedVertsUsed)
 		{
 			__debugbreak();
 		}
@@ -7500,7 +7505,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 	{
 		const unsigned vertCount = PrimitiveCount + 2;
 #ifdef _DEBUG
-		if (vertCount > processedVerts.size() )
+		if (vertCount > processedVertsUsed)
 		{
 			__debugbreak();
 		}
@@ -7553,7 +7558,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 	{
 #ifdef _DEBUG
 		const unsigned vertCount = PrimitiveCount * 2;
-		if (vertCount > processedVerts.size() )
+		if (vertCount > processedVertsUsed)
 		{
 			__debugbreak();
 		}
@@ -7571,7 +7576,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 	{
 		const unsigned vertCount = PrimitiveCount + 1;
 #ifdef _DEBUG
-		if (vertCount > processedVerts.size() )
+		if (vertCount > processedVertsUsed)
 		{
 			__debugbreak();
 		}
@@ -7590,7 +7595,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 	{
 #ifdef _DEBUG
 		const unsigned vertCount = PrimitiveCount;
-		if (vertCount > processedVerts.size() )
+		if (vertCount > processedVertsUsed)
 		{
 			__debugbreak();
 		}
@@ -7861,7 +7866,8 @@ void IDirect3DDevice9Hook::InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, c
 }
 
 IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D9Hook* _parentHook) : d3d9dev(_d3d9dev), parentHook(_parentHook), refCount(1), initialDevType(D3DDEVTYPE_HAL), initialCreateFlags(D3DCREATE_HARDWARE_VERTEXPROCESSING),
-	enableDialogs(FALSE), sceneBegun(FALSE), implicitSwapChain(NULL), hConsoleHandle(INVALID_HANDLE_VALUE), overlayFontTexture(NULL), numPixelsPassedZTest(0), initialCreateFocusWindow(NULL), initialCreateDeviceWindow(NULL)
+	enableDialogs(FALSE), sceneBegun(FALSE), implicitSwapChain(NULL), hConsoleHandle(INVALID_HANDLE_VALUE), overlayFontTexture(NULL), numPixelsPassedZTest(0), initialCreateFocusWindow(NULL), initialCreateDeviceWindow(NULL),
+	processedVertexBuffer(NULL), processedVertsUsed(0), processVertsAllocated(0)
 {
 #ifdef _DEBUG
 	m_FirstMember = false;
@@ -7888,7 +7894,7 @@ IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D
 	currentState.currentSoftUPIndexBuffer = new IDirect3DIndexBuffer9Hook(NULL, this);
 	currentState.currentSoftUPIndexBuffer->MarkSoftBufferUP(true);
 
-	processedVertexBuffer = new std::vector<VS_2_0_OutputRegisters>;
+	processedVertexBuffer = (VS_2_0_OutputRegisters* const)_mm_malloc(sizeof(VS_2_0_OutputRegisters), 16);
 }
 
 /*virtual*/ IDirect3DDevice9Hook::~IDirect3DDevice9Hook()
@@ -7909,8 +7915,11 @@ IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D
 	FVFToVertDeclCache = NULL;
 #endif
 
-	delete processedVertexBuffer;
-	processedVertexBuffer = NULL;
+	if (processedVertexBuffer)
+	{
+		_mm_free(processedVertexBuffer);
+		processedVertexBuffer = NULL;
+	}
 
 	DeleteCriticalSection(&deviceCS);
 	memset(&deviceCS, 0, sizeof(deviceCS) );
