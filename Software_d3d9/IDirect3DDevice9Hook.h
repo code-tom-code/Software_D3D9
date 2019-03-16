@@ -1289,10 +1289,7 @@ static const __m128 ColorDWORDToFloat4Divisor = { 1.0f / 255.0f, 1.0f / 255.0f, 
 template <const unsigned char writeMask = 0xF>
 inline void ColorDWORDToFloat4(const D3DCOLOR inColor, D3DXVECTOR4& outColor)
 {
-	// I'm not sure what the intrinsic for this should be, so let's let the compiler figure that out...
-	__m128i colorbyte4;
-	colorbyte4.m128i_u32[0] = colorbyte4.m128i_u32[1] = colorbyte4.m128i_u32[2] = colorbyte4.m128i_u32[3] = inColor;
-
+	const __m128i colorbyte4 = _mm_set1_epi32(inColor);
 	const __m128i coloruint4 = _mm_cvtepu8_epi32(colorbyte4);
 	const __m128 colorfloat4 = _mm_cvtepi32_ps(coloruint4);
 	const __m128 normalizedColorFloat4 = _mm_mul_ps(colorfloat4, ColorDWORDToFloat4Divisor);
@@ -1320,12 +1317,13 @@ inline void ColorDWORDToFloat4(const D3DCOLOR inColor, D3DXVECTOR4& outColor)
 template <const unsigned char writeMask = 0xF>
 inline void ColorDWORDToFloat4_4(const D3DCOLOR** const inColor4, D3DXVECTOR4* const outColor4[4])
 {
-	// I'm not sure what the intrinsic for this should be, so let's let the compiler figure that out...
-	__m128i colorbyte4[4];
-	colorbyte4[0].m128i_u32[0] = colorbyte4[0].m128i_u32[1] = colorbyte4[0].m128i_u32[2] = colorbyte4[0].m128i_u32[3] = *inColor4[0];
-	colorbyte4[1].m128i_u32[0] = colorbyte4[1].m128i_u32[1] = colorbyte4[1].m128i_u32[2] = colorbyte4[1].m128i_u32[3] = *inColor4[1];
-	colorbyte4[2].m128i_u32[0] = colorbyte4[2].m128i_u32[1] = colorbyte4[2].m128i_u32[2] = colorbyte4[2].m128i_u32[3] = *inColor4[2];
-	colorbyte4[3].m128i_u32[0] = colorbyte4[3].m128i_u32[1] = colorbyte4[3].m128i_u32[2] = colorbyte4[3].m128i_u32[3] = *inColor4[3];
+	const __m128i colorbyte4[4] = 
+	{
+		_mm_set1_epi32(*inColor4[0]),
+		_mm_set1_epi32(*inColor4[1]),
+		_mm_set1_epi32(*inColor4[2]),
+		_mm_set1_epi32(*inColor4[3])
+	};
 
 	const __m128i coloruint4[4] = 
 	{
