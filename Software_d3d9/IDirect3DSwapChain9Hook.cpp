@@ -133,7 +133,20 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::Present(
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::GetFrontBufferData(THIS_ IDirect3DSurface9* pDestSurface)
 {
-	HRESULT ret = realObject->GetFrontBufferData(pDestSurface);
+	IDirect3DSurface9Hook* hookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pDestSurface);
+	if (hookPtr)
+		pDestSurface = hookPtr->GetUnderlyingSurface();
+#ifdef _DEBUG
+	else if (pDestSurface != NULL)
+	{
+		DbgBreakPrint("Error: GetFrontBufferData called with a non-hooked surface pointer");
+	}
+#endif
+	HRESULT ret = realObject->GetFrontBufferData(hookPtr ? hookPtr->GetUnderlyingSurface() : NULL);
+	if (SUCCEEDED(ret) )
+	{
+		// TODO: Implement this...
+	}
 	return ret;
 }
 
@@ -186,6 +199,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::GetBackB
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::GetRasterStatus(THIS_ D3DRASTER_STATUS* pRasterStatus)
 {
 	HRESULT ret = realObject->GetRasterStatus(pRasterStatus);
+	// TODO: Implement this...
 	return ret;
 }
 
@@ -198,6 +212,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::GetDispl
 #ifdef _DEBUG
 	if (pMode)
 	{
+		// TODO: Implement this...
 		/*if (memcmp(pMode, &InternalDisplayMode, sizeof(D3DDISPLAYMODE) ) != 0)
 		{
 			__debugbreak();
