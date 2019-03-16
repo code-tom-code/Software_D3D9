@@ -30,6 +30,7 @@
 // TODO: Fix bug in core rasterizer loop when this is tuned > 0 (ie, when subpixel precision is enabled)
 static const unsigned SUBPIXEL_ACCURACY_BITS = 0u;
 static const unsigned SUBPIXEL_ACCURACY_BIASMULT = 1 << SUBPIXEL_ACCURACY_BITS;
+static const unsigned SUBPIXEL_ACCURACY_BIASMULT2 = 2 * SUBPIXEL_ACCURACY_BIASMULT;
 static const int SUBPIXEL_MAX_VALUE = MAXINT >> SUBPIXEL_ACCURACY_BITS;
 static const int SUBPIXEL_MIN_VALUE = MININT >> SUBPIXEL_ACCURACY_BITS;
 static const float SUBPIXEL_MAX_VALUEF = 8191.0f;//(const float)SUBPIXEL_MAX_VALUE;
@@ -38,6 +39,9 @@ static const float SUBPIXEL_ACCURACY_BIASMULTF = (const float)SUBPIXEL_ACCURACY_
 static const __m128 SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF = { SUBPIXEL_ACCURACY_BIASMULTF, SUBPIXEL_ACCURACY_BIASMULTF, SUBPIXEL_ACCURACY_BIASMULTF, SUBPIXEL_ACCURACY_BIASMULTF };
 static const D3DXVECTOR4 zeroVec(0.0f, 0.0f, 0.0f, 0.0f);
 static const D3DXVECTOR4 vertShaderInputRegisterDefault(0.0f, 0.0f, 0.0f, 1.0f);
+
+static const unsigned twoVecBytes[4] = { 0x2, 0x2, 0x2, 0x2 };
+static const __m128i twoVec = *(const __m128i* const)twoVecBytes;
 
 static const D3DXVECTOR4 staticColorWhiteOpaque(1.0f, 1.0f, 1.0f, 1.0f);
 static const D3DXVECTOR4 staticColorBlackTranslucent(0.0f, 0.0f, 0.0f, 0.0f);
@@ -3086,7 +3090,7 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 	++workStatus.numJobs;
 }
 
-void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const unsigned x, const unsigned y, const int (&barycentricA)[4], const int (&barycentricB)[4], const int (&barycentricC)[4], const primitivePixelJobData* const primitiveData) const
+/*void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const unsigned x, const unsigned y, const int (&barycentricA)[4], const int (&barycentricB)[4], const int (&barycentricC)[4], const primitivePixelJobData* const primitiveData) const
 {
 	slist_item* const newItem = GetNewWorkerJob<true>();
 	newItem->jobType = pixelShade4Job;
@@ -3120,7 +3124,7 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const unsigned x, const unsig
 	pixelJobData.barycentricCoords[3].c = barycentricC[3];
 
 	++workStatus.numJobs;
-}
+}*/
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
@@ -3251,6 +3255,13 @@ void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDec
 
 	VS_2_0_OutputRegisters* const startOutputBuffer = &outputVerts.front();
 	VS_2_0_OutputRegisters* outputBufferPtr = startOutputBuffer;
+
+#ifdef _DEBUG
+	if ( ( ( (const size_t)outputBufferPtr) & 0xF) != 0)
+	{
+		__debugbreak(); // Oh noes, our registers aren't aligned and this will break SSE instructions!
+	}
+#endif
 
 	vertJobsToShade.clear();
 
@@ -6791,8 +6802,19 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	// Clip to the scissor rect, if enabled
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.scissorTestEnable)
 	{
-		topleft = _mm_max_ps(topleft, _mm_set_ps(0.0f, 0.0f, currentState.currentScissorRect.ftop, currentState.currentScissorRect.fleft) );
-		botright = _mm_min_ps(botright, _mm_set_ps(0.0f, 0.0f, currentState.currentScissorRect.fbottom, currentState.currentScissorRect.fright) );
+		topleft = _mm_max_ps(topleft, currentState.currentScissorRect.topleftF);
+		botright = _mm_min_ps(botright, currentState.currentScissorRect.botrightF);
+	}
+
+	// Clip to the depth buffer extents, if Z-testing is enabled
+	const IDirect3DSurface9Hook* depthStencil;
+	if (rasterizerUsesEarlyZTest)
+	{
+		depthStencil = currentState.currentDepthStencil;
+
+		const __m128 depthExtents = depthStencil->GetInternalWidthHeightM1F();
+		topleft = _mm_min_ps(topleft, depthExtents);
+		botright = _mm_min_ps(botright, depthExtents);
 	}
 
 	bounds = _mm_shuffle_ps(topleft, botright, _MM_SHUFFLE(1, 0, 1, 0) );
@@ -6817,7 +6839,7 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	const int yMax = intBounds.m128i_i32[3];
 	if (!(yMin <= yMax && xMin < xMax) )
 		return;
-
+	
 	// Cull zero or negative-area triangles (with our default triangle winding being CW, this will also cull CCW triangles):
 	const int maxNumPixels = (yMax - yMin) * (xMax - xMin);
 	if (maxNumPixels < 1)
@@ -6830,11 +6852,13 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	const __m128i y012 = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(y0011), _mm_castsi128_ps(i2vec), _MM_SHUFFLE(0, 1, 2, 0) ) ); // Shuffles to be: i0.y, i1.y, i2.y, i2.x
 	const __m128i y120 = _mm_shuffle_epi32(y012, _MM_SHUFFLE(0, 0, 2, 1) ); // Shuffles to be: i1.y, i2.y, i0.y, i0.y
 	const __m128i barycentricXDelta = _mm_shuffle_epi32(_mm_sub_epi32(y012, y120), _MM_SHUFFLE(0, 0, 2, 1) ); // Shuffles to be barycentricXDelta1, barycentricXDelta2, barycentricXDelta0
+	const __m128i barycentricXDelta2 = _mm_slli_epi32(barycentricXDelta, 1); // Times 2
 
 	const __m128i x0011 = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(i0vec), _mm_castsi128_ps(i1vec), _MM_SHUFFLE(0, 0, 0, 0) ) ); // Shuffles to be: i0.x, i0.x, i1.x, i1.x
 	const __m128i x012 = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(x0011), _mm_castsi128_ps(i2vec), _MM_SHUFFLE(0, 0, 2, 0) ) ); // Shuffles to be: i0.x, i1.x, i2.x, i2.x
 	const __m128i x120 = _mm_shuffle_epi32(x012, _MM_SHUFFLE(0, 0, 2, 1) ); // Shuffles to be: i1.x, i2.x, i0.x, i0.x
 	const __m128i barycentricYDelta = _mm_shuffle_epi32(_mm_sub_epi32(x120, x012), _MM_SHUFFLE(0, 0, 2, 1) ); // Shuffles to be barycentricYDelta1, barycentricYDelta2, barycentricYDelta0
+	const __m128i barycentricYDelta2 = _mm_slli_epi32(barycentricYDelta, 1); // Times 2
 
 	// Correct for top-left rule. Source: https://fgiesen.wordpress.com/2013/02/08/triangle-rasterization-in-practice/
 	const char topleftEdgeBias0 = isTopLeftEdge(i1, i2) ? 0 : -1;
@@ -6847,11 +6871,8 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	__m128i rowReset = _mm_add_epi32(_mm_set_epi32(0, computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, xMin, yMin), computeEdgeSidedness(i2.x, i2.y, i0.x, i0.y, xMin, yMin), computeEdgeSidedness(i1.x, i1.y, i2.x, i2.y, xMin, yMin) ), topleftEdgeBias);
 
 	unsigned earlyZTestDepthValue;
-	const IDirect3DSurface9Hook* depthStencil;
 	if (rasterizerUsesEarlyZTest)
 	{
-		depthStencil = currentState.currentDepthStencil;
-
 		// TODO: Don't assume less-than test for Z CMPFUNC
 		float minDepthValue = pos0.z < pos1.z ? pos0.z : pos1.z;
 		minDepthValue = minDepthValue < pos2.z ? minDepthValue : pos2.z;
@@ -6860,64 +6881,73 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	}
 
 	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData<shadeFromShader>(v0, v1, v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
-	for (int y = yMin; y <= yMax; y += SUBPIXEL_ACCURACY_BIASMULT)
+	for (int y = yMin; y <= yMax; y += SUBPIXEL_ACCURACY_BIASMULT2)
 	{
 		// Reset at the next row:
-		__m128i currentBarycentric = rowReset;
+		__m128i currentBarycentric[4];
+		currentBarycentric[0] = rowReset;
 
-		for (int x = xMin; x < xMax; x += SUBPIXEL_ACCURACY_BIASMULT)
+		for (int x = xMin; x < xMax; x += SUBPIXEL_ACCURACY_BIASMULT2)
 		{
-			// Is our test-pixel inside all three triangle edges?
-			if ( (_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpgt_epi32(currentBarycentric, oneMaskVec) ) ) & 0x7) == 0x7)
-			{
-				if (rasterizerUsesEarlyZTest)
-				{
-					const unsigned compareDepth = depthStencil->GetRawDepth(x, y);
+			currentBarycentric[1] = _mm_add_epi32(currentBarycentric[0], barycentricXDelta);
+			currentBarycentric[2] = _mm_add_epi32(currentBarycentric[0], barycentricYDelta);
+			currentBarycentric[3] = _mm_add_epi32(currentBarycentric[2], barycentricXDelta);
 
-					// TODO: Don't assume less-than test for Z CMPFUNC
-					if (compareDepth < earlyZTestDepthValue)
+			// Is our test-pixel inside all three triangle edges?
+			for (unsigned z = 0; z < 4; ++z)
+			{
+				if ( (_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpgt_epi32(currentBarycentric[z], oneMaskVec) ) ) & 0x7) == 0x7)
+				{
+					const int newX = x + (z & 0x1);
+					const int newY = y + ( (z & 0x2) >> 1);
+					if (rasterizerUsesEarlyZTest)
 					{
-						currentBarycentric = _mm_add_epi32(currentBarycentric, barycentricXDelta);
-						continue;
+						const unsigned compareDepth = depthStencil->GetRawDepth(newX, newY);
+
+						// TODO: Don't assume less-than test for Z CMPFUNC
+						if (compareDepth < earlyZTestDepthValue)
+						{
+							continue;
+						}
 					}
-				}
-				const __m128i barycentricAdjusted = _mm_sub_epi32(currentBarycentric, topleftEdgeBias);
+					const __m128i barycentricAdjusted = _mm_sub_epi32(currentBarycentric[z], topleftEdgeBias);
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-				CreateNewPixelShadeJob(x, y, barycentricAdjusted.m128i_i32[0], barycentricAdjusted.m128i_i32[1], barycentricAdjusted.m128i_i32[2], primitiveData);
+					CreateNewPixelShadeJob(newX, newY, barycentricAdjusted.m128i_i32[0], barycentricAdjusted.m128i_i32[1], barycentricAdjusted.m128i_i32[2], primitiveData);
 #else // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 
-				const __m128 barycentricFactors = _mm_mul_ps(_mm_cvtepi32_ps(barycentricAdjusted), barycentricNormalizeFactorSplattedF);
+					const __m128 barycentricFactors = _mm_mul_ps(_mm_cvtepi32_ps(barycentricAdjusted), barycentricNormalizeFactorSplattedF);
 
 #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
-				LARGE_INTEGER pixelStartTime;
-				QueryPerformanceCounter(&pixelStartTime);
+					LARGE_INTEGER pixelStartTime;
+					QueryPerformanceCounter(&pixelStartTime);
 #endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
-				if (shadeFromShader)
-				{
-					ShadePixelFromShader(pShaderEngine, *(const VStoPSMapping* const)mappingData, x, y, 
-						barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2);
-				}
-				else
-				{
-					ShadePixelFromStream(pShaderEngine, *(const DeclarationSemanticMapping* const)mappingData, x, y, 
-						barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2);
-				}
+					if (shadeFromShader)
+					{
+						ShadePixelFromShader(pShaderEngine, *(const VStoPSMapping* const)mappingData, x, y, 
+							barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2);
+					}
+					else
+					{
+						ShadePixelFromStream(pShaderEngine, *(const DeclarationSemanticMapping* const)mappingData, x, y, 
+							barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2);
+					}
 
 #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
-				LARGE_INTEGER pixelEndTime;
-				QueryPerformanceCounter(&pixelEndTime);
+					LARGE_INTEGER pixelEndTime;
+					QueryPerformanceCounter(&pixelEndTime);
 
-				totalPixelShadeTicks += (pixelEndTime.QuadPart - pixelStartTime.QuadPart);
-				++numPixelShadeTasks;
+					totalPixelShadeTicks += (pixelEndTime.QuadPart - pixelStartTime.QuadPart);
+					++numPixelShadeTasks;
 #endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 
 #endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+				}
 			}
 
-			currentBarycentric = _mm_add_epi32(currentBarycentric, barycentricXDelta);
+			currentBarycentric[0] = _mm_add_epi32(currentBarycentric[0], barycentricXDelta2);
 		}
 
-		rowReset = _mm_add_epi32(rowReset, barycentricYDelta);
+		rowReset = _mm_add_epi32(rowReset, barycentricYDelta2);
 	}
 }
 

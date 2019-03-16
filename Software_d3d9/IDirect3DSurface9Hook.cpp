@@ -1349,6 +1349,7 @@ void IDirect3DSurface9Hook::UpdateCachedValuesOnCreate()
 	InternalHeightM1SplattedF = _mm_set1_ps(InternalHeightM1F);
 	InternalWidthM1Splatted = _mm_set1_epi32(InternalWidthM1);
 	InternalHeightM1Splatted = _mm_set1_epi32(InternalHeightM1);
+	InternalWidthHeightM1F = _mm_set_ps(0.0f, 0.0f, InternalHeightM1F, InternalWidthM1F);
 }
 
 void IDirect3DSurface9Hook::CreateOffscreenPlainSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DPOOL _Pool)

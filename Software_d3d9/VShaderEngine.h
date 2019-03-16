@@ -57,7 +57,7 @@ struct vertexClipStruct
 static_assert(sizeof(vertexClipStruct) == sizeof(unsigned short), "Error!");
 
 // Be careful about reordering elements within this struct, see outPositionRegisterIndex for more info
-struct VS_2_0_OutputRegisters
+__declspec(align(16) ) struct VS_2_0_OutputRegisters
 {
 	VS_2_0_OutputRegisters()
 	{

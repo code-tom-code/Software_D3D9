@@ -281,6 +281,11 @@ public:
 	}
 #endif
 
+	const __m128& GetInternalWidthHeightM1F(void) const
+	{
+		return InternalWidthHeightM1F;
+	}
+
 protected:
 	template <const unsigned char writeMask, const bool sRGBSurface>
 	void SampleSurfaceInternal(const float x, const float y, const D3DTEXTUREFILTERTYPE texf, D3DXVECTOR4& outColor) const;
@@ -336,5 +341,6 @@ protected:
 	__declspec(align(16) ) __m128 InternalHeightM1SplattedF;
 	__declspec(align(16) ) __m128i InternalWidthM1Splatted;
 	__declspec(align(16) ) __m128i InternalHeightM1Splatted;
+	__declspec(align(16) ) __m128 InternalWidthHeightM1F; // This is in the format of (float32[4])(InternalWidthM1F, InternalHeightM1F, 0.0f, 0.0f)
 	bool is1x1surface;
 };

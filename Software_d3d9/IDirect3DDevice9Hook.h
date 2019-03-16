@@ -624,6 +624,8 @@ struct scissorRectStruct
 
 	RECT scissorRect;
 	float fleft, fright, ftop, fbottom;
+	__m128 topleftF;
+	__m128 botrightF;
 
 	inline void RecomputeScissorRect()
 	{
@@ -631,6 +633,9 @@ struct scissorRectStruct
 		fright = (const float)scissorRect.right;
 		ftop = (const float)scissorRect.top;
 		fbottom = (const float)scissorRect.bottom;
+
+		topleftF = _mm_set_ps(0.0f, 0.0f, ftop, fleft);
+		botrightF = _mm_set_ps(0.0f, 0.0f, fbottom, fright);
 	}
 };
 
@@ -1148,7 +1153,7 @@ public:
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 	void CreateNewPixelShadeJob(const unsigned x, const unsigned y, const int barycentricA, const int barycentricB, const int barycentricC, const primitivePixelJobData* const primitiveData) const;
-	void CreateNewPixelShadeJob4(const unsigned x, const unsigned y, const int (&barycentricA)[4], const int (&barycentricB)[4], const int (&barycentricC)[4], const primitivePixelJobData* const primitiveData) const;
+	void CreateNewPixelShadeJob4(const unsigned x, const unsigned y, const __m128i barycentrics0, const __m128i barycentrics1, const __m128i barycentrics2, const __m128i barycentrics3, const primitivePixelJobData* const primitiveData) const;
 #endif
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
