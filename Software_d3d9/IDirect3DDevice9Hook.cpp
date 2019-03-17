@@ -230,25 +230,36 @@ static inline void PixelShadeJob4(slist_item& job, _threadItem* const myPtr)
 
 	SIMPLE_FUNC_SCOPE_CONDITIONAL(primitiveData->primitiveID == 0 && abs( (const int)(320 - pixelJobData.x[0]) ) < 5 && abs( (const int)(240 - pixelJobData.y[0]) ) < 5);
 
-	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
+	const __m128i x4 = *(const __m128i* const)(pixelJobData.x);
+	const __m128i y4 = *(const __m128i* const)(pixelJobData.y);
 
-	// TODO: Actually shade in parallel, don't use a sequential FOR-loop here (need to fully implement ShadePixelFromShader4 and ShadePixelFromStream4)
-	for (unsigned x = 0; x < 4; ++x)
+	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
+	const __m128i barycentricCoordIntVal4[4] =
 	{
-		const __m128i barycentricCoordsVector = _mm_load_si128( (const __m128i* const)&pixelJobData.barycentricCoords[x]);
-		const __m128 barycentricCoordsVectorF = _mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordsVector), barycentricNormalizeFactor);
-		if (drawCallData.useShaderVerts)
-		{
-			const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
-			devHook->ShadePixelFromShader(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), pixelJobData.x[x], pixelJobData.y[x], 
-				barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
-		}
-		else
-		{
-			const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
-			devHook->ShadePixelFromStream(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), pixelJobData.x[x], pixelJobData.y[x], 
-				barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
-		}
+		*(const __m128i* const)(&pixelJobData.barycentricCoords[0]),
+		*(const __m128i* const)(&pixelJobData.barycentricCoords[1]),
+		*(const __m128i* const)(&pixelJobData.barycentricCoords[2]),
+		*(const __m128i* const)(&pixelJobData.barycentricCoords[3])
+	};
+	const __m128 barycentricCoords4[4] =
+	{
+		_mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordIntVal4[0]), barycentricNormalizeFactor),
+		_mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordIntVal4[1]), barycentricNormalizeFactor),
+		_mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordIntVal4[2]), barycentricNormalizeFactor),
+		_mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordIntVal4[3]), barycentricNormalizeFactor)
+	};
+
+	if (drawCallData.useShaderVerts)
+	{
+		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
+		devHook->ShadePixelFromShader4(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), x4, y4, barycentricCoords4, 
+			drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
+	}
+	else
+	{
+		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
+		devHook->ShadePixelFromStream4(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), x4, y4, barycentricCoords4,
+			drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
 	}
 }
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
@@ -660,14 +671,14 @@ static inline const __m128i DepthTest4(const __m128 pixelDepth4, const __m128i b
 	case D3DFMT_D15S1:
 	{
 		const __m128 scaledDepth4 = _mm_mul_ps(pixelDepthScaleD15, pixelDepth4);
-		quantizedPixelDepth4 = _mm_cvtps_epu32(scaledDepth4);
+		quantizedPixelDepth4 = _mm_cvtps_epi32(scaledDepth4);
 	}
 		break;
 	case D3DFMT_D16:
 	case D3DFMT_D16_LOCKABLE:
 	{
 		const __m128 scaledDepth4 = _mm_mul_ps(pixelDepthScaleD16, pixelDepth4);
-		quantizedPixelDepth4 = _mm_cvtps_epu32(scaledDepth4);
+		quantizedPixelDepth4 = _mm_cvtps_epi32(scaledDepth4);
 	}
 		break;
 	default:
@@ -678,14 +689,14 @@ static inline const __m128i DepthTest4(const __m128 pixelDepth4, const __m128i b
 	case D3DFMT_D24X8:
 	{
 		const __m128 scaledDepth4 = _mm_mul_ps(pixelDepthScaleD24, pixelDepth4);
-		quantizedPixelDepth4 = _mm_cvtps_epu32(scaledDepth4);
+		quantizedPixelDepth4 = _mm_cvtps_epi32(scaledDepth4);
 	}
 		break;
 	case D3DFMT_D32:
 	case D3DFMT_D32_LOCKABLE:
 	{
 		const __m128 scaledDepth4 = _mm_mul_ps(pixelDepthScaleD32, pixelDepth4);
-		quantizedPixelDepth4 = _mm_cvtps_epu32(scaledDepth4);
+		quantizedPixelDepth4 = _mm_cvtps_epi32(scaledDepth4); // Technically this isn't correct and this should instead be using _mm_cvtps_epu32, but that requires AVX512 for some reason
 	}
 		break;
 	case D3DFMT_D32F_LOCKABLE:
@@ -3160,7 +3171,13 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 
 void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m128i y4, const __m128i (&barycentricsAdjusted4)[4], const primitivePixelJobData* const primitiveData) const
 {
-#if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+	// Quick-disabling pixelShade4 for check-in:
+	for (unsigned z = 0; z < 4; ++z)
+	{
+		CreateNewPixelShadeJob(x4.m128i_u32[z], y4.m128i_u32[z], barycentricsAdjusted4[z], primitiveData);
+	}
+
+/*#if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 	slist_item* const newItem = GetNewWorkerJob<true>();
 	newItem->jobType = pixelShade4Job;
 	slist_item::_jobData::_pixelJobData& pixelJobData = newItem->jobData.pixelJobData;
@@ -3194,12 +3211,28 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m12
 
 	++workStatus.numJobs;
 #else // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-	for (unsigned z = 0; z < 4; ++z)
+	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
+	const __m128 barycentricCoords4[4] =
 	{
-		// TODO: Replace this with ShadePixelFromShader4 and ShadePixelFromStream4 when they get coded
-		CreateNewPixelShadeJob(x4.m128i_i32[z], y4.m128i_i32[z], barycentricsAdjusted4[z], primitiveData);
+		_mm_mul_ps(_mm_cvtepi32_ps(barycentricsAdjusted4[0]), barycentricNormalizeFactor),
+		_mm_mul_ps(_mm_cvtepi32_ps(barycentricsAdjusted4[1]), barycentricNormalizeFactor),
+		_mm_mul_ps(_mm_cvtepi32_ps(barycentricsAdjusted4[2]), barycentricNormalizeFactor),
+		_mm_mul_ps(_mm_cvtepi32_ps(barycentricsAdjusted4[3]), barycentricNormalizeFactor)
+	};
+
+	if (currentDrawCallData.pixelData.useShaderVerts)
+	{
+		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
+		ShadePixelFromShader4(&deviceMainPShaderEngine, *(currentDrawCallData.pixelData.vs_to_ps_mappings.vs_psMapping), x4, y4, barycentricCoords4, 
+			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
 	}
-#endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+	else
+	{
+		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
+		ShadePixelFromStream4(&deviceMainPShaderEngine, *(currentDrawCallData.pixelData.vs_to_ps_mappings.vertexDeclMapping), x4, y4, barycentricCoords4,
+			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
+	}
+#endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS*/
 }
 
 template <const bool shadeFromShader>
@@ -5763,31 +5796,29 @@ void IDirect3DDevice9Hook::PreShadePixel(const unsigned x, const unsigned y, PSh
 	pixelShader->Reset(x, y, pixelOutput);
 }
 
+// Must be called before shading a pixel to reset the pixel shader state machine!
+void IDirect3DDevice9Hook::PreShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader, PS_2_0_OutputRegisters* const pixelOutput4) const
+{
+	pixelOutput4[0].pixelStatus = normalWrite;
+	pixelOutput4[1].pixelStatus = normalWrite;
+	pixelOutput4[2].pixelStatus = normalWrite;
+	pixelOutput4[3].pixelStatus = normalWrite;
+	pixelShader->Reset4(x4, y4, pixelOutput4);
+}
+
 // Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
 void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const
 {
-	// Perform Z-clipping (clip the pixel if it's outside of the [0.0, 1.0] range):
 	__m128 invZ;
 	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, offsetBytesToOPosition, v0, v1, v2, invZ);
 
-	// In the future when we have proper vertex clipping, this step shouldn't be necessary as the verts coming in from the rasterizer should always be clipped between 0.0 and 1.0
-	if (pixelDepth < 0.0f)
-		return;
-	else if (pixelDepth > 1.0f)
-		return;
-
-	PS_2_0_OutputRegisters pixelOutput;
+	__declspec(align(16) ) PS_2_0_OutputRegisters pixelOutput;
 
 	// Very important to reset the state machine back to its original settings!
 	PreShadePixel(x, y, pixelEngine, &pixelOutput);
 
 	if (currentState.currentDepthStencil)
 	{
-		// Return "depth fail/stencil fail" for all texels outside of the bounds of the depth/stencil buffer
-		// This can happen as the depth/stencil buffer can be a different size than the current render targets
-		if (!currentState.currentDepthStencil->IsTexelValid(x, y) )
-			return;
-
 		if (!StencilTestNoWrite(x, y) )
 		{
 			// Fail the stencil test!
@@ -5813,6 +5844,123 @@ void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine
 	InterpolateStreamIntoRegisters(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth);
 
 	ShadePixel(x, y, pixelEngine);
+}
+
+// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
+void IDirect3DDevice9Hook::ShadePixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const
+{
+	__m128 invZ;
+	__m128 pixelDepth4;
+	InterpolatePixelDepth4(barycentricInterpolants, offsetBytesToOPosition, v0, v1, v2, invZ, pixelDepth4);
+
+	__declspec(align(16) ) PS_2_0_OutputRegisters pixelOutput4[4];
+
+	// Very important to reset the state machine back to its original settings!
+	PreShadePixel4(x4, y4, pixelEngine, pixelOutput4);
+
+	unsigned char pixelWriteMask = 0xF;
+	if (currentState.currentDepthStencil)
+	{
+		// TODO: Make a StencilTestNoWrite4
+		/*for (unsigned z = 0; z < 4; ++z)
+		{
+			if (!StencilTestNoWrite(x4.m128i_i32[z], y4.m128i_i32[z]) )
+			{
+				// Fail the stencil test!
+				pixelOutput4[z].pixelStatus = stencilFail;
+				ShadePixel(x, y, pixelEngine);
+				return;
+			}
+		}*/
+
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zEnable)
+		{
+			const __m128i bufferDepth4 = currentState.currentDepthStencil->GetRawDepth4(x4, y4);
+			const __m128i depthTestResults = DepthTest4(pixelDepth4, bufferDepth4, currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc, currentState.currentDepthStencil->GetInternalFormat() );
+			const unsigned char maskBits = _mm_movemask_ps(_mm_cvtepi32_ps(depthTestResults) );
+			if (maskBits == 0x0)
+				return;
+			pixelWriteMask = maskBits;
+			pixelOutput4[0].oDepth = pixelDepth4.m128_f32[0];
+			pixelOutput4[0].pixelStatus = (maskBits & 0x1) ? normalWrite : ZFail;
+			pixelOutput4[1].oDepth = pixelDepth4.m128_f32[1];
+			pixelOutput4[1].pixelStatus = (maskBits & 0x2) ? normalWrite : ZFail;
+			pixelOutput4[2].oDepth = pixelDepth4.m128_f32[2];
+			pixelOutput4[2].pixelStatus = (maskBits & 0x4) ? normalWrite : ZFail;
+			pixelOutput4[3].oDepth = pixelDepth4.m128_f32[3];
+			pixelOutput4[3].pixelStatus = (maskBits & 0x8) ? normalWrite : ZFail;
+		}
+	}
+
+	switch (pixelWriteMask)
+	{
+	case 0x1:
+		InterpolateStreamIntoRegisters4<0x1>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x1>(x4, y4, pixelEngine);
+		break;
+	case 0x2:
+		InterpolateStreamIntoRegisters4<0x2>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x2>(x4, y4, pixelEngine);
+		break;
+	case 0x3:
+		InterpolateStreamIntoRegisters4<0x3>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x3>(x4, y4, pixelEngine);
+		break;
+	case 0x4:
+		InterpolateStreamIntoRegisters4<0x4>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x4>(x4, y4, pixelEngine);
+		break;
+	case 0x5:
+		InterpolateStreamIntoRegisters4<0x5>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x5>(x4, y4, pixelEngine);
+		break;
+	case 0x6:
+		InterpolateStreamIntoRegisters4<0x6>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x6>(x4, y4, pixelEngine);
+		break;
+	case 0x7:
+		InterpolateStreamIntoRegisters4<0x7>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x7>(x4, y4, pixelEngine);
+		break;
+	case 0x8:
+		InterpolateStreamIntoRegisters4<0x8>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x8>(x4, y4, pixelEngine);
+		break;
+	case 0x9:
+		InterpolateStreamIntoRegisters4<0x9>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x9>(x4, y4, pixelEngine);
+		break;
+	case 0xA:
+		InterpolateStreamIntoRegisters4<0xA>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xA>(x4, y4, pixelEngine);
+		break;
+	case 0xB:
+		InterpolateStreamIntoRegisters4<0xB>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xB>(x4, y4, pixelEngine);
+		break;
+	case 0xC:
+		InterpolateStreamIntoRegisters4<0xC>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xC>(x4, y4, pixelEngine);
+		break;
+	case 0xD:
+		InterpolateStreamIntoRegisters4<0xD>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xD>(x4, y4, pixelEngine);
+		break;
+	case 0xE:
+		InterpolateStreamIntoRegisters4<0xE>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xE>(x4, y4, pixelEngine);
+		break;
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // Should never be here!
+#else
+		__assume(0);
+#endif
+	case 0xF:
+		InterpolateStreamIntoRegisters4<0xF>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xF>(x4, y4, pixelEngine);
+		break;
+	}
 }
 
 // This is a non-perspective-correct attribute interpolation:
@@ -5845,7 +5993,8 @@ static inline void InterpolateVertexAttribute_PerspectiveCorrect(const D3DXVECTO
 }
 
 // This is a perspective-correct attribute interpolation:
-static inline void InterpolateVertexAttribute_PerspectiveCorrect4(const D3DXVECTOR4& attr0, const D3DXVECTOR4& attr1, const D3DXVECTOR4& attr2, const __m128 (&invZSplatted)[4], const __m128 pixelZ4, D3DXVECTOR4 (&outAttr4)[4])
+static inline void InterpolateVertexAttribute_PerspectiveCorrect4(const D3DXVECTOR4& attr0, const D3DXVECTOR4& attr1, const D3DXVECTOR4& attr2, 
+	const __m128 (&invZSplatted_X4)[4], const __m128 (&invZSplatted_Y4)[4], const __m128 (&invZSplatted_Z4)[4], const __m128 pixelZ4, D3DXVECTOR4 (&outAttr4)[4])
 {
 	const __m128 attr0vec = *(const __m128* const)&attr0;
 	const __m128 attr1vec = *(const __m128* const)&attr1;
@@ -5854,24 +6003,24 @@ static inline void InterpolateVertexAttribute_PerspectiveCorrect4(const D3DXVECT
 	// I think that mul, mul, mul, add, add is the best we can do here since the attribute data comes in and needs a transpose, which prevents us from using dotproduct3
 	const __m128 mulResultA[4] = 
 	{
-		_mm_mul_ps(invZSplatted[0], attr0vec),
-		_mm_mul_ps(invZSplatted[1], attr0vec),
-		_mm_mul_ps(invZSplatted[2], attr0vec),
-		_mm_mul_ps(invZSplatted[3], attr0vec)
+		_mm_mul_ps(invZSplatted_X4[0], attr0vec),
+		_mm_mul_ps(invZSplatted_X4[1], attr0vec),
+		_mm_mul_ps(invZSplatted_X4[2], attr0vec),
+		_mm_mul_ps(invZSplatted_X4[3], attr0vec),
 	};
 	const __m128 mulResultB[4] = 
 	{
-		_mm_mul_ps(invZSplatted[0], attr1vec),
-		_mm_mul_ps(invZSplatted[1], attr1vec),
-		_mm_mul_ps(invZSplatted[2], attr1vec),
-		_mm_mul_ps(invZSplatted[3], attr1vec)
+		_mm_mul_ps(invZSplatted_Y4[0], attr1vec),
+		_mm_mul_ps(invZSplatted_Y4[1], attr1vec),
+		_mm_mul_ps(invZSplatted_Y4[2], attr1vec),
+		_mm_mul_ps(invZSplatted_Y4[3], attr1vec)
 	};
 	const __m128 mulResultC[4] = 
 	{
-		_mm_mul_ps(invZSplatted[0], attr2vec),
-		_mm_mul_ps(invZSplatted[1], attr2vec),
-		_mm_mul_ps(invZSplatted[2], attr2vec),
-		_mm_mul_ps(invZSplatted[3], attr2vec)
+		_mm_mul_ps(invZSplatted_Z4[0], attr2vec),
+		_mm_mul_ps(invZSplatted_Z4[1], attr2vec),
+		_mm_mul_ps(invZSplatted_Z4[2], attr2vec),
+		_mm_mul_ps(invZSplatted_Z4[3], attr2vec)
 	};
 	const __m128 result[4] = 
 	{
@@ -5910,7 +6059,7 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 		{
 			if (pixelShaderInfo.inputRegistersUsedBitmask & (1 << v) )
 			{
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.v[v]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[v]);
 
 				const DebuggableD3DVERTEXELEMENT9* const foundColorValue = vertexDeclMapping.vals[D3DDECLUSAGE_COLOR][v];
 				if (foundColorValue)
@@ -5945,7 +6094,7 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 		{
 			if (pixelShaderInfo.inputRegistersUsedBitmask & (1 << (t + D3DMCS_COLOR2) ) )
 			{
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.t[t]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[t]);
 
 				const DebuggableD3DVERTEXELEMENT9* const foundTexcoordValue = vertexDeclMapping.vals[D3DDECLUSAGE_TEXCOORD][t];
 				if (foundTexcoordValue)
@@ -5985,7 +6134,7 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 			if (reg.registerType == D3DSPR_INPUT)
 			{
 				// Color interpolator registers:
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]);
 				const DebuggableD3DVERTEXELEMENT9* const element = vertexDeclMapping.vals[D3DDECLUSAGE_COLOR][reg.usageIndex];
 				if (!element)
 				{
@@ -6026,7 +6175,7 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 			{
 				// Texcoord interpolator registers:
 				const DebuggableD3DVERTEXELEMENT9* const element = vertexDeclMapping.vals[D3DDECLUSAGE_TEXCOORD][reg.usageIndex];
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]);
 				if (!element)
 				{
 					// It seems like this is correct behavior (color usage elements that are unbound from either the VS or pretransformed vertex data are read into the PS as (1,1,1,1) whereas all other usages are (0,0,0,0) ), but I can't find documentation for this
@@ -6073,7 +6222,7 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 			if (reg.registerType == D3DSPR_INPUT)
 			{
 				// Interpolator registers:
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]);
 				const DebuggableD3DVERTEXELEMENT9* const element = vertexDeclMapping.vals[reg.usageType][reg.usageIndex];
 				if (!element)
 				{
@@ -6122,6 +6271,353 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 #endif
 }
 
+// Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters4(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, const __m128 (&barycentricInterpolants)[4], CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ, const __m128 pixelZ4) const
+{
+	// Precompute some vectors that will be used for all of attribute interpolation
+	const __m128 floatBarycentricsInvZ4[4] = 
+	{
+		(pixelWriteMask & 0x1) ? _mm_mul_ps(invZ, barycentricInterpolants[0]) : _mm_setzero_ps(),
+		(pixelWriteMask & 0x2) ? _mm_mul_ps(invZ, barycentricInterpolants[1]) : _mm_setzero_ps(),
+		(pixelWriteMask & 0x4) ? _mm_mul_ps(invZ, barycentricInterpolants[2]) : _mm_setzero_ps(),
+		(pixelWriteMask & 0x8) ? _mm_mul_ps(invZ, barycentricInterpolants[3]) : _mm_setzero_ps()
+	};
+	const __m128 floatBarycentricsInvZ_X4[4] = 
+	{
+		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(0, 0, 0, 0) )
+	};
+	const __m128 floatBarycentricsInvZ_Y4[4] = 
+	{
+		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(1, 1, 1, 1) )
+	};
+	const __m128 floatBarycentricsInvZ_Z4[4] = 
+	{
+		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(2, 2, 2, 2) )
+	};
+
+	const ShaderInfo& pixelShaderInfo = currentState.currentPixelShader->GetShaderInfo();
+	if (pixelShaderInfo.shaderMajorVersion == 1)
+	{
+		for (unsigned char v = 0; v < D3DMCS_COLOR2; ++v)
+		{
+			if (pixelShaderInfo.inputRegistersUsedBitmask & (1 << v) )
+			{
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[v]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_2_0_inputs.v[v]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_2_0_inputs.v[v]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_2_0_inputs.v[v])
+				};
+
+				const DebuggableD3DVERTEXELEMENT9* const foundColorValue = vertexDeclMapping.vals[D3DDECLUSAGE_COLOR][v];
+				if (foundColorValue)
+				{
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
+					const D3DDECLTYPE registerLoadType = foundColorValue->Type;
+					LoadElementToRegister(cf0, registerLoadType, (v0 + foundColorValue->Offset) );
+
+					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT)
+					{
+						// Color interpolator registers:
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
+						LoadElementToRegister(cf1, registerLoadType, (v1 + foundColorValue->Offset) );
+						LoadElementToRegister(cf2, registerLoadType, (v2 + foundColorValue->Offset) );
+
+						D3DXVECTOR4 interpolatedValues4[4];
+						InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+					}
+					else
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+					}
+				}
+				else
+				{
+					// It seems like this is correct behavior (color usage elements that are unbound from either the VS or pretransformed vertex data are read into the PS as (1,1,1,1) whereas all other usages are (0,0,0,0) ), but I can't find documentation for this
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = staticColorWhiteOpaque;
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = staticColorWhiteOpaque;
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = staticColorWhiteOpaque;
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = staticColorWhiteOpaque;
+				}
+			}
+		}
+		for (unsigned char t = 0; t < 6; ++t)
+		{
+			if (pixelShaderInfo.inputRegistersUsedBitmask & (1 << (t + D3DMCS_COLOR2) ) )
+			{
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[t]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_2_0_inputs.t[t]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_2_0_inputs.t[t]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_2_0_inputs.t[t])
+				};
+
+				const DebuggableD3DVERTEXELEMENT9* const foundTexcoordValue = vertexDeclMapping.vals[D3DDECLUSAGE_TEXCOORD][t];
+				if (foundTexcoordValue)
+				{
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
+					const D3DDECLTYPE registerLoadType = foundTexcoordValue->Type;
+					LoadElementToRegister(cf0, registerLoadType, (v0 + foundTexcoordValue->Offset) );
+
+					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT)
+					{
+						// Texcoord interpolator registers:
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
+						LoadElementToRegister(cf1, registerLoadType, (v1 + foundTexcoordValue->Offset) );
+						LoadElementToRegister(cf2, registerLoadType, (v2 + foundTexcoordValue->Offset) );
+
+						D3DXVECTOR4 interpolatedValues4[4];
+						InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+					}
+					else
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+					}
+				}
+				else
+				{
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = staticColorBlackTranslucent;
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = staticColorBlackTranslucent;
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = staticColorBlackTranslucent;
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = staticColorBlackTranslucent;
+				}
+			}
+		}
+	}
+	else if (pixelShaderInfo.shaderMajorVersion == 2)
+	{
+		const unsigned numDeclaredRegisters = pixelShaderInfo.declaredRegisters.size();
+		for (unsigned x = 0; x < numDeclaredRegisters; ++x)
+		{
+			const DeclaredRegister& reg = pixelShaderInfo.declaredRegisters[x];
+			if (reg.registerType == D3DSPR_INPUT)
+			{
+				// Color interpolator registers:
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex])
+				};
+				const DebuggableD3DVERTEXELEMENT9* const element = vertexDeclMapping.vals[D3DDECLUSAGE_COLOR][reg.usageIndex];
+				if (!element)
+				{
+					// It seems like this is correct behavior (color usage elements that are unbound from either the VS or pretransformed vertex data are read into the PS as (1,1,1,1) whereas all other usages are (0,0,0,0) ), but I can't find documentation for this
+					if (reg.usageType == D3DDECLUSAGE_COLOR)
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = staticColorWhiteOpaque;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = staticColorWhiteOpaque;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = staticColorWhiteOpaque;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = staticColorWhiteOpaque;
+					}
+					else
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = staticColorBlackTranslucent;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = staticColorBlackTranslucent;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = staticColorBlackTranslucent;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = staticColorBlackTranslucent;
+					}
+				}
+				else
+				{
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
+					const D3DDECLTYPE registerLoadType = element->Type;
+					LoadElementToRegister(cf0, registerLoadType, (v0 + element->Offset) );
+
+					// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
+					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
+					{
+						// Color interpolator registers:
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
+						LoadElementToRegister(cf1, registerLoadType, (v1 + element->Offset) );
+						LoadElementToRegister(cf2, registerLoadType, (v2 + element->Offset) );
+
+						D3DXVECTOR4 interpolatedValues4[4];
+						InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+					}
+					else
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+					}
+				}
+			}
+			else if (reg.registerType == D3DSPR_TEXTURE)
+			{
+				// Texcoord interpolator registers:
+				const DebuggableD3DVERTEXELEMENT9* const element = vertexDeclMapping.vals[D3DDECLUSAGE_TEXCOORD][reg.usageIndex];
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex])
+				};
+				if (!element)
+				{
+					// It seems like this is correct behavior (color usage elements that are unbound from either the VS or pretransformed vertex data are read into the PS as (1,1,1,1) whereas all other usages are (0,0,0,0) ), but I can't find documentation for this
+					if (reg.usageType == D3DDECLUSAGE_COLOR)
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = staticColorWhiteOpaque;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = staticColorWhiteOpaque;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = staticColorWhiteOpaque;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = staticColorWhiteOpaque;
+					}
+					else
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = staticColorBlackTranslucent;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = staticColorBlackTranslucent;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = staticColorBlackTranslucent;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = staticColorBlackTranslucent;
+					}
+				}
+				else
+				{
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
+					const D3DDECLTYPE registerLoadType = element->Type;
+					LoadElementToRegister(cf0, registerLoadType, (v0 + element->Offset) );
+
+					// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
+					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
+					{
+						// Texcoord interpolator registers:
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
+						LoadElementToRegister(cf1, registerLoadType, (v1 + element->Offset) );
+						LoadElementToRegister(cf2, registerLoadType, (v2 + element->Offset) );
+
+						D3DXVECTOR4 interpolatedValues4[4];
+						InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+					}
+					else
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+					}
+				}
+			}
+		}
+	}
+	else if (pixelShaderInfo.shaderMajorVersion == 3)
+	{
+		const unsigned numDeclaredRegisters = pixelShaderInfo.declaredRegisters.size();
+		for (unsigned x = 0; x < numDeclaredRegisters; ++x)
+		{
+			const DeclaredRegister& reg = pixelShaderInfo.declaredRegisters[x];
+			if (reg.registerType == D3DSPR_INPUT)
+			{
+				// Interpolator registers:
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex])
+				};
+				const DebuggableD3DVERTEXELEMENT9* const element = vertexDeclMapping.vals[reg.usageType][reg.usageIndex];
+				if (!element)
+				{
+					// It seems like this is correct behavior (color usage elements that are unbound from either the VS or pretransformed vertex data are read into the PS as (1,1,1,1) whereas all other usages are (0,0,0,0) ), but I can't find documentation for this
+					if (reg.usageType == D3DDECLUSAGE_COLOR)
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = staticColorWhiteOpaque;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = staticColorWhiteOpaque;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = staticColorWhiteOpaque;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = staticColorWhiteOpaque;
+					}
+					else
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = staticColorBlackTranslucent;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = staticColorBlackTranslucent;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = staticColorBlackTranslucent;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = staticColorBlackTranslucent;
+					}
+				}
+				else
+				{
+					__declspec(align(16) ) D3DXVECTOR4 cf0;
+					const D3DDECLTYPE registerLoadType = element->Type;
+
+					LoadElementToRegister(cf0, registerLoadType, (v0 + element->Offset) );
+
+					// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
+					if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
+					{
+						// Interpolator registers:
+						__declspec(align(16) ) D3DXVECTOR4 cf1;
+						__declspec(align(16) ) D3DXVECTOR4 cf2;
+						LoadElementToRegister(cf1, registerLoadType, (v1 + element->Offset) );
+						LoadElementToRegister(cf2, registerLoadType, (v2 + element->Offset) );
+
+						// TODO: Implement PS_3_0 interpreters too
+						D3DXVECTOR4 interpolatedValues4[4];
+						InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+					}
+					else
+					{
+						if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+						if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+						if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+						if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+					}
+				}
+			}
+		}
+	}
+#ifdef _DEBUG
+	else
+	{
+		DbgBreakPrint("Error: Unknown pixel shader version specified (not 1, 2, or 3)");
+	}
+#endif
+}
+
 static const __m128 oneVec = { 1.0f, 1.0f, 1.0f, 1.0f };
 static const __m128 maxDepth24Bit = { 16777216.0f, 16777216.0f, 16777216.0f, 16777216.0f };
 
@@ -6133,6 +6629,8 @@ const float IDirect3DDevice9Hook::InterpolatePixelDepth(const __m128 barycentric
 	const D3DXVECTOR4& xyzRhw2 = *(const D3DXVECTOR4* const)(v2 + byteOffsetToOPosition);
 
 	// Apply perspective-correct Z interpolation:
+
+	// TODO: Move inverse-Z calculation into primitive data, since it doesn't change per-pixel, it only changes per-triangle
 	__m128 localInvZ;
 	localInvZ.m128_f32[0] = xyzRhw0.z;
 	localInvZ.m128_f32[1] = xyzRhw1.z;
@@ -6150,7 +6648,7 @@ const float IDirect3DDevice9Hook::InterpolatePixelDepth(const __m128 barycentric
 	return _mm_div_ps(oneVec, invInterpolatedDepth).m128_f32[0];
 }
 
-void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128 (&outInvZAndDepth4)[4]) const
+void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128& outInvZ, __m128& outPixelDepth4) const
 {
 	// TODO: This assumes that the PositionT element is a D3DDECLTYPE_FLOAT4 (which is the default, and the case in the vast majority of situations)
 	const D3DXVECTOR4& xyzRhw0 = *(const D3DXVECTOR4* const)(v0 + byteOffsetToOPosition);
@@ -6158,6 +6656,8 @@ void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInte
 	const D3DXVECTOR4& xyzRhw2 = *(const D3DXVECTOR4* const)(v2 + byteOffsetToOPosition);
 
 	// Apply perspective-correct Z interpolation:
+
+	// TODO: Move inverse-Z calculation into primitive data, since it doesn't change per-pixel, it only changes per-triangle
 	__m128 localInvZ;
 	localInvZ.m128_f32[0] = xyzRhw0.z;
 	localInvZ.m128_f32[1] = xyzRhw1.z;
@@ -6182,20 +6682,8 @@ void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInte
 	};
 
 	const __m128 pixelDepth4 = _mm_div_ps(oneVec, invInterpolatedDepth4);
-	__m128 out0 = localInvZSelected;
-	__m128 out1 = localInvZSelected;
-	__m128 out2 = localInvZSelected;
-	__m128 out3 = localInvZSelected;
-
-	out0.m128_f32[3] = pixelDepth4.m128_f32[0];
-	out1.m128_f32[3] = pixelDepth4.m128_f32[1];
-	out2.m128_f32[3] = pixelDepth4.m128_f32[2];
-	out3.m128_f32[3] = pixelDepth4.m128_f32[3];
-
-	outInvZAndDepth4[0] = out0;
-	outInvZAndDepth4[1] = out1;
-	outInvZAndDepth4[2] = out2;
-	outInvZAndDepth4[3] = out3;
+	outInvZ = localInvZSelected;
+	outPixelDepth4 = pixelDepth4;
 }
 
 // Handles interpolating pixel shader input registers from vertex shader output registers
@@ -6218,7 +6706,7 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 			{
 				const unsigned char vsRegisterIndex = v;
 				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_2_0_outputs.oD[vsRegisterIndex]);
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.v[v]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[v]);
 				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT)
 				{
 					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_2_0_outputs.oD[vsRegisterIndex]);
@@ -6237,7 +6725,7 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 			{
 				const unsigned char vsRegisterIndex = t;
 				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_2_0_outputs.oT[vsRegisterIndex]);
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.t[t]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[t]);
 				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT)
 				{
 					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_2_0_outputs.oT[vsRegisterIndex]);
@@ -6263,7 +6751,7 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 				const unsigned vsRegisterIndex = vs_psMapping.psInputRegistersUnion.ps_2_0_registers.colors[reg.registerIndex];
 				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
 
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]);
 
 				// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
 				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
@@ -6283,7 +6771,7 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 				// Texcoord interpolator registers:
 				const unsigned vsRegisterIndex = vs_psMapping.psInputRegistersUnion.ps_2_0_registers.texCoords[reg.registerIndex];
 				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]);
 
 				// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
 				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
@@ -6311,7 +6799,7 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 				// Interpolator registers:
 				const unsigned vsRegisterIndex = vs_psMapping.psInputRegistersUnion.ps_3_0_registers.inputs[reg.registerIndex];
 				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
-				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters.ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]);
+				D3DXVECTOR4& interpolatedFloatValue = *(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]);
 
 				// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
 				if (reg.usageType != D3DDECLUSAGE_BLENDINDICES)
@@ -6338,11 +6826,250 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 #endif
 }
 
+// Handles interpolating pixel shader input registers from vertex shader output registers
+// TODO: Like InterpolateStreamIntoRegisters, have this function fill with (1,1,1,1) for input color usage registers or (0,0,0,0) for other usages if the vertex shader doesn't write to the corresponding output registers
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters4(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const __m128 (&barycentricInterpolants)[4], const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ, const __m128 pixelZ4) const
+{
+	// Precompute some vectors that will be used for all of attribute interpolation
+	const __m128 floatBarycentricsInvZ4[4] = 
+	{
+		(pixelWriteMask & 0x1) ? _mm_mul_ps(invZ, barycentricInterpolants[0]) : _mm_setzero_ps(),
+		(pixelWriteMask & 0x2) ? _mm_mul_ps(invZ, barycentricInterpolants[1]) : _mm_setzero_ps(),
+		(pixelWriteMask & 0x4) ? _mm_mul_ps(invZ, barycentricInterpolants[2]) : _mm_setzero_ps(),
+		(pixelWriteMask & 0x8) ? _mm_mul_ps(invZ, barycentricInterpolants[3]) : _mm_setzero_ps()
+	};
+	const __m128 floatBarycentricsInvZ_X4[4] = 
+	{
+		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(0, 0, 0, 0) )
+	};
+	const __m128 floatBarycentricsInvZ_Y4[4] = 
+	{
+		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(1, 1, 1, 1) )
+	};
+	const __m128 floatBarycentricsInvZ_Z4[4] = 
+	{
+		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(2, 2, 2, 2) )
+	};
+
+	const ShaderInfo& pixelShaderInfo = currentState.currentPixelShader->GetShaderInfo();
+	if (pixelShaderInfo.shaderMajorVersion == 1)
+	{
+		// ps_1_* doesn't use input declarations, so we need to use another method to figure out which input registers we need interpolated
+		for (unsigned char v = 0; v < D3DMCS_COLOR2; ++v)
+		{
+			if (pixelShaderInfo.inputRegistersUsedBitmask & (1 << v) )
+			{
+				const unsigned char vsRegisterIndex = v;
+				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_2_0_outputs.oD[vsRegisterIndex]);
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[v]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_2_0_inputs.v[v]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_2_0_inputs.v[v]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_2_0_inputs.v[v])
+				};
+				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT)
+				{
+					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_2_0_outputs.oD[vsRegisterIndex]);
+					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_2_0_outputs.oD[vsRegisterIndex]);
+					
+					D3DXVECTOR4 interpolatedValues4[4];
+					InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+				}
+				else
+				{
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+				}
+			}
+		}
+		for (unsigned char t = 0; t < 6; ++t)
+		{
+			if (pixelShaderInfo.inputRegistersUsedBitmask & (1 << (t + D3DMCS_COLOR2) ) )
+			{
+				const unsigned char vsRegisterIndex = t;
+				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_2_0_outputs.oT[vsRegisterIndex]);
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[t]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_2_0_inputs.t[t]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_2_0_inputs.t[t]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_2_0_inputs.t[t])
+				};
+				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT)
+				{
+					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_2_0_outputs.oT[vsRegisterIndex]);
+					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_2_0_outputs.oT[vsRegisterIndex]);
+					
+					D3DXVECTOR4 interpolatedValues4[4];
+					InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+				}
+				else
+				{
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+				}
+			}
+		}
+	}
+	else if (pixelShaderInfo.shaderMajorVersion == 2)
+	{
+		const unsigned numDeclaredRegisters = pixelShaderInfo.declaredRegisters.size();
+		for (unsigned x = 0; x < numDeclaredRegisters; ++x)
+		{
+			const DeclaredRegister& reg = pixelShaderInfo.declaredRegisters[x];
+			if (reg.registerType == D3DSPR_INPUT)
+			{
+				// Color interpolator registers:
+				const unsigned vsRegisterIndex = vs_psMapping.psInputRegistersUnion.ps_2_0_registers.colors[reg.registerIndex];
+				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
+
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_2_0_inputs.v[reg.registerIndex])
+				};
+
+				// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
+				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
+				{
+					// Color interpolator registers:
+					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
+					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
+					
+					D3DXVECTOR4 interpolatedValues4[4];
+					InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+				}
+				else
+				{
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+				}
+			}
+			else if (reg.registerType == D3DSPR_TEXTURE)
+			{
+				// Texcoord interpolator registers:
+				const unsigned vsRegisterIndex = vs_psMapping.psInputRegistersUnion.ps_2_0_registers.texCoords[reg.registerIndex];
+				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_2_0_inputs.t[reg.registerIndex])
+				};
+
+				// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
+				if (currentState.currentRenderStates.renderStatesUnion.namedStates.shadeMode != D3DSHADE_FLAT && reg.usageType != D3DDECLUSAGE_BLENDINDICES)
+				{
+					// Texcoord interpolator registers:
+					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
+					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
+					
+					D3DXVECTOR4 interpolatedValues4[4];
+					InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+				}
+				else
+				{
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+				}
+			}
+		}
+	}
+	else if (pixelShaderInfo.shaderMajorVersion == 3)
+	{
+		const unsigned numDeclaredRegisters = pixelShaderInfo.declaredRegisters.size();
+		for (unsigned x = 0; x < numDeclaredRegisters; ++x)
+		{
+			const DeclaredRegister& reg = pixelShaderInfo.declaredRegisters[x];
+			if (reg.registerType == D3DSPR_INPUT)
+			{
+				// Interpolator registers:
+				const unsigned vsRegisterIndex = vs_psMapping.psInputRegistersUnion.ps_3_0_registers.inputs[reg.registerIndex];
+				const D3DXVECTOR4& cf0 = *(const D3DXVECTOR4* const)&(v0.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
+				D3DXVECTOR4* const interpolatedOutRegisterValues[4] = 
+				{
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[0].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[1].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[2].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex]),
+					(D3DXVECTOR4* const)&(pixelShader->inputRegisters[3].ps_interpolated_inputs.ps_3_0_inputs.t[reg.registerIndex])
+				};
+
+				// TODO: Look into whether or not D3DDECLUSAGE_POSITION in pixel shaders disables perspective correction for that interpolated register or not
+				if (reg.usageType != D3DDECLUSAGE_BLENDINDICES)
+				{
+					// Interpolator registers:
+					const D3DXVECTOR4& cf1 = *(const D3DXVECTOR4* const)&(v1.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
+					const D3DXVECTOR4& cf2 = *(const D3DXVECTOR4* const)&(v2.vs_interpolated_outputs.vs_3_0_outputs.oT[vsRegisterIndex]);
+
+					// TODO: Implement PS_3_0 interpreters too
+					
+					D3DXVECTOR4 interpolatedValues4[4];
+					InterpolateVertexAttribute_PerspectiveCorrect4(cf0, cf1, cf2, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4, pixelZ4, interpolatedValues4);
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = interpolatedValues4[0];
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = interpolatedValues4[1];
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = interpolatedValues4[2];
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = interpolatedValues4[3];
+				}
+				else
+				{
+					if (pixelWriteMask & 0x1) *interpolatedOutRegisterValues[0] = cf0;
+					if (pixelWriteMask & 0x2) *interpolatedOutRegisterValues[1] = cf0;
+					if (pixelWriteMask & 0x4) *interpolatedOutRegisterValues[2] = cf0;
+					if (pixelWriteMask & 0x8) *interpolatedOutRegisterValues[3] = cf0;
+				}
+			}
+		}
+	}
+#ifdef _DEBUG
+	else
+	{
+		DbgBreakPrint("Error: Unknown pixel shader version specified (not 1, 2, or 3)");
+	}
+#endif
+}
+
 
 /*
 Last big chunks before pixel4 is ready:
 StencilOperation
-InterpolateStreamIntoRegisters/InterpolateShaderIntoRegisters
 Interpreter engine
 Job forking
 
@@ -6364,7 +7091,7 @@ void IDirect3DDevice9Hook::ShadePixel(const unsigned x, const unsigned y, PShade
 {
 	++frameStats.numPixelsShaded;
 
-	if (pixelShader->outputRegisters->pixelStatus == normalWrite)
+	if (pixelShader->outputRegisters[0].pixelStatus == normalWrite)
 	{
 		// Perform pixel shading:
 #ifndef FORCE_INTERPRETED_PIXEL_SHADER
@@ -6381,13 +7108,13 @@ void IDirect3DDevice9Hook::ShadePixel(const unsigned x, const unsigned y, PShade
 		}
 	}
 
-	switch (pixelShader->outputRegisters->pixelStatus)
+	switch (pixelShader->outputRegisters[0].pixelStatus)
 	{
 	case normalWrite:
 	{
 		// Alpha testing:
 		// This MSDN page says that alpha testing only happens against the alpha value from oC0: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/multiple-render-targets
-		if (!AlphaTest(*(const D3DXVECTOR4* const)&(pixelShader->outputRegisters->oC[0]) ) )
+		if (!AlphaTest(*(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[0].oC[0]) ) )
 		{
 			++frameStats.numAlphaTestFailPixels;
 			return;
@@ -6401,7 +7128,7 @@ void IDirect3DDevice9Hook::ShadePixel(const unsigned x, const unsigned y, PShade
 			if (!currentRenderTarget)
 				continue;
 
-			RenderOutput(currentRenderTarget, xCoord, yCoord, *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters->oC[rt]) );
+			RenderOutput(currentRenderTarget, xCoord, yCoord, *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[0].oC[rt]) );
 		}
 
 		if (currentState.currentDepthStencil)
@@ -6409,7 +7136,7 @@ void IDirect3DDevice9Hook::ShadePixel(const unsigned x, const unsigned y, PShade
 			if (currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable)
 			{
 				const float depthBias = currentState.currentRenderStates.renderStatesUnion.namedStates.depthBias;
-				currentState.currentDepthStencil->SetDepth(xCoord, yCoord, pixelShader->outputRegisters->oDepth + depthBias);
+				currentState.currentDepthStencil->SetDepth(xCoord, yCoord, pixelShader->outputRegisters[0].oDepth + depthBias);
 			}
 			
 			if (currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
@@ -6443,6 +7170,125 @@ void IDirect3DDevice9Hook::ShadePixel(const unsigned x, const unsigned y, PShade
 			const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
 			const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
 			StencilZFailOperation(xCoord, yCoord);
+		}
+		break;
+	}
+}
+
+template <const unsigned pixelWriteMask>
+void IDirect3DDevice9Hook::ShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
+{
+	frameStats.numPixelsShaded += 4;
+
+	if (pixelShader->outputRegisters[0].pixelStatus == normalWrite)
+	{
+		// Perform pixel shading:
+#ifndef FORCE_INTERPRETED_PIXEL_SHADER
+		if (currentState.currentPixelShader->jitShaderMain)
+		{
+			// Execute JIT pixel shader engine:
+			currentState.currentPixelShader->jitShaderMain(*pixelShader);
+		}
+		else
+#endif
+		{
+			// Execute interpreted pixel shader engine:
+			pixelShader->InterpreterExecutePixel();
+		}
+
+		// Hack for now:
+		// TODO: Need to write a quad execution interpreter engine, and a quad JIT engine to replace this
+		pixelShader->outputRegisters[1] = pixelShader->outputRegisters[0];
+		pixelShader->outputRegisters[2] = pixelShader->outputRegisters[0];
+		pixelShader->outputRegisters[3] = pixelShader->outputRegisters[0];
+	}
+
+	switch (pixelShader->outputRegisters[0].pixelStatus)
+	{
+	case normalWrite:
+	{
+		// Alpha testing:
+		// This MSDN page says that alpha testing only happens against the alpha value from oC0: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/multiple-render-targets
+		if (!AlphaTest(*(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[0].oC[0]) ) )
+		{
+			frameStats.numAlphaTestFailPixels += 4;
+			return;
+		}
+
+		for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
+		{
+			IDirect3DSurface9Hook* const currentRenderTarget = currentState.currentRenderTargets[rt];
+			if (!currentRenderTarget)
+				continue;
+
+			// TODO: Need to write a RenderOutput4 to replace this
+			for (unsigned z = 0; z < 4; ++z)
+			{
+				if (pixelWriteMask & (1 << z) )
+					RenderOutput(currentRenderTarget, x4.m128i_u32[z], y4.m128i_u32[z], *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[0].oC[rt]) );
+			}
+		}
+
+		if (currentState.currentDepthStencil)
+		{
+			if (currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable)
+			{
+				const float depthBias = currentState.currentRenderStates.renderStatesUnion.namedStates.depthBias;
+				__m128 depth4;
+				if (pixelWriteMask & 0x1)
+					depth4.m128_f32[0] = pixelShader->outputRegisters[0].oDepth;
+				if (pixelWriteMask & 0x2)
+					depth4.m128_f32[1] = pixelShader->outputRegisters[1].oDepth;
+				if (pixelWriteMask & 0x4)
+					depth4.m128_f32[2] = pixelShader->outputRegisters[2].oDepth;
+				if (pixelWriteMask & 0x8)
+					depth4.m128_f32[3] = pixelShader->outputRegisters[3].oDepth;
+				depth4 = _mm_add_ps(depth4, _mm_set1_ps(depthBias) );
+				currentState.currentDepthStencil->SetDepth4<pixelWriteMask>(x4, y4, depth4);
+			}
+			
+			if (currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
+			{
+				// TODO: Need to write a StencilOperation4 to replace this
+				for (unsigned z = 0; z < 4; ++z)
+				{
+					if (pixelWriteMask & (1 << z) )
+						StencilPassOperation(x4.m128i_u32[z], y4.m128i_u32[z]);
+				}
+			}
+		}
+	}
+		break;
+	default:
+#ifdef _DEBUG
+		DbgBreakPrint("Error: Unknown pixelstatus!");
+#else
+		__assume(0);
+#endif
+	case discard:
+		// Pixel discarded (TEXKILL) case, don't write out anything!
+		frameStats.numPixelsTexkilled += 4;
+		break;
+	case stencilFail:
+		if (currentState.currentDepthStencil && currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
+		{
+			// TODO: Need to write a StencilOperation4 to replace this
+			for (unsigned z = 0; z < 4; ++z)
+			{
+				if (pixelWriteMask & (1 << z) )
+					StencilFailOperation(x4.m128i_u32[z], y4.m128i_u32[z]);
+			}
+		}
+		break;
+	case ZFail:
+		if (currentState.currentDepthStencil && currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
+		{
+			// TODO: Need to write a StencilOperation4 to replace this
+			for (unsigned z = 0; z < 4; ++z)
+			{
+				if (pixelWriteMask & (1 << z) )
+					StencilZFailOperation(x4.m128i_u32[z], y4.m128i_u32[z]);
+			}
 		}
 		break;
 	}
@@ -6663,9 +7509,6 @@ const bool IDirect3DDevice9Hook::StencilTestNoWrite(const unsigned x, const unsi
 	if (!currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
 		return true;
 
-	if (!currentState.currentDepthStencil)
-		return true;
-
 	const DWORD rawDestStencilVal = currentState.currentDepthStencil->GetStencil(x, y);
 	const DWORD maskedDestStencilVal = currentState.currentRenderStates.renderStatesUnion.namedStates.stencilMask & rawDestStencilVal;
 
@@ -6700,28 +7543,16 @@ const bool IDirect3DDevice9Hook::StencilTestNoWrite(const unsigned x, const unsi
 // Handles running the pixel shader from a processed vertex shader
 void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const
 {
-	// Perform Z-clipping (clip the pixel if it's outside of the [0.0, 1.0] range):
 	__m128 invZ;
 	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, byteOffsetToOPosition, (CONST BYTE* const)&v0, (CONST BYTE* const)&v1, (CONST BYTE* const)&v2, invZ);
 
-	// In the future when we have proper vertex clipping, this step shouldn't be necessary as the verts coming in from the rasterizer should always be clipped between 0.0 and 1.0
-	if (pixelDepth < 0.0f)
-		return;
-	else if (pixelDepth > 1.0f)
-		return;
-
-	PS_2_0_OutputRegisters pixelOutput;
+	__declspec(align(16) ) PS_2_0_OutputRegisters pixelOutput;
 
 	// Very important to reset the state machine back to its original settings!
 	PreShadePixel(x, y, pixelEngine, &pixelOutput);
 
 	if (currentState.currentDepthStencil)
 	{
-		// Return "depth fail/stencil fail" for all texels outside of the bounds of the depth/stencil buffer
-		// This can happen as the depth/stencil buffer can be a different size than the current render targets
-		if (!currentState.currentDepthStencil->IsTexelValid(x, y) )
-			return;
-
 		if (!StencilTestNoWrite(x, y) )
 		{
 			// Fail the stencil test!
@@ -6747,6 +7578,123 @@ void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine
 	InterpolateShaderIntoRegisters(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth);
 
 	ShadePixel(x, y, pixelEngine);
+}
+
+// Handles running the pixel shader from a processed vertex shader
+void IDirect3DDevice9Hook::ShadePixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const
+{
+	__m128 invZ;
+	__m128 pixelDepth4;
+	InterpolatePixelDepth4(barycentricInterpolants, byteOffsetToOPosition, (CONST BYTE* const)&v0, (CONST BYTE* const)&v1, (CONST BYTE* const)&v2, invZ, pixelDepth4);
+
+	__declspec(align(16) ) PS_2_0_OutputRegisters pixelOutput4[4];
+
+	// Very important to reset the state machine back to its original settings!
+	PreShadePixel4(x4, y4, pixelEngine, pixelOutput4);
+
+	unsigned char pixelWriteMask = 0xF;
+	if (currentState.currentDepthStencil)
+	{
+		// TODO: Make a StencilTestNoWrite4
+		/*for (unsigned z = 0; z < 4; ++z)
+		{
+			if (!StencilTestNoWrite(x4.m128i_i32[z], y4.m128i_i32[z]) )
+			{
+				// Fail the stencil test!
+				pixelOutput4[z].pixelStatus = stencilFail;
+				ShadePixel(x, y, pixelEngine);
+				return;
+			}
+		}*/
+
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zEnable)
+		{
+			const __m128i bufferDepth4 = currentState.currentDepthStencil->GetRawDepth4(x4, y4);
+			const __m128i depthTestResults = DepthTest4(pixelDepth4, bufferDepth4, currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc, currentState.currentDepthStencil->GetInternalFormat() );
+			const unsigned char maskBits = _mm_movemask_ps(_mm_cvtepi32_ps(depthTestResults) );
+			if (maskBits == 0x0)
+				return;
+			pixelWriteMask = maskBits;
+			pixelOutput4[0].oDepth = pixelDepth4.m128_f32[0];
+			pixelOutput4[0].pixelStatus = (maskBits & 0x1) ? normalWrite : ZFail;
+			pixelOutput4[1].oDepth = pixelDepth4.m128_f32[1];
+			pixelOutput4[1].pixelStatus = (maskBits & 0x2) ? normalWrite : ZFail;
+			pixelOutput4[2].oDepth = pixelDepth4.m128_f32[2];
+			pixelOutput4[2].pixelStatus = (maskBits & 0x4) ? normalWrite : ZFail;
+			pixelOutput4[3].oDepth = pixelDepth4.m128_f32[3];
+			pixelOutput4[3].pixelStatus = (maskBits & 0x8) ? normalWrite : ZFail;
+		}
+	}
+
+	switch (pixelWriteMask)
+	{
+	case 0x1:
+		InterpolateShaderIntoRegisters4<0x1>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x1>(x4, y4, pixelEngine);
+		break;
+	case 0x2:
+		InterpolateShaderIntoRegisters4<0x2>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x2>(x4, y4, pixelEngine);
+		break;
+	case 0x3:
+		InterpolateShaderIntoRegisters4<0x3>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x3>(x4, y4, pixelEngine);
+		break;
+	case 0x4:
+		InterpolateShaderIntoRegisters4<0x4>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x4>(x4, y4, pixelEngine);
+		break;
+	case 0x5:
+		InterpolateShaderIntoRegisters4<0x5>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x5>(x4, y4, pixelEngine);
+		break;
+	case 0x6:
+		InterpolateShaderIntoRegisters4<0x6>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x6>(x4, y4, pixelEngine);
+		break;
+	case 0x7:
+		InterpolateShaderIntoRegisters4<0x7>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x7>(x4, y4, pixelEngine);
+		break;
+	case 0x8:
+		InterpolateShaderIntoRegisters4<0x8>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x8>(x4, y4, pixelEngine);
+		break;
+	case 0x9:
+		InterpolateShaderIntoRegisters4<0x9>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0x9>(x4, y4, pixelEngine);
+		break;
+	case 0xA:
+		InterpolateShaderIntoRegisters4<0xA>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xA>(x4, y4, pixelEngine);
+		break;
+	case 0xB:
+		InterpolateShaderIntoRegisters4<0xB>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xB>(x4, y4, pixelEngine);
+		break;
+	case 0xC:
+		InterpolateShaderIntoRegisters4<0xC>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xC>(x4, y4, pixelEngine);
+		break;
+	case 0xD:
+		InterpolateShaderIntoRegisters4<0xD>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xD>(x4, y4, pixelEngine);
+		break;
+	case 0xE:
+		InterpolateShaderIntoRegisters4<0xE>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xE>(x4, y4, pixelEngine);
+		break;
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // Should never be here!
+#else
+		__assume(0);
+#endif
+	case 0xF:
+		InterpolateShaderIntoRegisters4<0xF>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		ShadePixel4<0xF>(x4, y4, pixelEngine);
+		break;
+	}
 }
 
 static inline const bool isTopLeftEdge(const int2& v0, const int2& v1)
@@ -6859,7 +7807,7 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	{
 		depthStencil = currentState.currentDepthStencil;
 
-		const __m128 depthExtents = depthStencil->GetInternalWidthHeightM1F();
+		const __m128 depthExtents = depthStencil->GetInternalWidthHeightM2F();
 		topleft = _mm_min_ps(topleft, depthExtents);
 		botright = _mm_min_ps(botright, depthExtents);
 	}

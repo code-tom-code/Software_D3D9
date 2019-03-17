@@ -1412,7 +1412,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 			{
 				sprintf(buffer, "\tif (%s.x < 0.0f)\n"
 					"\t{\n"
-					"\t\tps.outputRegisters->pixelStatus = discard;\n"
+					"\t\tps.outputRegisters[0].pixelStatus = discard;\n"
 					"\t\treturn;\n"
 					"\t}\n", registerName);
 				AppendString(shaderbody, buffer);
@@ -1421,7 +1421,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 			{
 				sprintf(buffer, "\tif (%s.y < 0.0f)\n"
 					"\t{\n"
-					"\t\tps.outputRegisters->pixelStatus = discard;\n"
+					"\t\tps.outputRegisters[0].pixelStatus = discard;\n"
 					"\t\treturn;\n"
 					"\t}\n", registerName);
 				AppendString(shaderbody, buffer);
@@ -1430,7 +1430,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 			{
 				sprintf(buffer, "\tif (%s.z < 0.0f)\n"
 					"\t{\n"
-					"\t\tps.outputRegisters->pixelStatus = discard;\n"
+					"\t\tps.outputRegisters[0].pixelStatus = discard;\n"
 					"\t\treturn;\n"
 					"\t}\n", registerName);
 				AppendString(shaderbody, buffer);
@@ -1807,7 +1807,7 @@ const bool JITCPPFileInternal(const ShaderInfo& shaderInfo, const char* const sh
 					bool textureRegCanBeConst = true;
 					if (shaderInfo.shaderMajorVersion == 1 && shaderInfo.shaderMinorVersion < 4 && shaderInfo.numTexInstructions > 0)
 						textureRegCanBeConst = false;
-					sprintf(inputRegBuffer, "\t%sfloat4& %c%u = *(%sfloat4* const)&(ps.inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.%c[%u]);\n", 
+					sprintf(inputRegBuffer, "\t%sfloat4& %c%u = *(%sfloat4* const)&(ps.inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.%c[%u]);\n", 
 						textureRegCanBeConst ? "const " : "", 't', thisReg.registerIndex, textureRegCanBeConst ? "const " : "", 't', thisReg.registerIndex);
 				}
 					break;
@@ -1815,7 +1815,7 @@ const bool JITCPPFileInternal(const ShaderInfo& shaderInfo, const char* const sh
 					sprintf(inputRegBuffer, "\tconst sampler* const s%u = &(ps.constantRegisters->s[%u]);\n", thisReg.registerIndex, thisReg.registerIndex);
 					break;
 				case D3DSPR_INPUT:
-					sprintf(inputRegBuffer, "\tconst float4& %c%u = *(const float4* const)&(ps.inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.%c[%u]);\n", 'v', thisReg.registerIndex, 'v', thisReg.registerIndex);
+					sprintf(inputRegBuffer, "\tconst float4& %c%u = *(const float4* const)&(ps.inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.%c[%u]);\n", 'v', thisReg.registerIndex, 'v', thisReg.registerIndex);
 					break;
 				}
 			}
@@ -1829,10 +1829,10 @@ const bool JITCPPFileInternal(const ShaderInfo& shaderInfo, const char* const sh
 					default:
 						DbgBreakPrint("Error: Unknown MISC register index!");
 					case D3DSMO_POSITION:
-						sprintf(inputRegBuffer, "\tconst float4& vpos%u = *(const float4* const)&(ps.miscRegisters.vPos);\n", thisReg.registerIndex); // Technically there's no such thing as VPOS1, VPOS2, etc., but this is for simplicity...
+						sprintf(inputRegBuffer, "\tconst float4& vpos%u = *(const float4* const)&(ps.miscRegisters[0].vPos);\n", thisReg.registerIndex); // Technically there's no such thing as VPOS1, VPOS2, etc., but this is for simplicity...
 						break;
 					case D3DSMO_FACE:
-						sprintf(inputRegBuffer, "\tconst float4& vface%u = *(const float4* const)&(ps.miscRegisters.vFace);\n", thisReg.registerIndex);
+						sprintf(inputRegBuffer, "\tconst float4& vface%u = *(const float4* const)&(ps.miscRegisters[0].vFace);\n", thisReg.registerIndex);
 						break;
 					}
 					break;
@@ -1842,7 +1842,7 @@ const bool JITCPPFileInternal(const ShaderInfo& shaderInfo, const char* const sh
 				default:
 					DbgBreakPrint("Error: Unknown register type!");
 				case D3DSPR_INPUT:
-					sprintf(inputRegBuffer, "\tconst float4& v%u = *(const float4* const)&(ps.inputRegisters.ps_interpolated_inputs.ps_3_0_inputs.t[%u]);\n", thisReg.registerIndex, thisReg.registerIndex);
+					sprintf(inputRegBuffer, "\tconst float4& v%u = *(const float4* const)&(ps.inputRegisters[0].ps_interpolated_inputs.ps_3_0_inputs.t[%u]);\n", thisReg.registerIndex, thisReg.registerIndex);
 					break;
 				}
 			}
@@ -1871,7 +1871,7 @@ const bool JITCPPFileInternal(const ShaderInfo& shaderInfo, const char* const sh
 		{
 			if (shaderInfo.inputRegistersUsedBitmask & (1 << v) )
 			{
-				sprintf(textureRegBuffer, "\tconst float4& %c%u = *(const float4* const)&(ps.inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.%c[%u]);\n", 
+				sprintf(textureRegBuffer, "\tconst float4& %c%u = *(const float4* const)&(ps.inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.%c[%u]);\n", 
 					'v', v, 'v', v);
 				AppendString(cppfile, textureRegBuffer);
 			}
@@ -1880,7 +1880,7 @@ const bool JITCPPFileInternal(const ShaderInfo& shaderInfo, const char* const sh
 		{
 			if (shaderInfo.inputRegistersUsedBitmask & (1 << (t + D3DMCS_COLOR2) ) )
 			{
-				sprintf(textureRegBuffer, "\t%sfloat4& %c%u = *(%sfloat4* const)&(ps.inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.%c[%u]);\n", 
+				sprintf(textureRegBuffer, "\t%sfloat4& %c%u = *(%sfloat4* const)&(ps.inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.%c[%u]);\n", 
 					textureRegCanBeConst ? "const " : "", 't', t, textureRegCanBeConst ? "const " : "", 't', t);
 				AppendString(cppfile, textureRegBuffer);
 			}
@@ -1899,14 +1899,14 @@ const bool JITCPPFileInternal(const ShaderInfo& shaderInfo, const char* const sh
 			if (shaderInfo.usedMRTMask & (1 << x) )
 			{
 				char tempRegBuffer[64] = {0};
-				sprintf(tempRegBuffer, "\tfloat4& oC%u = *(float4* const)&(ps.outputRegisters->oC[%u]);\n", x, x);
+				sprintf(tempRegBuffer, "\tfloat4& oC%u = *(float4* const)&(ps.outputRegisters[0].oC[%u]);\n", x, x);
 				AppendString(cppfile, tempRegBuffer);
 			}
 		}
 
 		if (shaderInfo.psWritesDepth)
 		{
-			AppendString(cppfile, "\tfloat4& oDepth = *(float4* const)&(ps.outputRegisters->oDepth);\n");
+			AppendString(cppfile, "\tfloat4& oDepth = *(float4* const)&(ps.outputRegisters[0].oDepth);\n");
 		}
 	}
 	else
@@ -2017,7 +2017,7 @@ const bool JITCPPFileInternal(const ShaderInfo& shaderInfo, const char* const sh
 	// Append suffix (return, closing braces)
 	if (shaderInfo.isPixelShader)
 	{
-		AppendString(cppfile, "\tps.outputRegisters->pixelStatus = normalWrite;\n");
+		AppendString(cppfile, "\tps.outputRegisters[0].pixelStatus = normalWrite;\n");
 	}
 	AppendString(cppfile, "} // end shadermain\n"); // Close the function brace
 	AppendString(cppfile, "\n} // end extern \"C\"\n"); // Close the extern "C" brace

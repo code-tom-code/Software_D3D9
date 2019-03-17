@@ -211,6 +211,8 @@ public:
 
 	// Depth functions:
 	void SetDepth(const unsigned x, const unsigned y, const float depth);
+
+	template <const unsigned char pixelWriteMask>
 	void SetDepth4(const __m128i x4, const __m128i y4, const __m128 depth4);
 
 	const float GetDepth(const unsigned x, const unsigned y) const;
@@ -285,9 +287,9 @@ public:
 	}
 #endif
 
-	const __m128& GetInternalWidthHeightM1F(void) const
+	const __m128& GetInternalWidthHeightM2F(void) const
 	{
-		return InternalWidthHeightM1F;
+		return InternalWidthHeightM2F;
 	}
 
 protected:
@@ -346,5 +348,6 @@ protected:
 	__declspec(align(16) ) __m128i InternalWidthM1Splatted;
 	__declspec(align(16) ) __m128i InternalHeightM1Splatted;
 	__declspec(align(16) ) __m128 InternalWidthHeightM1F; // This is in the format of (float32[4])(InternalWidthM1F, InternalHeightM1F, 0.0f, 0.0f)
+	__declspec(align(16) ) __m128 InternalWidthHeightM2F; // This is in the format of (float32[4])(InternalWidthM2F, InternalHeightM2F, 0.0f, 0.0f)
 	bool is1x1surface;
 };

@@ -1355,6 +1355,7 @@ void IDirect3DSurface9Hook::UpdateCachedValuesOnCreate()
 	InternalWidthM1Splatted = _mm_set1_epi32(InternalWidthM1);
 	InternalHeightM1Splatted = _mm_set1_epi32(InternalHeightM1);
 	InternalWidthHeightM1F = _mm_set_ps(0.0f, 0.0f, InternalHeightM1F, InternalWidthM1F);
+	InternalWidthHeightM2F = _mm_set_ps(0.0f, 0.0f, (const float)(InternalHeightM1 - 1), (const float)(InternalWidthM1 - 1) );
 }
 
 void IDirect3DSurface9Hook::CreateOffscreenPlainSurface(UINT _Width, UINT _Height, D3DFORMAT _Format, D3DPOOL _Pool)
@@ -2127,12 +2128,12 @@ template void IDirect3DSurface9Hook::GetPixelVec<6, false>(const unsigned x, con
 template void IDirect3DSurface9Hook::GetPixelVec<7, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 template void IDirect3DSurface9Hook::GetPixelVec<8, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 template void IDirect3DSurface9Hook::GetPixelVec<9, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<10, false>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<11, false>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<12, false>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<13, false>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<14, false>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<15, false>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<10, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<11, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<12, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<13, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<14, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<15, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 template void IDirect3DSurface9Hook::GetPixelVec<0, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 template void IDirect3DSurface9Hook::GetPixelVec<1, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 template void IDirect3DSurface9Hook::GetPixelVec<2, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
@@ -2143,12 +2144,12 @@ template void IDirect3DSurface9Hook::GetPixelVec<6, true>(const unsigned x, cons
 template void IDirect3DSurface9Hook::GetPixelVec<7, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 template void IDirect3DSurface9Hook::GetPixelVec<8, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 template void IDirect3DSurface9Hook::GetPixelVec<9, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<10, true>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<11, true>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<12, true>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<13, true>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<14, true>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
-template void IDirect3DSurface9Hook::GetPixelVec<15, true>(const unsigned x, const unsigned y,D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<10, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<11, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<12, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<13, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<14, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
+template void IDirect3DSurface9Hook::GetPixelVec<15, true>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 
 #ifdef USE_CHEAP_GAMMA_APPROXIMATION
 
@@ -2843,6 +2844,24 @@ const __m128 depthScale15 = { 32767.0f, 32767.0f, 32767.0f, 32767.0f };
 const __m128 depthScale16 = { 65535.0f, 65535.0f, 65535.0f, 65535.0f };
 const __m128 depthScale24 = { 16777215.0f, 16777215.0f, 16777215.0f, 16777215.0f };
 const __m128 depthScale32 = { 4294967295.0f, 4294967295.0f, 4294967295.0f, 4294967295.0f };
+
+template void IDirect3DSurface9Hook::SetDepth4<0x1>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0x2>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0x3>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0x4>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0x5>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0x6>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0x7>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0x8>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0x9>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0xA>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0xB>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0xC>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0xD>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0xE>(const __m128i x4, const __m128i y4, const __m128 depth4);
+template void IDirect3DSurface9Hook::SetDepth4<0xF>(const __m128i x4, const __m128i y4, const __m128 depth4);
+
+template <const unsigned char pixelWriteMask>
 void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const __m128 depth4)
 {
 	const __m128i pixelIndex = _mm_add_epi32(_mm_mullo_epi32(y4, InternalWidthSplatted), x4);
@@ -2857,10 +2876,10 @@ void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const 
 		const __m128 scaledDepth4 = _mm_mul_ps(depthScale15, depth4);
 		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
 
-		pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
-		pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
-		pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
-		pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
 	}
 		break;
 	case D3DFMT_D16:
@@ -2871,10 +2890,10 @@ void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const 
 		const __m128 scaledDepth4 = _mm_mul_ps(depthScale16, depth4);
 		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
 
-		pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
-		pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
-		pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
-		pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
 	}
 		break;
 	case D3DFMT_D24FS8:
@@ -2887,10 +2906,10 @@ void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const 
 		const __m128 scaledDepth4 = _mm_mul_ps(depthScale24, depth4);
 		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
 
-		pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
-		pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
-		pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
-		pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
 	}
 		break;
 	case D3DFMT_D32:
@@ -2902,25 +2921,25 @@ void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const 
 		const __m128 scaledDepth4 = _mm_mul_ps(depthScale32, depth4);
 		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
 
-		pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
-		pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
-		pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
-		pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
 	}
 		break;
 	case D3DFMT_D32F_LOCKABLE:
 	{
 		float* const pixels = (float* const)surfaceBytesRaw;
 
-		pixels[pixelIndex.m128i_u32[0] ] = depth4.m128_f32[0];
-		pixels[pixelIndex.m128i_u32[1] ] = depth4.m128_f32[1];
-		pixels[pixelIndex.m128i_u32[2] ] = depth4.m128_f32[2];
-		pixels[pixelIndex.m128i_u32[3] ] = depth4.m128_f32[3];
+		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = depth4.m128_f32[0];
+		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = depth4.m128_f32[1];
+		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = depth4.m128_f32[2];
+		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = depth4.m128_f32[3];
 	}
 		break;
 	default:
 #ifdef _DEBUG
-		__debugbreak(); // Error: Can't call SetDepth() on non-depth formats!
+		__debugbreak(); // Error: Can't call SetDepth4() on non-depth formats!
 #else
 		__assume(0);
 #endif

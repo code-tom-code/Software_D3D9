@@ -160,12 +160,12 @@ D3DXVECTOR4& PShaderEngine::ResolveDstParameter(const DWORD rawDstBytecode)
 			__debugbreak(); // Out of bounds register index
 		}
 #endif
-		return runtimeRegisters.r[index];
+		return runtimeRegisters[0].r[index];
 	case D3DSPR_INPUT      :
 #ifdef _DEBUG
 		__debugbreak(); // input registers can't be dst registers
 #endif
-		return *(D3DXVECTOR4* const)&(inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.v[index]);
+		return *(D3DXVECTOR4* const)&(inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[index]);
 	case D3DSPR_CONST      :
 #ifdef _DEBUG
 		__debugbreak(); // Const registers can't be dst parameters
@@ -178,7 +178,7 @@ D3DXVECTOR4& PShaderEngine::ResolveDstParameter(const DWORD rawDstBytecode)
 			__debugbreak(); // Input texcoord registers can't be dst parameters since ps_2_0
 		}
 #endif
-		return *(D3DXVECTOR4* const)&(inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.t[index]);
+		return *(D3DXVECTOR4* const)&(inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[index]);
 	case D3DSPR_RASTOUT    :
 	case D3DSPR_ATTROUT    :
 	case D3DSPR_TEXCRDOUT  : // Also known as D3DSPR_OUTPUT
@@ -220,21 +220,21 @@ D3DXVECTOR4& PShaderEngine::ResolveDstParameter(const DWORD rawDstBytecode)
 #ifdef _DEBUG
 		DbgBreakPrint("Error: TempFloat16 register cannot be destination parameter");
 #else
-		return runtimeRegisters.r[0];
+		return runtimeRegisters[0].r[0];
 #endif
 	case D3DSPR_MISCTYPE   : // VPOS and VFACE
 #ifdef _DEBUG
 		__debugbreak(); // Special input registers can't be dst parameters
 #endif
-		return *(&(miscRegisters.vPos) + index);
+		return *(&(miscRegisters[0].vPos) + index);
 	case D3DSPR_LABEL      :
 #ifdef _DEBUG
 		DbgBreakPrint("Error: Label register cannot be destination parameter");
 #else
-		return runtimeRegisters.r[0];
+		return runtimeRegisters[0].r[0];
 #endif
 	case D3DSPR_PREDICATE  :
-		return *(D3DXVECTOR4* const)&runtimeRegisters.p0;
+		return *(D3DXVECTOR4* const)&runtimeRegisters[0].p0;
 	default:
 #ifdef _DEBUG
 		{
@@ -369,18 +369,18 @@ const D3DXVECTOR4& PShaderEngine::ResolveSrcParameter(const DWORD rawSrcBytecode
 	switch (srcParameter.GetRegisterType() )
 	{
 	case D3DSPR_TEMP       :
-		return runtimeRegisters.r[index];
+		return runtimeRegisters[0].r[index];
 	case D3DSPR_INPUT      :
-		return *(const D3DXVECTOR4* const)&(inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.v[index]);
+		return *(const D3DXVECTOR4* const)&(inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.v[index]);
 	case D3DSPR_CONST      :
 		return constantRegisters->c[index];
 	case D3DSPR_TEXTURE       : // Also known as D3DSPR_ADDR (VS)
-		return *(const D3DXVECTOR4* const)&(inputRegisters.ps_interpolated_inputs.ps_2_0_inputs.t[index]);
+		return *(const D3DXVECTOR4* const)&(inputRegisters[0].ps_interpolated_inputs.ps_2_0_inputs.t[index]);
 	case D3DSPR_RASTOUT    :
 #ifdef _DEBUG
 		DbgBreakPrint("Error: RASTOUT register is not a valid Source parameter");
 #else
-		return runtimeRegisters.r[0];
+		return runtimeRegisters[0].r[0];
 #endif
 	case D3DSPR_ATTROUT    :
 	case D3DSPR_TEXCRDOUT  : // Also known as D3DSPR_OUTPUT
@@ -398,7 +398,7 @@ const D3DXVECTOR4& PShaderEngine::ResolveSrcParameter(const DWORD rawSrcBytecode
 #ifdef _DEBUG
 		DbgBreakPrint("Error: Constant indices beyond 1024 are not supported");
 #else
-		return runtimeRegisters.r[0];
+		return runtimeRegisters[0].r[0];
 #endif
 	case D3DSPR_CONSTBOOL  :
 		return *(const D3DXVECTOR4* const)&constantRegisters->b[index];
@@ -410,18 +410,18 @@ const D3DXVECTOR4& PShaderEngine::ResolveSrcParameter(const DWORD rawSrcBytecode
 #ifdef _DEBUG
 		DbgBreakPrint("Error: TempFloat16 register is not a valid source parameter");
 #else
-		return runtimeRegisters.r[0];
+		return runtimeRegisters[0].r[0];
 #endif
 	case D3DSPR_MISCTYPE   : // VPOS and VFACE
-		return *(&(miscRegisters.vPos) + index);
+		return *(&(miscRegisters[0].vPos) + index);
 	case D3DSPR_LABEL      :
 #ifdef _DEBUG
 		DbgBreakPrint("Error: Label register is not a valid source parameter");
 #else
-		return runtimeRegisters.r[0];
+		return runtimeRegisters[0].r[0];
 #endif
 	case D3DSPR_PREDICATE  :
-		return *(const D3DXVECTOR4* const)&runtimeRegisters.p0;
+		return *(const D3DXVECTOR4* const)&runtimeRegisters[0].p0;
 	default:
 #ifdef _DEBUG
 		{
@@ -441,7 +441,10 @@ void PShaderEngine::GlobalInit(const PS_2_0_ConstantsBuffer* const _constantRegi
 
 	GlobalInitTex2DFunctionTable();
 
-	miscRegisters.vFace.x = 1.0f;
+	miscRegisters[0].vFace.x = 1.0f;
+	miscRegisters[1].vFace.x = 1.0f;
+	miscRegisters[2].vFace.x = 1.0f;
+	miscRegisters[3].vFace.x = 1.0f;
 
 	constantRegisters = _constantRegisters;
 }
@@ -523,20 +526,55 @@ void PShaderEngine::Reset(const unsigned x, const unsigned y, PS_2_0_OutputRegis
 {
 	instructionPtr = shaderInfo->firstInstructionToken;
 
-	miscRegisters.vPos.x = (const float)x;
-	miscRegisters.vPos.y = (const float)y;
+	miscRegisters[0].vPos.x = (const float)x;
+	miscRegisters[0].vPos.y = (const float)y;
 
 	outputRegisters = _outputRegisters;
 
 #ifdef _DEBUG
 	// These values match the default GPR values in PIX
-	for (unsigned x = 0; x < ARRAYSIZE(runtimeRegisters.r); ++x)
+	for (unsigned x = 0; x < ARRAYSIZE(runtimeRegisters[0].r); ++x)
 	{
-		D3DXVECTOR4& vec = runtimeRegisters.r[x];
+		D3DXVECTOR4& vec = runtimeRegisters[0].r[x];
 		vec.x = 1.0f;
 		vec.y = 1.0f;
 		vec.z = 1.0f;
 		vec.w = 1.0f;
+	}
+#endif
+}
+
+// Called once for every quad of pixels to reset the state of the interpreter to its default
+void PShaderEngine::Reset4(const __m128i x4, const __m128i y4, PS_2_0_OutputRegisters* const _outputRegisters4)
+{
+	instructionPtr = shaderInfo->firstInstructionToken;
+
+	const __m128 x4f = _mm_cvtepi32_ps(x4);
+	const __m128 y4f = _mm_cvtepi32_ps(y4);
+
+	miscRegisters[0].vPos.x = x4f.m128_f32[0];
+	miscRegisters[1].vPos.x = x4f.m128_f32[1];
+	miscRegisters[2].vPos.x = x4f.m128_f32[2];
+	miscRegisters[3].vPos.x = x4f.m128_f32[3];
+	miscRegisters[0].vPos.y = y4f.m128_f32[0];
+	miscRegisters[0].vPos.y = y4f.m128_f32[1];
+	miscRegisters[0].vPos.y = y4f.m128_f32[2];
+	miscRegisters[0].vPos.y = y4f.m128_f32[3];
+
+	outputRegisters = _outputRegisters4;
+
+#ifdef _DEBUG
+	// These values match the default GPR values in PIX
+	for (unsigned z = 0; z < 4; ++z)
+	{
+		for (unsigned x = 0; x < ARRAYSIZE(runtimeRegisters[z].r); ++x)
+		{
+			D3DXVECTOR4& vec = runtimeRegisters[z].r[x];
+			vec.x = 1.0f;
+			vec.y = 1.0f;
+			vec.z = 1.0f;
+			vec.w = 1.0f;
+		}
 	}
 #endif
 }
@@ -1376,7 +1414,7 @@ void PShaderEngine::InterpreterExecutePixel(void)
 		// Do ps_1_* output register fixup (because ps_1_* outputs with register r0 instead of into one of the oC[N] registers):
 		if (shaderInfo->shaderMajorVersion < 2)
 		{
-			outputRegisters->oC[0] = *(const float4* const)&runtimeRegisters.r[0];
+			outputRegisters[0].oC[0] = *(const float4* const)&runtimeRegisters[0].r[0];
 		}
 		return;
 	}

@@ -1105,8 +1105,14 @@ public:
 	// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
 	void ShadePixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const;
 
+	// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
+	void ShadePixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const;
+
 	// Handles running the pixel shader from a processed vertex shade
 	void ShadePixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const;
+
+	// Handles running the pixel shader from a processed vertex shade
+	void ShadePixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const;
 
 	// Handles blending and write-masking
 	void RenderOutput(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
@@ -1122,16 +1128,30 @@ public:
 	// Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
 	void InterpolateStreamIntoRegisters(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, const __m128 barycentricInterpolants, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ, const float pixelZ) const;
 
+	// Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
+	template <const unsigned char pixelWriteMask>
+	void InterpolateStreamIntoRegisters4(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, const __m128 (&barycentricInterpolants)[4], CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ, const __m128 pixelZ4) const;
+
 	// Handles interpolating pixel shader input registers from vertex shader output registers
 	void InterpolateShaderIntoRegisters(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const __m128 barycentricInterpolants, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ, const float pixelZ) const;
 
+	// Handles interpolating pixel shader input registers from vertex shader output registers
+	template <const unsigned char pixelWriteMask>
+	void InterpolateShaderIntoRegisters4(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const __m128 (&barycentricInterpolants)[4], const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ, const __m128 pixelZ4) const;
+
 	const float InterpolatePixelDepth(const __m128 barycentricInterpolants, const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128& outInvZ) const;
-	void InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128 (&outInvZAndDepth4)[4]) const;
+	void InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128& outInvZ, __m128& outPixelDepth4) const;
 
 	// Must be called before shading a pixel to reset the pixel shader state machine!
 	void PreShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader, PS_2_0_OutputRegisters* const pixelOutput) const;
 
+	// Must be called before shading a pixel to reset the pixel shader state machine!
+	void PreShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader, PS_2_0_OutputRegisters* const pixelOutput4) const;
+
 	void ShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const;
+	
+	template <const unsigned pixelWriteMask>
+	void ShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
 
 	template <const unsigned char channelWriteMask>
 	void LoadBlend(D3DXVECTOR4& outBlend, const D3DBLEND blendMode, const D3DXVECTOR4& srcColor, const D3DXVECTOR4& dstColor) const;

@@ -109,21 +109,24 @@ public:
 	// Called once for every pixel to reset the state of the interpreter to its default
 	void Reset(const unsigned x, const unsigned y, PS_2_0_OutputRegisters* const _outputRegisters);
 
+	// Called once for every quad of pixels to reset the state of the interpreter to its default
+	void Reset4(const __m128i x4, const __m128i y4, PS_2_0_OutputRegisters* const _outputRegisters4);
+
 	void InterpreterExecutePixel(void);
 
 	const PS_2_0_ConstantsBuffer* constantRegisters;
-	__declspec(align(16) ) PS_2_0_InputRegisters inputRegisters;
-	__declspec(align(16) ) PS_2_0_RuntimeRegisters runtimeRegisters;
+	__declspec(align(16) ) PS_2_0_InputRegisters inputRegisters[4];
+	__declspec(align(16) ) PS_2_0_RuntimeRegisters runtimeRegisters[4];
 	PS_2_0_OutputRegisters* outputRegisters;
-	PS_2_0_MiscRegisters miscRegisters;
+	PS_2_0_MiscRegisters miscRegisters[4];
 
 	const INTRINSIC_INLINE D3DXVECTOR4& ResolveSrcAddressIfValid(const void* const addressPtr) const
 	{
 		if (addressPtr >= &constantRegisters->c[0] && addressPtr <= &constantRegisters->c[(MAX_NUM_PS_CONSTANTS - 1)])
 			return *(const D3DXVECTOR4* const)addressPtr;
-		else if (addressPtr >= &runtimeRegisters.r[0] && addressPtr <= &runtimeRegisters.r[(MAX_NUM_TEMP_REGISTERS - 1)])
+		else if (addressPtr >= &runtimeRegisters[0].r[0] && addressPtr <= &runtimeRegisters[0].r[(MAX_NUM_TEMP_REGISTERS - 1)])
 			return *(const D3DXVECTOR4* const)addressPtr;
-		else if (addressPtr >= &inputRegisters.ps_interpolated_inputs.ps_3_0_inputs.t[0] && addressPtr <= &inputRegisters.ps_interpolated_inputs.ps_3_0_inputs.t[MAX_NUM_PS_INPUTS - 1])
+		else if (addressPtr >= &inputRegisters[0].ps_interpolated_inputs.ps_3_0_inputs.t[0] && addressPtr <= &inputRegisters[0].ps_interpolated_inputs.ps_3_0_inputs.t[MAX_NUM_PS_INPUTS - 1])
 			return *(const D3DXVECTOR4* const)addressPtr;
 		else
 			// When reading outside of the constants buffer or the runtime registers the

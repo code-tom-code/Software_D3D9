@@ -43,8 +43,8 @@
 
 // Comment these out to disable shader execution profiling
 #ifndef MULTITHREAD_SHADING
-	#define PROFILE_AVERAGE_VERTEX_SHADE_TIMES 1
-	#define PROFILE_AVERAGE_PIXEL_SHADE_TIMES 1
+	//#define PROFILE_AVERAGE_VERTEX_SHADE_TIMES 1
+	//#define PROFILE_AVERAGE_PIXEL_SHADE_TIMES 1
 #endif
 
 // If defined, the software renderer will improve the system's scheduler resolution (which is useful when running many threads in the job system).
