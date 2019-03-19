@@ -91,7 +91,7 @@ __declspec(align(16) ) struct VS_2_0_OutputRegisters
 	} vertexClip;
 };
 
-class VShaderEngine : public ShaderEngineBase
+__declspec(align(16) ) class VShaderEngine : public ShaderEngineBase
 {
 public:
 	VShaderEngine() : constantRegisters(NULL)

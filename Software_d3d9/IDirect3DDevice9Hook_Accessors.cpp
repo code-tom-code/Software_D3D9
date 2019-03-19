@@ -1026,14 +1026,22 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetRenderSt
 	else
 		return D3DERR_INVALIDCALL;
 
-	if (State == D3DRS_ALPHAREF)
-		currentState.currentRenderStates.cachedAlphaRefFloat = currentState.currentRenderStates.renderStatesUnion.namedStates.alphaRef / 255.0f;
-	else if (State == D3DRS_AMBIENT)
-		ColorDWORDToFloat4<0xF>(currentState.currentRenderStates.renderStatesUnion.namedStates.ambient, currentState.currentRenderStates.cachedAmbient);
-	else if (State == D3DRS_BLENDFACTOR)
+	switch (State)
 	{
+	case D3DRS_ALPHAREF:
+		currentState.currentRenderStates.cachedAlphaRefFloat = currentState.currentRenderStates.renderStatesUnion.namedStates.alphaRef / 255.0f;
+		currentState.currentRenderStates.alphaRefSplatted = _mm_set1_ps(currentState.currentRenderStates.cachedAlphaRefFloat);
+		break;
+	case D3DRS_AMBIENT:
+		ColorDWORDToFloat4<0xF>(currentState.currentRenderStates.renderStatesUnion.namedStates.ambient, currentState.currentRenderStates.cachedAmbient);
+		break;
+	case D3DRS_BLENDFACTOR:
 		ColorDWORDToFloat4(currentState.currentRenderStates.renderStatesUnion.states[D3DRS_BLENDFACTOR], currentState.currentRenderStates.cachedBlendFactor);
 		currentState.currentRenderStates.cachedInvBlendFactor = D3DXVECTOR4(1.0f, 1.0f, 1.0f, 1.0f) - currentState.currentRenderStates.cachedBlendFactor;
+		break;
+	case D3DRS_DEPTHBIAS:
+		currentState.currentRenderStates.depthBiasSplatted = _mm_set1_ps(currentState.currentRenderStates.renderStatesUnion.namedStates.depthBias);
+		break;
 	}
 
 	return ret;

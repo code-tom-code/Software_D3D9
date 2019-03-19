@@ -7,7 +7,7 @@ struct ShaderInfo;
 
 static const D3DXVECTOR4 ZEROVEC(0.0f, 0.0f, 0.0f, 0.0f);
 
-class ShaderEngineBase
+__declspec(align(16) ) class ShaderEngineBase
 {
 public:
 	ShaderEngineBase() : instructionPtr(NULL), shaderInfo(NULL)

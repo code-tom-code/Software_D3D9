@@ -330,7 +330,7 @@ typedef float D3DVALUE;
 
 // All of the render states available via SetRenderState() and GetRenderState()
 // Reference for the D3D9-supported ones: https://msdn.microsoft.com/en-us/library/windows/desktop/bb172599(v=vs.85).aspx
-struct RenderStates
+__declspec(align(16) ) struct RenderStates
 {
 	RenderStates();
 
@@ -495,10 +495,12 @@ struct RenderStates
 	static_assert(sizeof(_renderStatesUnion) == sizeof(DWORD) * MAX_NUM_RENDERSTATES, "Error: Unexpected union size!");
 
 	// Cache some derived values from SetRenderState() for more efficient runtime usage:
-	float cachedAlphaRefFloat;
-	D3DXVECTOR4 cachedAmbient;
-	D3DXVECTOR4 cachedBlendFactor;
-	D3DXVECTOR4 cachedInvBlendFactor;
+	__declspec(align(16) ) float cachedAlphaRefFloat;
+	__declspec(align(16) ) D3DXVECTOR4 cachedAmbient;
+	__declspec(align(16) ) D3DXVECTOR4 cachedBlendFactor;
+	__declspec(align(16) ) D3DXVECTOR4 cachedInvBlendFactor;
+	__declspec(align(16) ) __m128 depthBiasSplatted;
+	__declspec(align(16) ) __m128 alphaRefSplatted;
 };
 
 __declspec(align(16) ) struct Transforms
@@ -727,7 +729,7 @@ struct DeviceState
 
 	D3DMATERIAL9 currentMaterial;
 
-	RenderStates currentRenderStates;
+	__declspec(align(16) ) RenderStates currentRenderStates;
 
 	std::map<UINT, LightInfo*>* lightInfoMap;
 #define MAX_ENABLED_LIGHTS 32 // CAPS only goes up to 8, but we can do better
@@ -1143,10 +1145,10 @@ public:
 	void InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128& outInvZ, __m128& outPixelDepth4) const;
 
 	// Must be called before shading a pixel to reset the pixel shader state machine!
-	void PreShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader, PS_2_0_OutputRegisters* const pixelOutput) const;
+	void PreShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const;
 
 	// Must be called before shading a pixel to reset the pixel shader state machine!
-	void PreShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader, PS_2_0_OutputRegisters* const pixelOutput4) const;
+	void PreShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
 
 	void ShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const;
 	
@@ -1191,10 +1193,13 @@ public:
 	const bool StencilTestNoWrite(const unsigned x, const unsigned y) const;
 
 	// true = "pass" (draw the pixel), false = "fail" (discard the pixel)
+	// This MSDN page says that alpha testing only happens against the alpha value from oC0: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/multiple-render-targets
 	const bool AlphaTest(const D3DXVECTOR4& outColor) const;
 
 	// Returns a SSE vector mask (0xFF for "test pass" and 0x00 for "test fail")
-	const __m128 AlphaTest4(const D3DXVECTOR4 (&outColor4)[4]) const;
+	// This MSDN page says that alpha testing only happens against the alpha value from oC0: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/multiple-render-targets
+	template <const unsigned char pixelWriteMask>
+	const __m128 AlphaTest4(const PS_2_0_OutputRegisters (&outColor4)[4]) const;
 
 #ifdef MULTITHREAD_SHADING
 	void InitThreadQueue();
@@ -1268,10 +1273,10 @@ protected:
 	HWND initialCreateDeviceWindow;
 	BOOL enableDialogs;
 
-	mutable VShaderEngine deviceMainVShaderEngine;
-	mutable PShaderEngine deviceMainPShaderEngine;
-	mutable VS_2_0_ConstantsBuffer vsDrawCallCB;
-	mutable PS_2_0_ConstantsBuffer psDrawCallCB;
+	mutable __declspec(align(16) ) VShaderEngine deviceMainVShaderEngine;
+	mutable __declspec(align(16) ) PShaderEngine deviceMainPShaderEngine;
+	mutable __declspec(align(16) ) VS_2_0_ConstantsBuffer vsDrawCallCB;
+	mutable __declspec(align(16) ) PS_2_0_ConstantsBuffer psDrawCallCB;
 
 #ifndef NO_CACHING_FVF_VERT_DECLS
 	std::map<DWORD, IDirect3DVertexDeclaration9Hook*>* FVFToVertDeclCache;

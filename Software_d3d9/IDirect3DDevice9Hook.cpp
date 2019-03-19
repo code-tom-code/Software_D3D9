@@ -42,6 +42,8 @@ static const D3DXVECTOR4 vertShaderInputRegisterDefault(0.0f, 0.0f, 0.0f, 1.0f);
 
 static const unsigned twoVecBytes[4] = { 0x2, 0x2, 0x2, 0x2 };
 static const __m128i twoVec = *(const __m128i* const)twoVecBytes;
+static const unsigned intBoundsQuadAlignVecBytes[4] = { ~0x1, ~0x1, ~0x0, ~0x0 };
+static const __m128i intBoundsQuadAlignVec = *(const __m128i* const)intBoundsQuadAlignVecBytes;
 
 static const D3DXVECTOR4 staticColorWhiteOpaque(1.0f, 1.0f, 1.0f, 1.0f);
 static const D3DXVECTOR4 staticColorBlackTranslucent(0.0f, 0.0f, 0.0f, 0.0f);
@@ -972,6 +974,8 @@ RenderStates::RenderStates() : cachedAlphaRefFloat(0.0f)
 	cachedAmbient = D3DXVECTOR4(0.0f, 0.0f, 0.0f, 0.0f);
 	ColorDWORDToFloat4(renderStatesUnion.states[D3DRS_BLENDFACTOR], cachedBlendFactor);
 	cachedInvBlendFactor = D3DXVECTOR4(1.0f, 1.0f, 1.0f, 1.0f) - cachedBlendFactor;
+	depthBiasSplatted = _mm_set1_ps(0.0f);
+	alphaRefSplatted = _mm_set1_ps(0.0f);
 }
 
 /*** IUnknown methods ***/
@@ -3171,13 +3175,7 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 
 void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m128i y4, const __m128i (&barycentricsAdjusted4)[4], const primitivePixelJobData* const primitiveData) const
 {
-	// Quick-disabling pixelShade4 for check-in:
-	for (unsigned z = 0; z < 4; ++z)
-	{
-		CreateNewPixelShadeJob(x4.m128i_u32[z], y4.m128i_u32[z], barycentricsAdjusted4[z], primitiveData);
-	}
-
-/*#if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
+#if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 	slist_item* const newItem = GetNewWorkerJob<true>();
 	newItem->jobType = pixelShade4Job;
 	slist_item::_jobData::_pixelJobData& pixelJobData = newItem->jobData.pixelJobData;
@@ -3232,7 +3230,7 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m12
 		ShadePixelFromStream4(&deviceMainPShaderEngine, *(currentDrawCallData.pixelData.vs_to_ps_mappings.vertexDeclMapping), x4, y4, barycentricCoords4,
 			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
 	}
-#endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS*/
+#endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 }
 
 template <const bool shadeFromShader>
@@ -5790,20 +5788,15 @@ void IDirect3DDevice9Hook::RenderOutput(IDirect3DSurface9Hook* const outSurface,
 }
 
 // Must be called before shading a pixel to reset the pixel shader state machine!
-void IDirect3DDevice9Hook::PreShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader, PS_2_0_OutputRegisters* const pixelOutput) const
+void IDirect3DDevice9Hook::PreShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const
 {
-	pixelOutput->pixelStatus = normalWrite;
-	pixelShader->Reset(x, y, pixelOutput);
+	pixelShader->Reset(x, y);
 }
 
 // Must be called before shading a pixel to reset the pixel shader state machine!
-void IDirect3DDevice9Hook::PreShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader, PS_2_0_OutputRegisters* const pixelOutput4) const
+void IDirect3DDevice9Hook::PreShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
 {
-	pixelOutput4[0].pixelStatus = normalWrite;
-	pixelOutput4[1].pixelStatus = normalWrite;
-	pixelOutput4[2].pixelStatus = normalWrite;
-	pixelOutput4[3].pixelStatus = normalWrite;
-	pixelShader->Reset4(x4, y4, pixelOutput4);
+	pixelShader->Reset4(x4, y4);
 }
 
 // Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
@@ -5812,17 +5805,15 @@ void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine
 	__m128 invZ;
 	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, offsetBytesToOPosition, v0, v1, v2, invZ);
 
-	__declspec(align(16) ) PS_2_0_OutputRegisters pixelOutput;
-
 	// Very important to reset the state machine back to its original settings!
-	PreShadePixel(x, y, pixelEngine, &pixelOutput);
+	PreShadePixel(x, y, pixelEngine);
 
 	if (currentState.currentDepthStencil)
 	{
 		if (!StencilTestNoWrite(x, y) )
 		{
 			// Fail the stencil test!
-			pixelOutput.pixelStatus = stencilFail;
+			pixelEngine->outputRegisters[0].pixelStatus = stencilFail;
 			ShadePixel(x, y, pixelEngine);
 			return;
 		}
@@ -5833,11 +5824,11 @@ void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine
 			if (!DepthTest(pixelDepth, bufferDepth, currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc, currentState.currentDepthStencil->GetInternalFormat() ) )
 			{
 				// Fail the depth test!
-				pixelOutput.pixelStatus = ZFail;
+				pixelEngine->outputRegisters[0].pixelStatus = ZFail;
 				ShadePixel(x, y, pixelEngine);
 				return;
 			}
-			pixelOutput.oDepth = pixelDepth;
+			pixelEngine->outputRegisters[0].oDepth = pixelDepth;
 		}
 	}
 
@@ -5853,10 +5844,8 @@ void IDirect3DDevice9Hook::ShadePixelFromStream4(PShaderEngine* const pixelEngin
 	__m128 pixelDepth4;
 	InterpolatePixelDepth4(barycentricInterpolants, offsetBytesToOPosition, v0, v1, v2, invZ, pixelDepth4);
 
-	__declspec(align(16) ) PS_2_0_OutputRegisters pixelOutput4[4];
-
 	// Very important to reset the state machine back to its original settings!
-	PreShadePixel4(x4, y4, pixelEngine, pixelOutput4);
+	PreShadePixel4(x4, y4, pixelEngine);
 
 	unsigned char pixelWriteMask = 0xF;
 	if (currentState.currentDepthStencil)
@@ -5881,14 +5870,14 @@ void IDirect3DDevice9Hook::ShadePixelFromStream4(PShaderEngine* const pixelEngin
 			if (maskBits == 0x0)
 				return;
 			pixelWriteMask = maskBits;
-			pixelOutput4[0].oDepth = pixelDepth4.m128_f32[0];
-			pixelOutput4[0].pixelStatus = (maskBits & 0x1) ? normalWrite : ZFail;
-			pixelOutput4[1].oDepth = pixelDepth4.m128_f32[1];
-			pixelOutput4[1].pixelStatus = (maskBits & 0x2) ? normalWrite : ZFail;
-			pixelOutput4[2].oDepth = pixelDepth4.m128_f32[2];
-			pixelOutput4[2].pixelStatus = (maskBits & 0x4) ? normalWrite : ZFail;
-			pixelOutput4[3].oDepth = pixelDepth4.m128_f32[3];
-			pixelOutput4[3].pixelStatus = (maskBits & 0x8) ? normalWrite : ZFail;
+			pixelEngine->outputRegisters[0].oDepth = pixelDepth4.m128_f32[0];
+			pixelEngine->outputRegisters[0].pixelStatus = (maskBits & 0x1) ? normalWrite : ZFail;
+			pixelEngine->outputRegisters[1].oDepth = pixelDepth4.m128_f32[1];
+			pixelEngine->outputRegisters[1].pixelStatus = (maskBits & 0x2) ? normalWrite : ZFail;
+			pixelEngine->outputRegisters[2].oDepth = pixelDepth4.m128_f32[2];
+			pixelEngine->outputRegisters[2].pixelStatus = (maskBits & 0x4) ? normalWrite : ZFail;
+			pixelEngine->outputRegisters[3].oDepth = pixelDepth4.m128_f32[3];
+			pixelEngine->outputRegisters[3].pixelStatus = (maskBits & 0x8) ? normalWrite : ZFail;
 		}
 	}
 
@@ -7208,12 +7197,7 @@ void IDirect3DDevice9Hook::ShadePixel4(const __m128i x4, const __m128i y4, PShad
 	case normalWrite:
 	{
 		// Alpha testing:
-		// This MSDN page says that alpha testing only happens against the alpha value from oC0: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/multiple-render-targets
-		if (!AlphaTest(*(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[0].oC[0]) ) )
-		{
-			frameStats.numAlphaTestFailPixels += 4;
-			return;
-		}
+		const unsigned char postAlphaTestWriteMask = pixelWriteMask & _mm_movemask_ps(AlphaTest4<0xF>(pixelShader->outputRegisters) );
 
 		for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
 		{
@@ -7224,7 +7208,7 @@ void IDirect3DDevice9Hook::ShadePixel4(const __m128i x4, const __m128i y4, PShad
 			// TODO: Need to write a RenderOutput4 to replace this
 			for (unsigned z = 0; z < 4; ++z)
 			{
-				if (pixelWriteMask & (1 << z) )
+				if (postAlphaTestWriteMask & (1 << z) )
 					RenderOutput(currentRenderTarget, x4.m128i_u32[z], y4.m128i_u32[z], *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[0].oC[rt]) );
 			}
 		}
@@ -7233,17 +7217,16 @@ void IDirect3DDevice9Hook::ShadePixel4(const __m128i x4, const __m128i y4, PShad
 		{
 			if (currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable)
 			{
-				const float depthBias = currentState.currentRenderStates.renderStatesUnion.namedStates.depthBias;
 				__m128 depth4;
-				if (pixelWriteMask & 0x1)
+				if (postAlphaTestWriteMask & 0x1)
 					depth4.m128_f32[0] = pixelShader->outputRegisters[0].oDepth;
-				if (pixelWriteMask & 0x2)
+				if (postAlphaTestWriteMask & 0x2)
 					depth4.m128_f32[1] = pixelShader->outputRegisters[1].oDepth;
-				if (pixelWriteMask & 0x4)
+				if (postAlphaTestWriteMask & 0x4)
 					depth4.m128_f32[2] = pixelShader->outputRegisters[2].oDepth;
-				if (pixelWriteMask & 0x8)
+				if (postAlphaTestWriteMask & 0x8)
 					depth4.m128_f32[3] = pixelShader->outputRegisters[3].oDepth;
-				depth4 = _mm_add_ps(depth4, _mm_set1_ps(depthBias) );
+				depth4 = _mm_add_ps(depth4, currentState.currentRenderStates.depthBiasSplatted);
 				currentState.currentDepthStencil->SetDepth4<pixelWriteMask>(x4, y4, depth4);
 			}
 			
@@ -7252,7 +7235,7 @@ void IDirect3DDevice9Hook::ShadePixel4(const __m128i x4, const __m128i y4, PShad
 				// TODO: Need to write a StencilOperation4 to replace this
 				for (unsigned z = 0; z < 4; ++z)
 				{
-					if (pixelWriteMask & (1 << z) )
+					if (postAlphaTestWriteMask & (1 << z) )
 						StencilPassOperation(x4.m128i_u32[z], y4.m128i_u32[z]);
 				}
 			}
@@ -7384,6 +7367,7 @@ void IDirect3DDevice9Hook::StencilPassOperation4(const __m128i x4, const __m128i
 }*/
 
 // true = "pass" (draw the pixel), false = "fail" (discard the pixel for all render targets and also discard depth/stencil writes for this pixel)
+// This MSDN page says that alpha testing only happens against the alpha value from oC0: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/multiple-render-targets
 const bool IDirect3DDevice9Hook::AlphaTest(const D3DXVECTOR4& outColor) const
 {
 	// Alpha testing:
@@ -7444,7 +7428,8 @@ const bool IDirect3DDevice9Hook::AlphaTest(const D3DXVECTOR4& outColor) const
 }
 
 // Returns a SSE vector mask (0xFF for "test pass" and 0x00 for "test fail")
-const __m128 IDirect3DDevice9Hook::AlphaTest4(const D3DXVECTOR4 (&outColor4)[4]) const
+template <const unsigned char pixelWriteMask>
+const __m128 IDirect3DDevice9Hook::AlphaTest4(const PS_2_0_OutputRegisters (&outColor4)[4]) const
 {
 	// Alpha testing:
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaTestEnable)
@@ -7455,39 +7440,57 @@ const __m128 IDirect3DDevice9Hook::AlphaTest4(const D3DXVECTOR4 (&outColor4)[4])
 			return *(const __m128* const)&zeroMaskVec;
 		case D3DCMP_LESS        :
 		{
-			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
-			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
-			return _mm_cmplt_ps(alphaVec, alphaRef);
+			__m128 alphaVec;
+			if (pixelWriteMask & 0x1) alphaVec.m128_f32[0] = outColor4[0].oC[0].w;
+			if (pixelWriteMask & 0x2) alphaVec.m128_f32[1] = outColor4[1].oC[0].w;
+			if (pixelWriteMask & 0x4) alphaVec.m128_f32[2] = outColor4[2].oC[0].w;
+			if (pixelWriteMask & 0x8) alphaVec.m128_f32[3] = outColor4[3].oC[0].w;
+			return _mm_cmplt_ps(alphaVec, currentState.currentRenderStates.alphaRefSplatted);
 		}
 		case D3DCMP_EQUAL       :
 		{
-			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
-			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
-			return _mm_cmpeq_ps(alphaVec, alphaRef);
+			__m128 alphaVec;
+			if (pixelWriteMask & 0x1) alphaVec.m128_f32[0] = outColor4[0].oC[0].w;
+			if (pixelWriteMask & 0x2) alphaVec.m128_f32[1] = outColor4[1].oC[0].w;
+			if (pixelWriteMask & 0x4) alphaVec.m128_f32[2] = outColor4[2].oC[0].w;
+			if (pixelWriteMask & 0x8) alphaVec.m128_f32[3] = outColor4[3].oC[0].w;
+			return _mm_cmpeq_ps(alphaVec, currentState.currentRenderStates.alphaRefSplatted);
 		}
 		case D3DCMP_LESSEQUAL   :
 		{
-			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
-			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
-			return _mm_cmple_ps(alphaVec, alphaRef);
+			__m128 alphaVec;
+			if (pixelWriteMask & 0x1) alphaVec.m128_f32[0] = outColor4[0].oC[0].w;
+			if (pixelWriteMask & 0x2) alphaVec.m128_f32[1] = outColor4[1].oC[0].w;
+			if (pixelWriteMask & 0x4) alphaVec.m128_f32[2] = outColor4[2].oC[0].w;
+			if (pixelWriteMask & 0x8) alphaVec.m128_f32[3] = outColor4[3].oC[0].w;
+			return _mm_cmple_ps(alphaVec, currentState.currentRenderStates.alphaRefSplatted);
 		}
 		case D3DCMP_GREATER     :
 		{
-			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
-			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
-			return _mm_cmpgt_ps(alphaVec, alphaRef);
+			__m128 alphaVec;
+			if (pixelWriteMask & 0x1) alphaVec.m128_f32[0] = outColor4[0].oC[0].w;
+			if (pixelWriteMask & 0x2) alphaVec.m128_f32[1] = outColor4[1].oC[0].w;
+			if (pixelWriteMask & 0x4) alphaVec.m128_f32[2] = outColor4[2].oC[0].w;
+			if (pixelWriteMask & 0x8) alphaVec.m128_f32[3] = outColor4[3].oC[0].w;
+			return _mm_cmpgt_ps(alphaVec, currentState.currentRenderStates.alphaRefSplatted);
 		}
 		case D3DCMP_NOTEQUAL    :
 		{
-			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
-			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
-			return _mm_cmpneq_ps(alphaVec, alphaRef);
+			__m128 alphaVec;
+			if (pixelWriteMask & 0x1) alphaVec.m128_f32[0] = outColor4[0].oC[0].w;
+			if (pixelWriteMask & 0x2) alphaVec.m128_f32[1] = outColor4[1].oC[0].w;
+			if (pixelWriteMask & 0x4) alphaVec.m128_f32[2] = outColor4[2].oC[0].w;
+			if (pixelWriteMask & 0x8) alphaVec.m128_f32[3] = outColor4[3].oC[0].w;
+			return _mm_cmpneq_ps(alphaVec, currentState.currentRenderStates.alphaRefSplatted);
 		}
 		case D3DCMP_GREATEREQUAL:
 		{
-			const __m128 alphaRef = _mm_load1_ps(&currentState.currentRenderStates.cachedAlphaRefFloat);
-			const __m128 alphaVec = { outColor4[0].w, outColor4[1].w, outColor4[2].w, outColor4[3].w };
-			return _mm_cmpge_ps(alphaVec, alphaRef);
+			__m128 alphaVec;
+			if (pixelWriteMask & 0x1) alphaVec.m128_f32[0] = outColor4[0].oC[0].w;
+			if (pixelWriteMask & 0x2) alphaVec.m128_f32[1] = outColor4[1].oC[0].w;
+			if (pixelWriteMask & 0x4) alphaVec.m128_f32[2] = outColor4[2].oC[0].w;
+			if (pixelWriteMask & 0x8) alphaVec.m128_f32[3] = outColor4[3].oC[0].w;
+			return _mm_cmpge_ps(alphaVec, currentState.currentRenderStates.alphaRefSplatted);
 		}
 		default:
 #ifdef _DEBUG
@@ -7546,17 +7549,15 @@ void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine
 	__m128 invZ;
 	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, byteOffsetToOPosition, (CONST BYTE* const)&v0, (CONST BYTE* const)&v1, (CONST BYTE* const)&v2, invZ);
 
-	__declspec(align(16) ) PS_2_0_OutputRegisters pixelOutput;
-
 	// Very important to reset the state machine back to its original settings!
-	PreShadePixel(x, y, pixelEngine, &pixelOutput);
+	PreShadePixel(x, y, pixelEngine);
 
 	if (currentState.currentDepthStencil)
 	{
 		if (!StencilTestNoWrite(x, y) )
 		{
 			// Fail the stencil test!
-			pixelOutput.pixelStatus = stencilFail;
+			pixelEngine->outputRegisters[0].pixelStatus = stencilFail;
 			ShadePixel(x, y, pixelEngine);
 			return;
 		}
@@ -7567,11 +7568,11 @@ void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine
 			if (!DepthTest(pixelDepth, bufferDepth, currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc, currentState.currentDepthStencil->GetInternalFormat() ) )
 			{
 				// Fail the depth test!
-				pixelOutput.pixelStatus = ZFail;
+				pixelEngine->outputRegisters[0].pixelStatus = ZFail;
 				ShadePixel(x, y, pixelEngine);
 				return;
 			}
-			pixelOutput.oDepth = pixelDepth;
+			pixelEngine->outputRegisters[0].oDepth = pixelDepth;
 		}
 	}
 
@@ -7587,10 +7588,8 @@ void IDirect3DDevice9Hook::ShadePixelFromShader4(PShaderEngine* const pixelEngin
 	__m128 pixelDepth4;
 	InterpolatePixelDepth4(barycentricInterpolants, byteOffsetToOPosition, (CONST BYTE* const)&v0, (CONST BYTE* const)&v1, (CONST BYTE* const)&v2, invZ, pixelDepth4);
 
-	__declspec(align(16) ) PS_2_0_OutputRegisters pixelOutput4[4];
-
 	// Very important to reset the state machine back to its original settings!
-	PreShadePixel4(x4, y4, pixelEngine, pixelOutput4);
+	PreShadePixel4(x4, y4, pixelEngine);
 
 	unsigned char pixelWriteMask = 0xF;
 	if (currentState.currentDepthStencil)
@@ -7615,14 +7614,14 @@ void IDirect3DDevice9Hook::ShadePixelFromShader4(PShaderEngine* const pixelEngin
 			if (maskBits == 0x0)
 				return;
 			pixelWriteMask = maskBits;
-			pixelOutput4[0].oDepth = pixelDepth4.m128_f32[0];
-			pixelOutput4[0].pixelStatus = (maskBits & 0x1) ? normalWrite : ZFail;
-			pixelOutput4[1].oDepth = pixelDepth4.m128_f32[1];
-			pixelOutput4[1].pixelStatus = (maskBits & 0x2) ? normalWrite : ZFail;
-			pixelOutput4[2].oDepth = pixelDepth4.m128_f32[2];
-			pixelOutput4[2].pixelStatus = (maskBits & 0x4) ? normalWrite : ZFail;
-			pixelOutput4[3].oDepth = pixelDepth4.m128_f32[3];
-			pixelOutput4[3].pixelStatus = (maskBits & 0x8) ? normalWrite : ZFail;
+			pixelEngine->outputRegisters[0].oDepth = pixelDepth4.m128_f32[0];
+			pixelEngine->outputRegisters[0].pixelStatus = (maskBits & 0x1) ? normalWrite : ZFail;
+			pixelEngine->outputRegisters[1].oDepth = pixelDepth4.m128_f32[1];
+			pixelEngine->outputRegisters[1].pixelStatus = (maskBits & 0x2) ? normalWrite : ZFail;
+			pixelEngine->outputRegisters[2].oDepth = pixelDepth4.m128_f32[2];
+			pixelEngine->outputRegisters[2].pixelStatus = (maskBits & 0x4) ? normalWrite : ZFail;
+			pixelEngine->outputRegisters[3].oDepth = pixelDepth4.m128_f32[3];
+			pixelEngine->outputRegisters[3].pixelStatus = (maskBits & 0x8) ? normalWrite : ZFail;
 		}
 	}
 
@@ -7826,12 +7825,16 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	i2.x = i2vec.m128i_i32[0];
 	i2.y = i2vec.m128i_i32[1];
 
-	// Early out on zero area triangles
 	const __m128i intBounds = _mm_cvtps_epi32(bounds);
-	const int xMin = intBounds.m128i_i32[0];
-	const int yMin = intBounds.m128i_i32[1];
-	const int xMax = intBounds.m128i_i32[2];
-	const int yMax = intBounds.m128i_i32[3];
+
+	// Align our triangle rasterization such that our quads line up with the render-target and depth-buffer's swizzles
+	const __m128i intBoundsQuadAligned = _mm_and_si128(intBounds, intBoundsQuadAlignVec);
+	const int xMin = intBoundsQuadAligned.m128i_i32[0];
+	const int yMin = intBoundsQuadAligned.m128i_i32[1];
+	const int xMax = intBoundsQuadAligned.m128i_i32[2];
+	const int yMax = intBoundsQuadAligned.m128i_i32[3];
+
+	// Early out on zero area triangles
 	if (!(yMin <= yMax && xMin < xMax) )
 		return;
 	

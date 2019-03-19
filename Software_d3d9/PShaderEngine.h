@@ -11,7 +11,7 @@ struct ShaderInfo;
 #define MAX_NUM_PS_CONSTANTS 32
 #define MAX_NUM_PS_INPUTS 10
 
-struct PS_2_0_ConstantsBuffer
+__declspec(align(16) ) struct PS_2_0_ConstantsBuffer
 {
 	D3DXVECTOR4 c[MAX_NUM_PS_CONSTANTS]; // Constant registers
 	BOOL b[MAX_NUM_CONST_BOOL_REGISTERS]; // Constant boolean registers
@@ -19,7 +19,7 @@ struct PS_2_0_ConstantsBuffer
 	sampler s[16]; // Samplers
 };
 
-struct PS_2_0_InputRegisters
+__declspec(align(16) ) struct PS_2_0_InputRegisters
 {
 	union _ps_interpolated_inputs
 	{
@@ -36,7 +36,7 @@ struct PS_2_0_InputRegisters
 	} ps_interpolated_inputs;
 };
 
-struct PS_2_0_RuntimeRegisters
+__declspec(align(16) ) struct PS_2_0_RuntimeRegisters
 {
 	D3DXVECTOR4 r[MAX_NUM_TEMP_REGISTERS]; // Temporary GPR
 	int4 p0; // Predicate register
@@ -51,14 +51,14 @@ enum pixelOutputStatus
 	ZFail
 };
 
-struct PS_2_0_OutputRegisters
+__declspec(align(16) ) struct PS_2_0_OutputRegisters
 {
 	float4 oC[4]; // Output color registers (very important)
 	float oDepth; // Output depth register
 	pixelOutputStatus pixelStatus; // Was this pixel discarded or did it finish (or was it Z or Stencil-culled)?
 };
 
-struct PS_2_0_MiscRegisters
+__declspec(align(16) ) struct PS_2_0_MiscRegisters
 {
 	D3DXVECTOR4 vPos;
 	D3DXVECTOR4 vFace;
@@ -72,17 +72,16 @@ enum shaderStatus : unsigned char
 	normalCompletion = 3
 };
 
-class PShaderEngine : public ShaderEngineBase
+__declspec(align(16) ) class PShaderEngine : public ShaderEngineBase
 {
 public:
-	PShaderEngine() : outputRegisters(NULL), constantRegisters(NULL)
+	PShaderEngine() : constantRegisters(NULL)
 	{
 	}
 
 	~PShaderEngine()
 	{
 		constantRegisters = NULL;
-		outputRegisters = NULL;
 	}
 
 	inline PShaderEngine& operator=(const PShaderEngine& rhs)
@@ -107,18 +106,18 @@ public:
 	void Init(const DeviceState& deviceState, const ShaderInfo& _shaderInfo, PS_2_0_ConstantsBuffer* const mutableConstantRegisters);
 
 	// Called once for every pixel to reset the state of the interpreter to its default
-	void Reset(const unsigned x, const unsigned y, PS_2_0_OutputRegisters* const _outputRegisters);
+	void Reset(const unsigned x, const unsigned y);
 
 	// Called once for every quad of pixels to reset the state of the interpreter to its default
-	void Reset4(const __m128i x4, const __m128i y4, PS_2_0_OutputRegisters* const _outputRegisters4);
+	void Reset4(const __m128i x4, const __m128i y4);
 
 	void InterpreterExecutePixel(void);
 
 	const PS_2_0_ConstantsBuffer* constantRegisters;
 	__declspec(align(16) ) PS_2_0_InputRegisters inputRegisters[4];
 	__declspec(align(16) ) PS_2_0_RuntimeRegisters runtimeRegisters[4];
-	PS_2_0_OutputRegisters* outputRegisters;
-	PS_2_0_MiscRegisters miscRegisters[4];
+	__declspec(align(16) ) PS_2_0_OutputRegisters outputRegisters[4];
+	__declspec(align(16) ) PS_2_0_MiscRegisters miscRegisters[4];
 
 	const INTRINSIC_INLINE D3DXVECTOR4& ResolveSrcAddressIfValid(const void* const addressPtr) const
 	{

@@ -189,14 +189,14 @@ D3DXVECTOR4& PShaderEngine::ResolveDstParameter(const DWORD rawDstBytecode)
 			__debugbreak(); // Out of bounds register index
 		}
 #endif
-		return *(D3DXVECTOR4* const)&(outputRegisters->oC[index]);
+		return *(D3DXVECTOR4* const)&(outputRegisters[0].oC[index]);
 	case D3DSPR_CONSTINT   :
 #ifdef _DEBUG
 		__debugbreak(); // Const registers can't be dst registers
 #endif
 		return *(D3DXVECTOR4* const)&constantRegisters->i[index];
 	case D3DSPR_DEPTHOUT   :
-		return *(D3DXVECTOR4* const)&outputRegisters->oDepth;
+		return *(D3DXVECTOR4* const)&outputRegisters[0].oDepth;
 	case D3DSPR_SAMPLER    :
 #ifdef _DEBUG
 		DbgBreakPrint("Error: Sampler register cannot be destination parameter");
@@ -385,11 +385,11 @@ const D3DXVECTOR4& PShaderEngine::ResolveSrcParameter(const DWORD rawSrcBytecode
 	case D3DSPR_ATTROUT    :
 	case D3DSPR_TEXCRDOUT  : // Also known as D3DSPR_OUTPUT
 	case D3DSPR_COLOROUT   :
-		return *(const D3DXVECTOR4* const)&(outputRegisters->oC[index]);
+		return *(const D3DXVECTOR4* const)&(outputRegisters[0].oC[index]);
 	case D3DSPR_CONSTINT   :
 		return *(const D3DXVECTOR4* const)&constantRegisters->i[index];
 	case D3DSPR_DEPTHOUT   :
-		return *(const D3DXVECTOR4* const)&outputRegisters->oDepth;
+		return *(const D3DXVECTOR4* const)&outputRegisters[0].oDepth;
 	case D3DSPR_SAMPLER    :
 		return *(const D3DXVECTOR4* const)&constantRegisters->s[index];
 	case D3DSPR_CONST2     :
@@ -522,14 +522,14 @@ void PShaderEngine::InitSamplers(const DeviceState& deviceState, PS_2_0_Constant
 }
 
 // Called once for every pixel to reset the state of the interpreter to its default
-void PShaderEngine::Reset(const unsigned x, const unsigned y, PS_2_0_OutputRegisters* const _outputRegisters)
+void PShaderEngine::Reset(const unsigned x, const unsigned y)
 {
 	instructionPtr = shaderInfo->firstInstructionToken;
 
 	miscRegisters[0].vPos.x = (const float)x;
 	miscRegisters[0].vPos.y = (const float)y;
 
-	outputRegisters = _outputRegisters;
+	outputRegisters[0].pixelStatus = normalWrite;
 
 #ifdef _DEBUG
 	// These values match the default GPR values in PIX
@@ -545,7 +545,7 @@ void PShaderEngine::Reset(const unsigned x, const unsigned y, PS_2_0_OutputRegis
 }
 
 // Called once for every quad of pixels to reset the state of the interpreter to its default
-void PShaderEngine::Reset4(const __m128i x4, const __m128i y4, PS_2_0_OutputRegisters* const _outputRegisters4)
+void PShaderEngine::Reset4(const __m128i x4, const __m128i y4)
 {
 	instructionPtr = shaderInfo->firstInstructionToken;
 
@@ -557,11 +557,14 @@ void PShaderEngine::Reset4(const __m128i x4, const __m128i y4, PS_2_0_OutputRegi
 	miscRegisters[2].vPos.x = x4f.m128_f32[2];
 	miscRegisters[3].vPos.x = x4f.m128_f32[3];
 	miscRegisters[0].vPos.y = y4f.m128_f32[0];
-	miscRegisters[0].vPos.y = y4f.m128_f32[1];
-	miscRegisters[0].vPos.y = y4f.m128_f32[2];
-	miscRegisters[0].vPos.y = y4f.m128_f32[3];
+	miscRegisters[1].vPos.y = y4f.m128_f32[1];
+	miscRegisters[2].vPos.y = y4f.m128_f32[2];
+	miscRegisters[3].vPos.y = y4f.m128_f32[3];
 
-	outputRegisters = _outputRegisters4;
+	outputRegisters[0].pixelStatus = normalWrite;
+	outputRegisters[1].pixelStatus = normalWrite;
+	outputRegisters[2].pixelStatus = normalWrite;
+	outputRegisters[3].pixelStatus = normalWrite;
 
 #ifdef _DEBUG
 	// These values match the default GPR values in PIX
@@ -1022,7 +1025,7 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 		const int4* const i4Value = (const int4* const)&dstValue;
 		if ( (i4Value->x | i4Value->y | i4Value->z) < 0)
 		{
-			outputRegisters->pixelStatus = discard;
+			outputRegisters[0].pixelStatus = discard;
 			return texkillStatus;
 		}
 		else
@@ -1367,7 +1370,7 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 		break;
 	case D3DSIO_END         :
 		// We're done! We reached the end of the shader!
-		outputRegisters->pixelStatus = normalWrite;
+		outputRegisters[0].pixelStatus = normalWrite;
 		return normalCompletion;
 	default:
 #ifdef _DEBUG
