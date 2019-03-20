@@ -1108,19 +1108,19 @@ public:
 	void RasterizePointFromShader(const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0) const;
 
 	// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-	void ShadePixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
+	void SetupPixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
 		const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const;
 
 	// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-	void ShadePixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
+	void SetupPixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
 		const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const;
 
 	// Handles running the pixel shader from a processed vertex shade
-	void ShadePixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
+	void SetupPixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
 		const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const;
 
 	// Handles running the pixel shader from a processed vertex shade
-	void ShadePixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
+	void SetupPixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
 		const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const;
 
 	// Handles blending and write-masking
