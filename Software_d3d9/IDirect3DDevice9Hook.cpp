@@ -208,18 +208,19 @@ static inline void PixelShadeJob1(slist_item& job, _threadItem* const myPtr)
 	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
 	const __m128i barycentricCoordsVector = _mm_load_si128( (const __m128i* const)&pixelJobData.barycentricCoords[0]);
 	const __m128 barycentricCoordsVectorF = _mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordsVector), barycentricNormalizeFactor);
+	const __m128 invZ = _mm_load_ps( (const float* const)&(primitiveData->invZ) );
 
 	if (drawCallData.useShaderVerts)
 	{
 		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
 		devHook->ShadePixelFromShader(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), pixelJobData.x[0], pixelJobData.y[0], 
-			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
+			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2, invZ);
 	}
 	else
 	{
 		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
 		devHook->ShadePixelFromStream(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), pixelJobData.x[0], pixelJobData.y[0], 
-			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
+			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2, invZ);
 	}
 }
 
@@ -251,17 +252,19 @@ static inline void PixelShadeJob4(slist_item& job, _threadItem* const myPtr)
 		_mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordIntVal4[3]), barycentricNormalizeFactor)
 	};
 
+	const __m128 invZ = _mm_load_ps( (const float* const)&(primitiveData->invZ) );
+
 	if (drawCallData.useShaderVerts)
 	{
 		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
 		devHook->ShadePixelFromShader4(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), x4, y4, barycentricCoords4, 
-			drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
+			drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2, invZ);
 	}
 	else
 	{
 		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
 		devHook->ShadePixelFromStream4(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), x4, y4, barycentricCoords4,
-			drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
+			drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2, invZ);
 	}
 }
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
@@ -3145,6 +3148,7 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 	++workStatus.numJobs;
 #else // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 	const __m128 barycentricFactors = _mm_mul_ps(_mm_cvtepi32_ps(barycentricAdjusted), _mm_set1_ps(primitiveData->barycentricNormalizeFactor) );
+	const __m128 invZ = _mm_load_ps( (const float* const)&(primitiveData->invZ) );
 
 #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 	LARGE_INTEGER pixelStartTime;
@@ -3154,13 +3158,13 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 	{
 		ShadePixelFromShader(&deviceMainPShaderEngine, *currentDrawCallData.pixelData.vs_to_ps_mappings.vs_psMapping, 
 			x, y, barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, 
-			*primitiveData->pixelShadeVertexData.shadeFromShader.v0, *primitiveData->pixelShadeVertexData.shadeFromShader.v1, *primitiveData->pixelShadeVertexData.shadeFromShader.v2);
+			*primitiveData->pixelShadeVertexData.shadeFromShader.v0, *primitiveData->pixelShadeVertexData.shadeFromShader.v1, *primitiveData->pixelShadeVertexData.shadeFromShader.v2, invZ);
 	}
 	else
 	{
 		ShadePixelFromStream(&deviceMainPShaderEngine, *currentDrawCallData.pixelData.vs_to_ps_mappings.vertexDeclMapping, 
 			x, y, barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, 
-			primitiveData->pixelShadeVertexData.shadeFromStream.v0, primitiveData->pixelShadeVertexData.shadeFromStream.v1, primitiveData->pixelShadeVertexData.shadeFromStream.v2);
+			primitiveData->pixelShadeVertexData.shadeFromStream.v0, primitiveData->pixelShadeVertexData.shadeFromStream.v1, primitiveData->pixelShadeVertexData.shadeFromStream.v2, invZ);
 	}
 #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 	LARGE_INTEGER pixelEndTime;
@@ -3217,25 +3221,26 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m12
 		_mm_mul_ps(_mm_cvtepi32_ps(barycentricsAdjusted4[2]), barycentricNormalizeFactor),
 		_mm_mul_ps(_mm_cvtepi32_ps(barycentricsAdjusted4[3]), barycentricNormalizeFactor)
 	};
+	const __m128 invZ = _mm_load_ps( (const float* const)&(primitiveData->invZ) );
 
 	if (currentDrawCallData.pixelData.useShaderVerts)
 	{
 		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
 		ShadePixelFromShader4(&deviceMainPShaderEngine, *(currentDrawCallData.pixelData.vs_to_ps_mappings.vs_psMapping), x4, y4, barycentricCoords4, 
-			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2);
+			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2, invZ);
 	}
 	else
 	{
 		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
 		ShadePixelFromStream4(&deviceMainPShaderEngine, *(currentDrawCallData.pixelData.vs_to_ps_mappings.vertexDeclMapping), x4, y4, barycentricCoords4,
-			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2);
+			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2, invZ);
 	}
 #endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 }
 
 template <const bool shadeFromShader>
 const primitivePixelJobData* const IDirect3DDevice9Hook::GetNewPrimitiveJobData(const void* const v0, const void* const v1, const void* const v2, const float barycentricNormalizeFactor, const UINT primitiveID, const bool VFace,
-	const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const
+	const UINT vertex0index, const UINT vertex1index, const UINT vertex2index, const __m128 p0, const __m128 p1, const __m128 p2) const
 {
 #ifdef _DEBUG
 	if (primitiveID >= ARRAYSIZE(allPrimitiveJobData) )
@@ -3245,6 +3250,17 @@ const primitivePixelJobData* const IDirect3DDevice9Hook::GetNewPrimitiveJobData(
 #endif
 
 	primitivePixelJobData& newPrimitiveData = allPrimitiveJobData[primitiveID];
+
+	__m128 localInvZ;
+	localInvZ.m128_f32[0] = p0.m128_f32[2];
+	localInvZ.m128_f32[1] = p1.m128_f32[2];
+	localInvZ.m128_f32[2] = p2.m128_f32[2];
+
+	const __m128 zeroVec = _mm_setzero_ps();
+	const __m128 localZ = _mm_div_ps(oneVec, localInvZ);
+	const __m128 selectMask = _mm_cmpeq_ps(zeroVec, localInvZ); // Members that equal zero will be set to 0xFF, members that don't will be set to 0x00
+	const __m128 localInvZSelected = _mm_blendv_ps(localZ, maxDepth24Bit, selectMask);
+	newPrimitiveData.invZ = D3DXVECTOR3(localInvZSelected.m128_f32[0], localInvZSelected.m128_f32[1], localInvZSelected.m128_f32[2]);
 
 	if (shadeFromShader)
 	{
@@ -5800,10 +5816,10 @@ void IDirect3DDevice9Hook::PreShadePixel4(const __m128i x4, const __m128i y4, PS
 }
 
 // Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const
+void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
+	const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const
 {
-	__m128 invZ;
-	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, offsetBytesToOPosition, v0, v1, v2, invZ);
+	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, invZ);
 
 	// Very important to reset the state machine back to its original settings!
 	PreShadePixel(x, y, pixelEngine);
@@ -5838,11 +5854,11 @@ void IDirect3DDevice9Hook::ShadePixelFromStream(PShaderEngine* const pixelEngine
 }
 
 // Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-void IDirect3DDevice9Hook::ShadePixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const
+void IDirect3DDevice9Hook::ShadePixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
+	const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const
 {
-	__m128 invZ;
 	__m128 pixelDepth4;
-	InterpolatePixelDepth4(barycentricInterpolants, offsetBytesToOPosition, v0, v1, v2, invZ, pixelDepth4);
+	InterpolatePixelDepth4(barycentricInterpolants, invZ, pixelDepth4);
 
 	// Very important to reset the state machine back to its original settings!
 	PreShadePixel4(x4, y4, pixelEngine);
@@ -6610,57 +6626,19 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters4(PShaderEngine* const 
 static const __m128 oneVec = { 1.0f, 1.0f, 1.0f, 1.0f };
 static const __m128 maxDepth24Bit = { 16777216.0f, 16777216.0f, 16777216.0f, 16777216.0f };
 
-const float IDirect3DDevice9Hook::InterpolatePixelDepth(const __m128 barycentricInterpolants, const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128& outInvZ) const
+const float IDirect3DDevice9Hook::InterpolatePixelDepth(const __m128 barycentricInterpolants, const __m128 invZ) const
 {
-	// TODO: This assumes that the PositionT element is a D3DDECLTYPE_FLOAT4 (which is the default, and the case in the vast majority of situations)
-	const D3DXVECTOR4& xyzRhw0 = *(const D3DXVECTOR4* const)(v0 + byteOffsetToOPosition);
-	const D3DXVECTOR4& xyzRhw1 = *(const D3DXVECTOR4* const)(v1 + byteOffsetToOPosition);
-	const D3DXVECTOR4& xyzRhw2 = *(const D3DXVECTOR4* const)(v2 + byteOffsetToOPosition);
-
-	// Apply perspective-correct Z interpolation:
-
-	// TODO: Move inverse-Z calculation into primitive data, since it doesn't change per-pixel, it only changes per-triangle
-	__m128 localInvZ;
-	localInvZ.m128_f32[0] = xyzRhw0.z;
-	localInvZ.m128_f32[1] = xyzRhw1.z;
-	localInvZ.m128_f32[2] = xyzRhw2.z;
-
-	const __m128 zeroVec = _mm_setzero_ps();
-	const __m128 localZ = _mm_div_ps(oneVec, localInvZ);
-	const __m128 selectMask = _mm_cmpeq_ps(zeroVec, localInvZ); // Members that equal zero will be set to 0xFF, members that don't will be set to 0x00
-	const __m128 localInvZSelected = _mm_blendv_ps(localZ, maxDepth24Bit, selectMask);
-
-	const __m128 invInterpolatedDepth = _mm_dp_ps(localInvZSelected, barycentricInterpolants, 0x7F);
-
-	outInvZ = localInvZSelected;
+	const __m128 invInterpolatedDepth = _mm_dp_ps(invZ, barycentricInterpolants, 0x7F);
 
 	return _mm_div_ps(oneVec, invInterpolatedDepth).m128_f32[0];
 }
 
-void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128& outInvZ, __m128& outPixelDepth4) const
+void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const __m128 invZ, __m128& outPixelDepth4) const
 {
-	// TODO: This assumes that the PositionT element is a D3DDECLTYPE_FLOAT4 (which is the default, and the case in the vast majority of situations)
-	const D3DXVECTOR4& xyzRhw0 = *(const D3DXVECTOR4* const)(v0 + byteOffsetToOPosition);
-	const D3DXVECTOR4& xyzRhw1 = *(const D3DXVECTOR4* const)(v1 + byteOffsetToOPosition);
-	const D3DXVECTOR4& xyzRhw2 = *(const D3DXVECTOR4* const)(v2 + byteOffsetToOPosition);
-
-	// Apply perspective-correct Z interpolation:
-
-	// TODO: Move inverse-Z calculation into primitive data, since it doesn't change per-pixel, it only changes per-triangle
-	__m128 localInvZ;
-	localInvZ.m128_f32[0] = xyzRhw0.z;
-	localInvZ.m128_f32[1] = xyzRhw1.z;
-	localInvZ.m128_f32[2] = xyzRhw2.z;
-
-	const __m128 zeroVec = _mm_setzero_ps();
-	const __m128 localZ = _mm_div_ps(oneVec, localInvZ);
-	const __m128 selectMask = _mm_cmpeq_ps(zeroVec, localInvZ); // Members that equal zero will be set to 0xFF, members that don't will be set to 0x00
-	const __m128 localInvZSelected = _mm_blendv_ps(localZ, maxDepth24Bit, selectMask);
-
-	const __m128 dotProdResult0 = _mm_dp_ps(localInvZSelected, barycentricInterpolants4[0], 0x7F);
-	const __m128 dotProdResult1 = _mm_dp_ps(localInvZSelected, barycentricInterpolants4[1], 0x7F);
-	const __m128 dotProdResult2 = _mm_dp_ps(localInvZSelected, barycentricInterpolants4[2], 0x7F);
-	const __m128 dotProdResult3 = _mm_dp_ps(localInvZSelected, barycentricInterpolants4[3], 0x7F);
+	const __m128 dotProdResult0 = _mm_dp_ps(invZ, barycentricInterpolants4[0], 0x7F);
+	const __m128 dotProdResult1 = _mm_dp_ps(invZ, barycentricInterpolants4[1], 0x7F);
+	const __m128 dotProdResult2 = _mm_dp_ps(invZ, barycentricInterpolants4[2], 0x7F);
+	const __m128 dotProdResult3 = _mm_dp_ps(invZ, barycentricInterpolants4[3], 0x7F);
 
 	const __m128 invInterpolatedDepth4 = 
 	{
@@ -6671,7 +6649,6 @@ void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInte
 	};
 
 	const __m128 pixelDepth4 = _mm_div_ps(oneVec, invInterpolatedDepth4);
-	outInvZ = localInvZSelected;
 	outPixelDepth4 = pixelDepth4;
 }
 
@@ -7544,10 +7521,10 @@ const bool IDirect3DDevice9Hook::StencilTestNoWrite(const unsigned x, const unsi
 }
 
 // Handles running the pixel shader from a processed vertex shader
-void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const
+void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
+	const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const
 {
-	__m128 invZ;
-	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, byteOffsetToOPosition, (CONST BYTE* const)&v0, (CONST BYTE* const)&v1, (CONST BYTE* const)&v2, invZ);
+	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, invZ);
 
 	// Very important to reset the state machine back to its original settings!
 	PreShadePixel(x, y, pixelEngine);
@@ -7582,11 +7559,11 @@ void IDirect3DDevice9Hook::ShadePixelFromShader(PShaderEngine* const pixelEngine
 }
 
 // Handles running the pixel shader from a processed vertex shader
-void IDirect3DDevice9Hook::ShadePixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const
+void IDirect3DDevice9Hook::ShadePixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
+	const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const
 {
-	__m128 invZ;
 	__m128 pixelDepth4;
-	InterpolatePixelDepth4(barycentricInterpolants, byteOffsetToOPosition, (CONST BYTE* const)&v0, (CONST BYTE* const)&v1, (CONST BYTE* const)&v2, invZ, pixelDepth4);
+	InterpolatePixelDepth4(barycentricInterpolants, invZ, pixelDepth4);
 
 	// Very important to reset the state machine back to its original settings!
 	PreShadePixel4(x4, y4, pixelEngine);
@@ -7878,7 +7855,8 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 		earlyZTestDepthValue4 = _mm_set1_epi32(depthStencil->GetRawDepthValueFromFloatDepth(minDepthValue) );
 	}
 
-	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData<shadeFromShader>(v0, v1, v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index);
+	const primitivePixelJobData* const primitiveData = GetNewPrimitiveJobData<shadeFromShader>(v0, v1, v2, barycentricNormalizeFactor, primitiveID, twiceTriangleArea > 0, vertex0index, vertex1index, vertex2index,
+		pos0vec, pos1vec, pos2vec);
 	for (int y = yMin; y <= yMax; y += SUBPIXEL_ACCURACY_BIASMULT2)
 	{
 		// Reset at the next row:

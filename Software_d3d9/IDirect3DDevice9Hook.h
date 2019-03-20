@@ -809,9 +809,9 @@ struct drawCallPixelJobData
 	} vs_to_ps_mappings;
 };
 
-struct primitivePixelJobData
+__declspec(align(16) ) struct primitivePixelJobData
 {
-	primitivePixelJobData() : barycentricNormalizeFactor(0.0f), primitiveID(0), VFace(true), vertex0index(0), vertex1index(0), vertex2index(0)
+	primitivePixelJobData() : invZ(0.0f, 0.0f, 0.0f), barycentricNormalizeFactor(0.0f), primitiveID(0), VFace(true), vertex0index(0), vertex1index(0), vertex2index(0)
 	{
 		pixelShadeVertexData.shadeFromShader.v0 = NULL;
 		pixelShadeVertexData.shadeFromShader.v1 = NULL;
@@ -821,6 +821,9 @@ struct primitivePixelJobData
 		pixelShadeVertexData.shadeFromStream.v1 = NULL;
 		pixelShadeVertexData.shadeFromStream.v2 = NULL;
 	}
+
+	// This is: float3(1.0f / v0.z, 1.0f / v1.z, 1.0f / v2.z)
+	__declspec(align(16) ) D3DXVECTOR3 invZ;
 
 	union _pixelShadeVertexData
 	{
@@ -1105,16 +1108,20 @@ public:
 	void RasterizePointFromShader(const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0) const;
 
 	// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-	void ShadePixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const;
+	void ShadePixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
+		const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const;
 
 	// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-	void ShadePixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2) const;
+	void ShadePixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
+		const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const;
 
 	// Handles running the pixel shader from a processed vertex shade
-	void ShadePixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const;
+	void ShadePixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
+		const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const;
 
 	// Handles running the pixel shader from a processed vertex shade
-	void ShadePixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2) const;
+	void ShadePixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
+		const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const;
 
 	// Handles blending and write-masking
 	void RenderOutput(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
@@ -1141,8 +1148,8 @@ public:
 	template <const unsigned char pixelWriteMask>
 	void InterpolateShaderIntoRegisters4(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const __m128 (&barycentricInterpolants)[4], const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ, const __m128 pixelZ4) const;
 
-	const float InterpolatePixelDepth(const __m128 barycentricInterpolants, const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128& outInvZ) const;
-	void InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const UINT byteOffsetToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, __m128& outInvZ, __m128& outPixelDepth4) const;
+	const float InterpolatePixelDepth(const __m128 barycentricInterpolants, const __m128 invZ) const;
+	void InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const __m128 invZ, __m128& outPixelDepth4) const;
 
 	// Must be called before shading a pixel to reset the pixel shader state machine!
 	void PreShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const;
@@ -1183,11 +1190,11 @@ public:
 	void CreateNewPixelShadeJob4(const __m128i x4, const __m128i y4, const __m128i (&barycentricsAdjusted4)[4], const primitivePixelJobData* const primitiveData) const;
 
 	// TODO: Find another way to do this other than mutable
-	mutable primitivePixelJobData allPrimitiveJobData[1024 * 1024];
+	mutable __declspec(align(16) ) primitivePixelJobData allPrimitiveJobData[1024 * 1024];
 
 	template <const bool shadeFromShader>
 	const primitivePixelJobData* const GetNewPrimitiveJobData(const void* const v0, const void* const v1, const void* const v2, const float barycentricNormalizeFactor, const UINT primitiveID, const bool VFace,
-		const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const;
+		const UINT vertex0index, const UINT vertex1index, const UINT vertex2index, const __m128 p0, const __m128 p1, const __m128 p2) const;
 
 	// true = "pass" (draw the pixel), false = "fail" (discard the pixel)
 	const bool StencilTestNoWrite(const unsigned x, const unsigned y) const;
