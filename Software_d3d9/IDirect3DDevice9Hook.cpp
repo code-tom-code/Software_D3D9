@@ -210,18 +210,13 @@ static inline void PixelShadeJob1(slist_item& job, _threadItem* const myPtr)
 	const __m128 barycentricCoordsVectorF = _mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordsVector), barycentricNormalizeFactor);
 	const __m128 invZ = _mm_load_ps( (const float* const)&(primitiveData->invZ) );
 
+	const primitivePixelJobData::_pixelShadeVertexData::_shadeFromAgnostic& verts = primitiveData->pixelShadeVertexData.shadeFromAgnostic;
 	if (drawCallData.useShaderVerts)
-	{
-		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
-		devHook->SetupPixelFromShader(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), pixelJobData.x[0], pixelJobData.y[0], 
-			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2, invZ);
-	}
+		devHook->SetupPixel<true>(&myPtr->threadPS_2_0, drawCallData.vs_to_ps_mappings.sourceAgnosticMapping, pixelJobData.x[0], pixelJobData.y[0], 
+			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, verts.v0, verts.v1, verts.v2, invZ);
 	else
-	{
-		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
-		devHook->SetupPixelFromStream(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), pixelJobData.x[0], pixelJobData.y[0], 
-			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2, invZ);
-	}
+		devHook->SetupPixel<false>(&myPtr->threadPS_2_0, drawCallData.vs_to_ps_mappings.sourceAgnosticMapping, pixelJobData.x[0], pixelJobData.y[0], 
+			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, verts.v0, verts.v1, verts.v2, invZ);
 }
 
 static inline void PixelShadeJob4(slist_item& job, _threadItem* const myPtr)
@@ -254,18 +249,13 @@ static inline void PixelShadeJob4(slist_item& job, _threadItem* const myPtr)
 
 	const __m128 invZ = _mm_load_ps( (const float* const)&(primitiveData->invZ) );
 
+	const primitivePixelJobData::_pixelShadeVertexData::_shadeFromAgnostic& verts = primitiveData->pixelShadeVertexData.shadeFromAgnostic;
 	if (drawCallData.useShaderVerts)
-	{
-		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
-		devHook->SetupPixelFromShader4(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vs_psMapping), x4, y4, barycentricCoords4, 
-			drawCallData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2, invZ);
-	}
+		devHook->SetupPixel4<true>(&myPtr->threadPS_2_0, drawCallData.vs_to_ps_mappings.sourceAgnosticMapping, x4, y4, barycentricCoords4, 
+			drawCallData.offsetIntoVertexForOPosition_Bytes, verts.v0, verts.v1, verts.v2, invZ);
 	else
-	{
-		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
-		devHook->SetupPixelFromStream4(&myPtr->threadPS_2_0, *(drawCallData.vs_to_ps_mappings.vertexDeclMapping), x4, y4, barycentricCoords4,
-			drawCallData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2, invZ);
-	}
+		devHook->SetupPixel4<false>(&myPtr->threadPS_2_0, drawCallData.vs_to_ps_mappings.sourceAgnosticMapping, x4, y4, barycentricCoords4, 
+			drawCallData.offsetIntoVertexForOPosition_Bytes, verts.v0, verts.v1, verts.v2, invZ);
 }
 #endif // #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 
@@ -3155,17 +3145,13 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 	QueryPerformanceCounter(&pixelStartTime);
 #endif // PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 	if (currentDrawCallData.pixelData.useShaderVerts)
-	{
-		SetupPixelFromShader(&deviceMainPShaderEngine, *currentDrawCallData.pixelData.vs_to_ps_mappings.vs_psMapping, 
+		SetupPixel<true>(&deviceMainPShaderEngine, currentDrawCallData.pixelData.vs_to_ps_mappings.sourceAgnosticMapping, 
 			x, y, barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, 
-			*primitiveData->pixelShadeVertexData.shadeFromShader.v0, *primitiveData->pixelShadeVertexData.shadeFromShader.v1, *primitiveData->pixelShadeVertexData.shadeFromShader.v2, invZ);
-	}
+			primitiveData->pixelShadeVertexData.shadeFromAgnostic.v0, primitiveData->pixelShadeVertexData.shadeFromAgnostic.v1, primitiveData->pixelShadeVertexData.shadeFromAgnostic.v2, invZ);
 	else
-	{
-		SetupPixelFromStream(&deviceMainPShaderEngine, *currentDrawCallData.pixelData.vs_to_ps_mappings.vertexDeclMapping, 
+		SetupPixel<false>(&deviceMainPShaderEngine, currentDrawCallData.pixelData.vs_to_ps_mappings.sourceAgnosticMapping, 
 			x, y, barycentricFactors, currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, 
-			primitiveData->pixelShadeVertexData.shadeFromStream.v0, primitiveData->pixelShadeVertexData.shadeFromStream.v1, primitiveData->pixelShadeVertexData.shadeFromStream.v2, invZ);
-	}
+			primitiveData->pixelShadeVertexData.shadeFromAgnostic.v0, primitiveData->pixelShadeVertexData.shadeFromAgnostic.v1, primitiveData->pixelShadeVertexData.shadeFromAgnostic.v2, invZ);
 #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 	LARGE_INTEGER pixelEndTime;
 	QueryPerformanceCounter(&pixelEndTime);
@@ -3223,18 +3209,13 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m12
 	};
 	const __m128 invZ = _mm_load_ps( (const float* const)&(primitiveData->invZ) );
 
+	const primitivePixelJobData::_pixelShadeVertexData::_shadeFromAgnostic& verts = primitiveData->pixelShadeVertexData.shadeFromAgnostic;
 	if (currentDrawCallData.pixelData.useShaderVerts)
-	{
-		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromShader& vertsFromShader = primitiveData->pixelShadeVertexData.shadeFromShader;
-		SetupPixelFromShader4(&deviceMainPShaderEngine, *(currentDrawCallData.pixelData.vs_to_ps_mappings.vs_psMapping), x4, y4, barycentricCoords4, 
-			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, *vertsFromShader.v0, *vertsFromShader.v1, *vertsFromShader.v2, invZ);
-	}
+		SetupPixel4<true>(&deviceMainPShaderEngine, currentDrawCallData.pixelData.vs_to_ps_mappings.sourceAgnosticMapping, x4, y4, barycentricCoords4, 
+			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, verts.v0, verts.v1, verts.v2, invZ);
 	else
-	{
-		const primitivePixelJobData::_pixelShadeVertexData::_shadeFromStream& vertsFromStream = primitiveData->pixelShadeVertexData.shadeFromStream;
-		SetupPixelFromStream4(&deviceMainPShaderEngine, *(currentDrawCallData.pixelData.vs_to_ps_mappings.vertexDeclMapping), x4, y4, barycentricCoords4,
-			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, vertsFromStream.v0, vertsFromStream.v1, vertsFromStream.v2, invZ);
-	}
+		SetupPixel4<false>(&deviceMainPShaderEngine, currentDrawCallData.pixelData.vs_to_ps_mappings.sourceAgnosticMapping, x4, y4, barycentricCoords4, 
+			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, verts.v0, verts.v1, verts.v2, invZ);
 #endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 }
 
@@ -5815,9 +5796,10 @@ void IDirect3DDevice9Hook::PreShadePixel4(const __m128i x4, const __m128i y4, PS
 	pixelShader->Reset4(x4, y4);
 }
 
-// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-void IDirect3DDevice9Hook::SetupPixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
-	const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const
+// Handles pixel setup and depth and attribute interpolation before shading the pixel
+template <const bool setupFromShader>
+void IDirect3DDevice9Hook::SetupPixel(PShaderEngine* const pixelEngine, const void* const shaderOrStreamMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
+	const UINT offsetBytesToOPosition, const void* const v0, const void* const v1, const void* const v2, const __m128 invZ) const
 {
 	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, invZ);
 
@@ -5848,14 +5830,24 @@ void IDirect3DDevice9Hook::SetupPixelFromStream(PShaderEngine* const pixelEngine
 		}
 	}
 
-	InterpolateStreamIntoRegisters(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth);
+	if (setupFromShader)
+	{
+		InterpolateShaderIntoRegisters(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, 
+			*(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth);
+	}
+	else
+	{
+		InterpolateStreamIntoRegisters(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, 
+			(const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth);
+	}
 
 	ShadePixel(x, y, pixelEngine);
 }
 
-// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-void IDirect3DDevice9Hook::SetupPixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
-	const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const
+// Handles pixel quad setup and depth and attribute interpolation before shading the pixel quad
+template <const bool setupFromShader>
+void IDirect3DDevice9Hook::SetupPixel4(PShaderEngine* const pixelEngine, const void* const shaderOrStreamMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
+	const UINT offsetBytesToOPosition, const void* const v0, const void* const v1, const void* const v2, const __m128 invZ) const
 {
 	__m128 pixelDepth4;
 	InterpolatePixelDepth4(barycentricInterpolants, invZ, pixelDepth4);
@@ -5900,59 +5892,101 @@ void IDirect3DDevice9Hook::SetupPixelFromStream4(PShaderEngine* const pixelEngin
 	switch (pixelWriteMask)
 	{
 	case 0x1:
-		InterpolateStreamIntoRegisters4<0x1>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0x1>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0x1>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0x1>(x4, y4, pixelEngine);
 		break;
 	case 0x2:
-		InterpolateStreamIntoRegisters4<0x2>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0x2>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0x2>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0x2>(x4, y4, pixelEngine);
 		break;
 	case 0x3:
-		InterpolateStreamIntoRegisters4<0x3>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0x3>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0x3>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0x3>(x4, y4, pixelEngine);
 		break;
 	case 0x4:
-		InterpolateStreamIntoRegisters4<0x4>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0x4>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0x4>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0x4>(x4, y4, pixelEngine);
 		break;
 	case 0x5:
-		InterpolateStreamIntoRegisters4<0x5>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0x5>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0x5>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0x5>(x4, y4, pixelEngine);
 		break;
 	case 0x6:
-		InterpolateStreamIntoRegisters4<0x6>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0x6>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0x6>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0x6>(x4, y4, pixelEngine);
 		break;
 	case 0x7:
-		InterpolateStreamIntoRegisters4<0x7>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0x7>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0x7>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0x7>(x4, y4, pixelEngine);
 		break;
 	case 0x8:
-		InterpolateStreamIntoRegisters4<0x8>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0x8>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0x8>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0x8>(x4, y4, pixelEngine);
 		break;
 	case 0x9:
-		InterpolateStreamIntoRegisters4<0x9>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0x9>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0x9>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0x9>(x4, y4, pixelEngine);
 		break;
 	case 0xA:
-		InterpolateStreamIntoRegisters4<0xA>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0xA>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0xA>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0xA>(x4, y4, pixelEngine);
 		break;
 	case 0xB:
-		InterpolateStreamIntoRegisters4<0xB>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0xB>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0xB>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0xB>(x4, y4, pixelEngine);
 		break;
 	case 0xC:
-		InterpolateStreamIntoRegisters4<0xC>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0xC>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0xC>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0xC>(x4, y4, pixelEngine);
 		break;
 	case 0xD:
-		InterpolateStreamIntoRegisters4<0xD>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0xD>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0xD>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0xD>(x4, y4, pixelEngine);
 		break;
 	case 0xE:
-		InterpolateStreamIntoRegisters4<0xE>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0xE>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0xE>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0xE>(x4, y4, pixelEngine);
 		break;
 	default:
@@ -5962,7 +5996,10 @@ void IDirect3DDevice9Hook::SetupPixelFromStream4(PShaderEngine* const pixelEngin
 		__assume(0);
 #endif
 	case 0xF:
-		InterpolateStreamIntoRegisters4<0xF>(pixelEngine, vertexDeclMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
+		if (setupFromShader)
+			InterpolateShaderIntoRegisters4<0xF>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+		else
+			InterpolateStreamIntoRegisters4<0xF>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
 		ShadePixel4<0xF>(x4, y4, pixelEngine);
 		break;
 	}
@@ -7517,159 +7554,6 @@ const bool IDirect3DDevice9Hook::StencilTestNoWrite(const unsigned x, const unsi
 #endif
 	case D3DCMP_ALWAYS      :
 		return true;
-	}
-}
-
-// Handles running the pixel shader from a processed vertex shader
-void IDirect3DDevice9Hook::SetupPixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
-	const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const
-{
-	const float pixelDepth = InterpolatePixelDepth(barycentricInterpolants, invZ);
-
-	// Very important to reset the state machine back to its original settings!
-	PreShadePixel(x, y, pixelEngine);
-
-	if (currentState.currentDepthStencil)
-	{
-		if (!StencilTestNoWrite(x, y) )
-		{
-			// Fail the stencil test!
-			pixelEngine->outputRegisters[0].pixelStatus = stencilFail;
-			ShadePixel(x, y, pixelEngine);
-			return;
-		}
-
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zEnable)
-		{
-			const unsigned bufferDepth = currentState.currentDepthStencil->GetRawDepth(x, y);
-			if (!DepthTest(pixelDepth, bufferDepth, currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc, currentState.currentDepthStencil->GetInternalFormat() ) )
-			{
-				// Fail the depth test!
-				pixelEngine->outputRegisters[0].pixelStatus = ZFail;
-				ShadePixel(x, y, pixelEngine);
-				return;
-			}
-			pixelEngine->outputRegisters[0].oDepth = pixelDepth;
-		}
-	}
-
-	InterpolateShaderIntoRegisters(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth);
-
-	ShadePixel(x, y, pixelEngine);
-}
-
-// Handles running the pixel shader from a processed vertex shader
-void IDirect3DDevice9Hook::SetupPixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
-	const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const
-{
-	__m128 pixelDepth4;
-	InterpolatePixelDepth4(barycentricInterpolants, invZ, pixelDepth4);
-
-	// Very important to reset the state machine back to its original settings!
-	PreShadePixel4(x4, y4, pixelEngine);
-
-	unsigned char pixelWriteMask = 0xF;
-	if (currentState.currentDepthStencil)
-	{
-		// TODO: Make a StencilTestNoWrite4
-		/*for (unsigned z = 0; z < 4; ++z)
-		{
-			if (!StencilTestNoWrite(x4.m128i_i32[z], y4.m128i_i32[z]) )
-			{
-				// Fail the stencil test!
-				pixelOutput4[z].pixelStatus = stencilFail;
-				ShadePixel(x, y, pixelEngine);
-				return;
-			}
-		}*/
-
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zEnable)
-		{
-			const __m128i bufferDepth4 = currentState.currentDepthStencil->GetRawDepth4(x4, y4);
-			const __m128i depthTestResults = DepthTest4(pixelDepth4, bufferDepth4, currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc, currentState.currentDepthStencil->GetInternalFormat() );
-			const unsigned char maskBits = _mm_movemask_ps(_mm_cvtepi32_ps(depthTestResults) );
-			if (maskBits == 0x0)
-				return;
-			pixelWriteMask = maskBits;
-			pixelEngine->outputRegisters[0].oDepth = pixelDepth4.m128_f32[0];
-			pixelEngine->outputRegisters[0].pixelStatus = (maskBits & 0x1) ? normalWrite : ZFail;
-			pixelEngine->outputRegisters[1].oDepth = pixelDepth4.m128_f32[1];
-			pixelEngine->outputRegisters[1].pixelStatus = (maskBits & 0x2) ? normalWrite : ZFail;
-			pixelEngine->outputRegisters[2].oDepth = pixelDepth4.m128_f32[2];
-			pixelEngine->outputRegisters[2].pixelStatus = (maskBits & 0x4) ? normalWrite : ZFail;
-			pixelEngine->outputRegisters[3].oDepth = pixelDepth4.m128_f32[3];
-			pixelEngine->outputRegisters[3].pixelStatus = (maskBits & 0x8) ? normalWrite : ZFail;
-		}
-	}
-
-	switch (pixelWriteMask)
-	{
-	case 0x1:
-		InterpolateShaderIntoRegisters4<0x1>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0x1>(x4, y4, pixelEngine);
-		break;
-	case 0x2:
-		InterpolateShaderIntoRegisters4<0x2>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0x2>(x4, y4, pixelEngine);
-		break;
-	case 0x3:
-		InterpolateShaderIntoRegisters4<0x3>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0x3>(x4, y4, pixelEngine);
-		break;
-	case 0x4:
-		InterpolateShaderIntoRegisters4<0x4>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0x4>(x4, y4, pixelEngine);
-		break;
-	case 0x5:
-		InterpolateShaderIntoRegisters4<0x5>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0x5>(x4, y4, pixelEngine);
-		break;
-	case 0x6:
-		InterpolateShaderIntoRegisters4<0x6>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0x6>(x4, y4, pixelEngine);
-		break;
-	case 0x7:
-		InterpolateShaderIntoRegisters4<0x7>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0x7>(x4, y4, pixelEngine);
-		break;
-	case 0x8:
-		InterpolateShaderIntoRegisters4<0x8>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0x8>(x4, y4, pixelEngine);
-		break;
-	case 0x9:
-		InterpolateShaderIntoRegisters4<0x9>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0x9>(x4, y4, pixelEngine);
-		break;
-	case 0xA:
-		InterpolateShaderIntoRegisters4<0xA>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0xA>(x4, y4, pixelEngine);
-		break;
-	case 0xB:
-		InterpolateShaderIntoRegisters4<0xB>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0xB>(x4, y4, pixelEngine);
-		break;
-	case 0xC:
-		InterpolateShaderIntoRegisters4<0xC>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0xC>(x4, y4, pixelEngine);
-		break;
-	case 0xD:
-		InterpolateShaderIntoRegisters4<0xD>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0xD>(x4, y4, pixelEngine);
-		break;
-	case 0xE:
-		InterpolateShaderIntoRegisters4<0xE>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0xE>(x4, y4, pixelEngine);
-		break;
-	default:
-#ifdef _DEBUG
-		__debugbreak(); // Should never be here!
-#else
-		__assume(0);
-#endif
-	case 0xF:
-		InterpolateShaderIntoRegisters4<0xF>(pixelEngine, vs_psMapping, barycentricInterpolants, v0, v1, v2, invZ, pixelDepth4);
-		ShadePixel4<0xF>(x4, y4, pixelEngine);
-		break;
 	}
 }
 

@@ -806,6 +806,7 @@ struct drawCallPixelJobData
 	{
 		const VStoPSMapping* vs_psMapping;
 		const DeclarationSemanticMapping* vertexDeclMapping;
+		const void* sourceAgnosticMapping;
 	} vs_to_ps_mappings;
 };
 
@@ -839,6 +840,12 @@ __declspec(align(16) ) struct primitivePixelJobData
 			CONST BYTE* v1;
 			CONST BYTE* v2;
 		} shadeFromStream;
+		struct _shadeFromAgnostic
+		{
+			const void* v0;
+			const void* v1;
+			const void* v2;
+		} shadeFromAgnostic;
 	} pixelShadeVertexData;
 	UINT vertex0index;
 	UINT vertex1index;
@@ -1107,21 +1114,15 @@ public:
 	// Assumes pre-transformed vertex from a processed vertex shader
 	void RasterizePointFromShader(const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0) const;
 
-	// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-	void SetupPixelFromStream(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
-		const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const;
+	// Handles pixel setup and depth and attribute interpolation before shading the pixel
+	template <const bool setupFromShader>
+	void SetupPixel(PShaderEngine* const pixelEngine, const void* const shaderOrStreamMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
+		const UINT offsetBytesToOPosition, const void* const v0, const void* const v1, const void* const v2, const __m128 invZ) const;
 
-	// Handles running the pixel shader and interpolating input for this pixel from a vertex declaration + raw vertex stream
-	void SetupPixelFromStream4(PShaderEngine* const pixelEngine, const DeclarationSemanticMapping& vertexDeclMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
-		const UINT offsetBytesToOPosition, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ) const;
-
-	// Handles running the pixel shader from a processed vertex shade
-	void SetupPixelFromShader(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
-		const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const;
-
-	// Handles running the pixel shader from a processed vertex shade
-	void SetupPixelFromShader4(PShaderEngine* const pixelEngine, const VStoPSMapping& vs_psMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
-		const UINT byteOffsetToOPosition, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ) const;
+	// Handles pixel quad setup and depth and attribute interpolation before shading the pixel quad
+	template <const bool setupFromShader>
+	void SetupPixel4(PShaderEngine* const pixelEngine, const void* const shaderOrStreamMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
+		const UINT offsetBytesToOPosition, const void* const v0, const void* const v1, const void* const v2, const __m128 invZ) const;
 
 	// Handles blending and write-masking
 	void RenderOutput(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
