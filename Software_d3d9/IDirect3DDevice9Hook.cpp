@@ -5811,8 +5811,7 @@ void IDirect3DDevice9Hook::SetupPixel(PShaderEngine* const pixelEngine, const vo
 		if (!StencilTestNoWrite(x, y) )
 		{
 			// Fail the stencil test!
-			pixelEngine->outputRegisters[0].pixelStatus = stencilFail;
-			ShadePixel(x, y, pixelEngine);
+			ShadePixel_FailStencil(x, y);
 			return;
 		}
 
@@ -5822,8 +5821,7 @@ void IDirect3DDevice9Hook::SetupPixel(PShaderEngine* const pixelEngine, const vo
 			if (!DepthTest(pixelDepth, bufferDepth, currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc, currentState.currentDepthStencil->GetInternalFormat() ) )
 			{
 				// Fail the depth test!
-				pixelEngine->outputRegisters[0].pixelStatus = ZFail;
-				ShadePixel(x, y, pixelEngine);
+				ShadePixel_FailDepth(x, y);
 				return;
 			}
 			pixelEngine->outputRegisters[0].oDepth = pixelDepth;
@@ -5841,7 +5839,7 @@ void IDirect3DDevice9Hook::SetupPixel(PShaderEngine* const pixelEngine, const vo
 			(const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth);
 	}
 
-	ShadePixel(x, y, pixelEngine);
+	ShadePixel_RunShader(x, y, pixelEngine);
 }
 
 // Handles pixel quad setup and depth and attribute interpolation before shading the pixel quad
@@ -5896,98 +5894,98 @@ void IDirect3DDevice9Hook::SetupPixel4(PShaderEngine* const pixelEngine, const v
 			InterpolateShaderIntoRegisters4<0x1>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0x1>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0x1>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0x1>(x4, y4, pixelEngine);
 		break;
 	case 0x2:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0x2>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0x2>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0x2>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0x2>(x4, y4, pixelEngine);
 		break;
 	case 0x3:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0x3>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0x3>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0x3>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0x3>(x4, y4, pixelEngine);
 		break;
 	case 0x4:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0x4>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0x4>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0x4>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0x4>(x4, y4, pixelEngine);
 		break;
 	case 0x5:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0x5>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0x5>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0x5>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0x5>(x4, y4, pixelEngine);
 		break;
 	case 0x6:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0x6>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0x6>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0x6>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0x6>(x4, y4, pixelEngine);
 		break;
 	case 0x7:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0x7>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0x7>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0x7>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0x7>(x4, y4, pixelEngine);
 		break;
 	case 0x8:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0x8>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0x8>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0x8>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0x8>(x4, y4, pixelEngine);
 		break;
 	case 0x9:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0x9>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0x9>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0x9>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0x9>(x4, y4, pixelEngine);
 		break;
 	case 0xA:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0xA>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0xA>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0xA>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0xA>(x4, y4, pixelEngine);
 		break;
 	case 0xB:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0xB>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0xB>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0xB>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0xB>(x4, y4, pixelEngine);
 		break;
 	case 0xC:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0xC>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0xC>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0xC>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0xC>(x4, y4, pixelEngine);
 		break;
 	case 0xD:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0xD>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0xD>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0xD>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0xD>(x4, y4, pixelEngine);
 		break;
 	case 0xE:
 		if (setupFromShader)
 			InterpolateShaderIntoRegisters4<0xE>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0xE>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0xE>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0xE>(x4, y4, pixelEngine);
 		break;
 	default:
 #ifdef _DEBUG
@@ -6000,7 +5998,7 @@ void IDirect3DDevice9Hook::SetupPixel4(PShaderEngine* const pixelEngine, const v
 			InterpolateShaderIntoRegisters4<0xF>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
 		else
 			InterpolateStreamIntoRegisters4<0xF>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
-		ShadePixel4<0xF>(x4, y4, pixelEngine);
+		ShadePixel4_RunShader<0xF>(x4, y4, pixelEngine);
 		break;
 	}
 }
@@ -7090,102 +7088,145 @@ Enum for why a pixel was culled:
 10) alpha blend skip (0 alpha)
 11) additive blend skip (0 color)
 */
-void IDirect3DDevice9Hook::ShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const
+void IDirect3DDevice9Hook::ShadePixel_RunShader(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const
 {
 	++frameStats.numPixelsShaded;
 
-	if (pixelShader->outputRegisters[0].pixelStatus == normalWrite)
-	{
-		// Perform pixel shading:
+	// Perform pixel shading:
 #ifndef FORCE_INTERPRETED_PIXEL_SHADER
-		if (currentState.currentPixelShader->jitShaderMain)
-		{
-			// Execute JIT pixel shader engine:
-			currentState.currentPixelShader->jitShaderMain(*pixelShader);
-		}
-		else
+	if (currentState.currentPixelShader->jitShaderMain)
+	{
+		// Execute JIT pixel shader engine:
+		currentState.currentPixelShader->jitShaderMain(*pixelShader);
+	}
+	else
 #endif
-		{
-			// Execute interpreted pixel shader engine:
-			pixelShader->InterpreterExecutePixel();
-		}
+	{
+		// Execute interpreted pixel shader engine:
+		pixelShader->InterpreterExecutePixel();
 	}
 
-	switch (pixelShader->outputRegisters[0].pixelStatus)
+	if (currentState.currentPixelShader->GetShaderInfo().usesTexkill)
+		PostShadePixel_DiscardTest(x, y, pixelShader->outputRegisters[0]);
+	else
+		PostShadePixel_AlphaTest(x, y, pixelShader->outputRegisters[0]);
+}
+
+void IDirect3DDevice9Hook::PostShadePixel_DiscardTest(const unsigned x, const unsigned y, const PS_2_0_OutputRegisters& pixelShaderOutput) const
+{
+	if (pixelShaderOutput.pixelStatus == discard)
 	{
-	case normalWrite:
+		PostShadePixel_Discard(x, y);
+		return;
+	}
+
+	// Alpha testing:
+	PostShadePixel_AlphaTest(x, y, pixelShaderOutput);
+}
+
+void IDirect3DDevice9Hook::PostShadePixel_AlphaTest(const unsigned x, const unsigned y, const PS_2_0_OutputRegisters& pixelShaderOutput) const
+{
+	// This MSDN page says that alpha testing only happens against the alpha value from oC0: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/multiple-render-targets
+	if (!AlphaTest(*(const D3DXVECTOR4* const)&(pixelShaderOutput.oC[0]) ) )
 	{
-		// Alpha testing:
-		// This MSDN page says that alpha testing only happens against the alpha value from oC0: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/multiple-render-targets
-		if (!AlphaTest(*(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[0].oC[0]) ) )
+		PostShadePixel_FailAlphaTest(x, y);
+		return;
+	}
+
+	PostShadePixel_WriteOutput(x, y, pixelShaderOutput);
+}
+
+void IDirect3DDevice9Hook::PostShadePixel_WriteOutput(const unsigned x, const unsigned y, const PS_2_0_OutputRegisters& pixelShaderOutput) const
+{
+	PostShadePixel_WriteOutputColor(x, y, pixelShaderOutput);
+
+	if (currentState.currentDepthStencil)
+	{
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable)
 		{
-			++frameStats.numAlphaTestFailPixels;
-			return;
+			// TODO: Re-run depth test in the case that this pixel shader writes out a custom depth
+			PostShadePixel_WriteOutputDepth(x, y, pixelShaderOutput.oDepth);
 		}
-
-		const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
-		const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
-		for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
-		{
-			IDirect3DSurface9Hook* const currentRenderTarget = currentState.currentRenderTargets[rt];
-			if (!currentRenderTarget)
-				continue;
-
-			RenderOutput(currentRenderTarget, xCoord, yCoord, *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[0].oC[rt]) );
-		}
-
-		if (currentState.currentDepthStencil)
-		{
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable)
-			{
-				const float depthBias = currentState.currentRenderStates.renderStatesUnion.namedStates.depthBias;
-				currentState.currentDepthStencil->SetDepth(xCoord, yCoord, pixelShader->outputRegisters[0].oDepth + depthBias);
-			}
 			
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
-			{
-				StencilPassOperation(x, y);
-			}
-		}
-	}
-		break;
-	default:
-#ifdef _DEBUG
-		DbgBreakPrint("Error: Unknown pixelstatus!");
-#else
-		__assume(0);
-#endif
-	case discard:
-		// Pixel discarded (TEXKILL) case, don't write out anything!
-		++frameStats.numPixelsTexkilled;
-		break;
-	case stencilFail:
-		if (currentState.currentDepthStencil && currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
 		{
-			const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
-			const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
-			StencilFailOperation(xCoord, yCoord);
+			PostShadePixel_WriteOutputStencil(x, y);
 		}
-		break;
-	case ZFail:
-		if (currentState.currentDepthStencil && currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
-		{
-			const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
-			const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
-			StencilZFailOperation(xCoord, yCoord);
-		}
-		break;
 	}
 }
 
-template <const unsigned pixelWriteMask>
-void IDirect3DDevice9Hook::ShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
+void IDirect3DDevice9Hook::ShadePixel_FailStencil(const unsigned x, const unsigned y) const
+{
+	const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
+	const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
+	StencilFailOperation(xCoord, yCoord);
+}
+
+void IDirect3DDevice9Hook::ShadePixel_FailDepth(const unsigned x, const unsigned y) const
+{
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
+	{
+		const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
+		const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
+		StencilZFailOperation(xCoord, yCoord);
+	}
+}
+
+void IDirect3DDevice9Hook::PostShadePixel_FailAlphaTest(const unsigned x, const unsigned y) const
+{
+	++frameStats.numAlphaTestFailPixels;
+}
+
+void IDirect3DDevice9Hook::PostShadePixel_Discard(const unsigned x, const unsigned y) const
+{
+	++frameStats.numPixelsTexkilled;
+}
+
+void IDirect3DDevice9Hook::PostShadePixel_WriteOutputColor(const unsigned x, const unsigned y, const PS_2_0_OutputRegisters& pixelOutputColor) const
+{
+	const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
+	const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
+	for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
+	{
+		IDirect3DSurface9Hook* const currentRenderTarget = currentState.currentRenderTargets[rt];
+		if (!currentRenderTarget)
+			continue;
+
+		RenderOutput(currentRenderTarget, xCoord, yCoord, *(const D3DXVECTOR4* const)&(pixelOutputColor.oC[rt]) );
+	}
+}
+
+void IDirect3DDevice9Hook::PostShadePixel_WriteOutputDepth(const unsigned x, const unsigned y, const float pixelOutputDepth) const
+{
+	const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
+	const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
+	const float depthBias = currentState.currentRenderStates.renderStatesUnion.namedStates.depthBias;
+	currentState.currentDepthStencil->SetDepth(xCoord, yCoord, pixelOutputDepth + depthBias);
+}
+
+void IDirect3DDevice9Hook::PostShadePixel_WriteOutputStencil(const unsigned x, const unsigned y) const
+{
+	StencilPassOperation(x, y);
+}
+
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::ShadePixel4_RunShader(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
 {
 	frameStats.numPixelsShaded += 4;
 
-	if (pixelShader->outputRegisters[0].pixelStatus == normalWrite)
+	// Perform pixel shading:
+	// TODO: Need to write a quad execution interpreter engine, and a quad JIT engine to replace this
+	// Hack for now, need to preserve the 0th set of output registers or else they'll get clobbered by later
+	// iterations of pixel shading
+	__declspec(align(16) ) PS_2_0_OutputRegisters savedOutputRegs0;
+	for (unsigned char z = 0; z < 4; ++z)
 	{
-		// Perform pixel shading:
+		if (!(pixelWriteMask & (1 << z) ) )
+			continue;
+
+		if (z != 0)
+			pixelShader->inputRegisters[0] = pixelShader->inputRegisters[z];
+
 #ifndef FORCE_INTERPRETED_PIXEL_SHADER
 		if (currentState.currentPixelShader->jitShaderMain)
 		{
@@ -7196,98 +7237,371 @@ void IDirect3DDevice9Hook::ShadePixel4(const __m128i x4, const __m128i y4, PShad
 #endif
 		{
 			// Execute interpreted pixel shader engine:
+			pixelShader->Reset(x4.m128i_u32[z], y4.m128i_u32[z]); // HACK!
 			pixelShader->InterpreterExecutePixel();
 		}
 
-		// Hack for now:
-		// TODO: Need to write a quad execution interpreter engine, and a quad JIT engine to replace this
-		pixelShader->outputRegisters[1] = pixelShader->outputRegisters[0];
-		pixelShader->outputRegisters[2] = pixelShader->outputRegisters[0];
-		pixelShader->outputRegisters[3] = pixelShader->outputRegisters[0];
+		if (z != 0)
+			pixelShader->outputRegisters[z] = pixelShader->outputRegisters[0];
+		else
+			savedOutputRegs0 = pixelShader->outputRegisters[0];
 	}
+	if (pixelWriteMask & 0x1)
+		pixelShader->outputRegisters[0] = savedOutputRegs0;
 
-	switch (pixelShader->outputRegisters[0].pixelStatus)
-	{
-	case normalWrite:
-	{
-		// Alpha testing:
-		const unsigned char postAlphaTestWriteMask = pixelWriteMask & _mm_movemask_ps(AlphaTest4<0xF>(pixelShader->outputRegisters) );
+	if (currentState.currentPixelShader->GetShaderInfo().usesTexkill)
+		PostShadePixel4_DiscardTest<pixelWriteMask>(x4, y4, pixelShader);
+	else
+		PostShadePixel4_AlphaTest<pixelWriteMask>(x4, y4, pixelShader);
+}
 
-		for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::ShadePixel4_FailStencil(const __m128i x4, const __m128i y4) const
+{
+	for (unsigned char z = 0; z < 4; ++z)
+	{
+		if (pixelWriteMask & (1 << z) )
 		{
-			IDirect3DSurface9Hook* const currentRenderTarget = currentState.currentRenderTargets[rt];
-			if (!currentRenderTarget)
-				continue;
-
-			// TODO: Need to write a RenderOutput4 to replace this
-			for (unsigned z = 0; z < 4; ++z)
-			{
-				if (postAlphaTestWriteMask & (1 << z) )
-					RenderOutput(currentRenderTarget, x4.m128i_u32[z], y4.m128i_u32[z], *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[0].oC[rt]) );
-			}
+			StencilFailOperation(x4.m128i_u32[z], y4.m128i_u32[z]);
 		}
+	}
+}
 
-		if (currentState.currentDepthStencil)
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::ShadePixel4_FailDepth(const __m128i x4, const __m128i y4) const
+{
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
+	{
+		for (unsigned char z = 0; z < 4; ++z)
 		{
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable)
+			if (pixelWriteMask & (1 << z) )
 			{
-				__m128 depth4;
-				if (postAlphaTestWriteMask & 0x1)
-					depth4.m128_f32[0] = pixelShader->outputRegisters[0].oDepth;
-				if (postAlphaTestWriteMask & 0x2)
-					depth4.m128_f32[1] = pixelShader->outputRegisters[1].oDepth;
-				if (postAlphaTestWriteMask & 0x4)
-					depth4.m128_f32[2] = pixelShader->outputRegisters[2].oDepth;
-				if (postAlphaTestWriteMask & 0x8)
-					depth4.m128_f32[3] = pixelShader->outputRegisters[3].oDepth;
-				depth4 = _mm_add_ps(depth4, currentState.currentRenderStates.depthBiasSplatted);
-				currentState.currentDepthStencil->SetDepth4<pixelWriteMask>(x4, y4, depth4);
-			}
-			
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
-			{
-				// TODO: Need to write a StencilOperation4 to replace this
-				for (unsigned z = 0; z < 4; ++z)
-				{
-					if (postAlphaTestWriteMask & (1 << z) )
-						StencilPassOperation(x4.m128i_u32[z], y4.m128i_u32[z]);
-				}
+				StencilZFailOperation(x4.m128i_u32[z], y4.m128i_u32[z]);
 			}
 		}
 	}
-		break;
+}
+
+static_assert(sizeof(PS_2_0_OutputRegisters) % sizeof(DWORD) == 0, "Error! Unexpected size slack!");
+static const unsigned outputRegisterOffsetsGatherBytes[4] = { 0, sizeof(PS_2_0_OutputRegisters) / sizeof(DWORD), sizeof(PS_2_0_OutputRegisters) * 2 / sizeof(DWORD), sizeof(PS_2_0_OutputRegisters) * 3 / sizeof(DWORD) };
+static const __m128i outputRegisterOffsetsGather = *(const __m128i* const)outputRegisterOffsetsGatherBytes;
+
+static const __m128i pixelStatusDiscardCheck4 = _mm_set1_epi32(discard);
+
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::PostShadePixel4_DiscardTest(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
+{
+	// Handle discard (texkill) here now, then call PostShadePixel4_Discard() for any discarded pixels
+	const __m128i pixelStatus4 = _mm_i32gather_epi32( (const int* const)&(pixelShader->outputRegisters[0].pixelStatus), outputRegisterOffsetsGather, 4);
+	const unsigned char pixelDiscardMask = pixelWriteMask & (const unsigned char)(_mm_movemask_ps(_mm_cvtepi32_ps(_mm_cmpeq_epi32(pixelStatus4, pixelStatusDiscardCheck4) ) ) );
+	PostShadePixel4_Discard(pixelDiscardMask);
+
+	const unsigned char pixelWriteMask_postDiscard = pixelWriteMask & (~pixelDiscardMask);
+	switch (pixelWriteMask_postDiscard)
+	{
 	default:
 #ifdef _DEBUG
-		DbgBreakPrint("Error: Unknown pixelstatus!");
+		__debugbreak(); // Should never be here!
 #else
 		__assume(0);
 #endif
-	case discard:
-		// Pixel discarded (TEXKILL) case, don't write out anything!
+	case 0x0:
+		return; // No pixels left, we're done!
+	case 0x1:
+		PostShadePixel_AlphaTest(x4.m128i_u32[0], y4.m128i_u32[0], pixelShader->outputRegisters[0]);
+		return;
+	case 0x2:
+		PostShadePixel_AlphaTest(x4.m128i_u32[1], y4.m128i_u32[1], pixelShader->outputRegisters[1]);
+		return;
+	case 0x4:
+		PostShadePixel_AlphaTest(x4.m128i_u32[2], y4.m128i_u32[2], pixelShader->outputRegisters[2]);
+		return;
+	case 0x8:
+		PostShadePixel_AlphaTest(x4.m128i_u32[3], y4.m128i_u32[3], pixelShader->outputRegisters[3]);
+		return;
+	case 0x3:
+		PostShadePixel4_AlphaTest<0x3>(x4, y4, pixelShader);
+		return;
+	case 0x5:
+		PostShadePixel4_AlphaTest<0x5>(x4, y4, pixelShader);
+		return;
+	case 0x6:
+		PostShadePixel4_AlphaTest<0x6>(x4, y4, pixelShader);
+		return;
+	case 0x7:
+		PostShadePixel4_AlphaTest<0x7>(x4, y4, pixelShader);
+		return;
+	case 0x9:
+		PostShadePixel4_AlphaTest<0x9>(x4, y4, pixelShader);
+		return;
+	case 0xA:
+		PostShadePixel4_AlphaTest<0xA>(x4, y4, pixelShader);
+		return;
+	case 0xB:
+		PostShadePixel4_AlphaTest<0xB>(x4, y4, pixelShader);
+		return;
+	case 0xC:
+		PostShadePixel4_AlphaTest<0xC>(x4, y4, pixelShader);
+		return;
+	case 0xD:
+		PostShadePixel4_AlphaTest<0xD>(x4, y4, pixelShader);
+		return;
+	case 0xE:
+		PostShadePixel4_AlphaTest<0xE>(x4, y4, pixelShader);
+		return;
+	case 0xF:
+		PostShadePixel4_AlphaTest<0xF>(x4, y4, pixelShader);
+		return;
+	}
+}
+
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::PostShadePixel4_AlphaTest(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
+{
+	const unsigned char postAlphaTestWriteMask = pixelWriteMask & _mm_movemask_ps(AlphaTest4<0xF>(pixelShader->outputRegisters) );
+	switch (postAlphaTestWriteMask)
+	{
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // Should never be here!
+#else
+		__assume(0);
+#endif
+	case 0x0:
+		return; // No more pixels left, we're done!
+	case 0x1:
+		PostShadePixel_WriteOutput(x4.m128i_u32[0], y4.m128i_u32[0], pixelShader->outputRegisters[0]);
+		return;
+	case 0x2:
+		PostShadePixel_WriteOutput(x4.m128i_u32[1], y4.m128i_u32[1], pixelShader->outputRegisters[1]);
+		return;
+	case 0x4:
+		PostShadePixel_WriteOutput(x4.m128i_u32[2], y4.m128i_u32[2], pixelShader->outputRegisters[2]);
+		return;
+	case 0x8:
+		PostShadePixel_WriteOutput(x4.m128i_u32[3], y4.m128i_u32[3], pixelShader->outputRegisters[3]);
+		return;
+	case 0x3:
+		PostShadePixel4_WriteOutput<0x3>(x4, y4, pixelShader);
+		return;
+	case 0x5:
+		PostShadePixel4_WriteOutput<0x5>(x4, y4, pixelShader);
+		return;
+	case 0x6:
+		PostShadePixel4_WriteOutput<0x6>(x4, y4, pixelShader);
+		return;
+	case 0x7:
+		PostShadePixel4_WriteOutput<0x7>(x4, y4, pixelShader);
+		return;
+	case 0x9:
+		PostShadePixel4_WriteOutput<0x9>(x4, y4, pixelShader);
+		return;
+	case 0xA:
+		PostShadePixel4_WriteOutput<0xA>(x4, y4, pixelShader);
+		return;
+	case 0xB:
+		PostShadePixel4_WriteOutput<0xB>(x4, y4, pixelShader);
+		return;
+	case 0xC:
+		PostShadePixel4_WriteOutput<0xC>(x4, y4, pixelShader);
+		return;
+	case 0xD:
+		PostShadePixel4_WriteOutput<0xD>(x4, y4, pixelShader);
+		return;
+	case 0xE:
+		PostShadePixel4_WriteOutput<0xE>(x4, y4, pixelShader);
+		return;
+	case 0xF:
+		PostShadePixel4_WriteOutput<0xF>(x4, y4, pixelShader);
+		return;
+	}
+}
+
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::PostShadePixel4_WriteOutput(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
+{	
+	PostShadePixel4_WriteOutputColor<pixelWriteMask>(x4, y4, pixelShader);
+
+	if (currentState.currentDepthStencil)
+	{
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable)
+		{
+			PostShadePixel4_WriteOutputDepth<pixelWriteMask>(x4, y4, pixelShader);
+		}
+			
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
+		{
+			PostShadePixel4_WriteOutputStencil<pixelWriteMask>(x4, y4);
+		}
+	}
+}
+
+void IDirect3DDevice9Hook::PostShadePixel4_Discard(const unsigned char pixelDiscardMask) const
+{
+	switch (pixelDiscardMask)
+	{
+	default:
+	case 0x0:
+		return;
+	case 0x1:
+	case 0x2:
+	case 0x4:
+	case 0x8:
+		++frameStats.numPixelsTexkilled;
+		return;
+	case 0x3:
+	case 0x5:
+	case 0x6:
+	case 0x9:
+	case 0xA:
+	case 0xC:
+		frameStats.numPixelsTexkilled += 2;
+		return;
+	case 0x7:
+	case 0xB:
+	case 0xD:
+	case 0xE:
+		frameStats.numPixelsTexkilled += 3;
+		return;
+	case 0xF:
 		frameStats.numPixelsTexkilled += 4;
+		return;
+	}
+}
+
+void IDirect3DDevice9Hook::PostShadePixel4_FailAlphaTest(const unsigned char pixelsFailAlphaTestMask) const
+{
+	switch (pixelsFailAlphaTestMask)
+	{
+	default:
+	case 0x0:
+		return;
+	case 0x1:
+	case 0x2:
+	case 0x4:
+	case 0x8:
+		++frameStats.numAlphaTestFailPixels;
+		return;
+	case 0x3:
+	case 0x5:
+	case 0x6:
+	case 0x9:
+	case 0xA:
+	case 0xC:
+		frameStats.numAlphaTestFailPixels += 2;
+		return;
+	case 0x7:
+	case 0xB:
+	case 0xD:
+	case 0xE:
+		frameStats.numAlphaTestFailPixels += 3;
+		return;
+	case 0xF:
+		frameStats.numAlphaTestFailPixels += 4;
+		return;
+	}
+}
+
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::PostShadePixel4_WriteOutputColor(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
+{
+	switch (pixelWriteMask)
+	{
+	case 0x0:
+#ifdef _DEBUG
+		__debugbreak();
+#else
+		__assume(0);
+#endif
+		return;
+	case 0x1:
+		PostShadePixel_WriteOutputColor(x4.m128i_u32[0], y4.m128i_u32[0], pixelShader->outputRegisters[0]);
+		return;
+	case 0x2:
+		PostShadePixel_WriteOutputColor(x4.m128i_u32[1], y4.m128i_u32[1], pixelShader->outputRegisters[1]);
+		return;
+	case 0x4:
+		PostShadePixel_WriteOutputColor(x4.m128i_u32[2], y4.m128i_u32[2], pixelShader->outputRegisters[2]);
+		return;
+	case 0x8:
+		PostShadePixel_WriteOutputColor(x4.m128i_u32[3], y4.m128i_u32[3], pixelShader->outputRegisters[3]);
+		return;
+	default:
 		break;
-	case stencilFail:
-		if (currentState.currentDepthStencil && currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
+	}
+
+	for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
+	{
+		IDirect3DSurface9Hook* const currentRenderTarget = currentState.currentRenderTargets[rt];
+		if (!currentRenderTarget)
+			continue;
+
+		// TODO: Need to write a RenderOutput4 to replace this
+		for (unsigned z = 0; z < 4; ++z)
 		{
-			// TODO: Need to write a StencilOperation4 to replace this
-			for (unsigned z = 0; z < 4; ++z)
-			{
-				if (pixelWriteMask & (1 << z) )
-					StencilFailOperation(x4.m128i_u32[z], y4.m128i_u32[z]);
-			}
+			if (pixelWriteMask & (1 << z) )
+				RenderOutput(currentRenderTarget, x4.m128i_u32[z], y4.m128i_u32[z], *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[z].oC[rt]) );
 		}
+	}
+}
+
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::PostShadePixel4_WriteOutputDepth(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
+{
+	switch (pixelWriteMask)
+	{
+	case 0x0:
+#ifdef _DEBUG
+		__debugbreak();
+#else
+		__assume(0);
+#endif
+		return;
+	case 0x1:
+		PostShadePixel_WriteOutputDepth(x4.m128i_u32[0], y4.m128i_u32[0], pixelShader->outputRegisters[0].oDepth);
+		return;
+	case 0x2:
+		PostShadePixel_WriteOutputDepth(x4.m128i_u32[1], y4.m128i_u32[1], pixelShader->outputRegisters[1].oDepth);
+		return;
+	case 0x4:
+		PostShadePixel_WriteOutputDepth(x4.m128i_u32[2], y4.m128i_u32[2], pixelShader->outputRegisters[2].oDepth);
+		return;
+	case 0x8:
+		PostShadePixel_WriteOutputDepth(x4.m128i_u32[3], y4.m128i_u32[3], pixelShader->outputRegisters[3].oDepth);
+		return;
+	default:
 		break;
-	case ZFail:
-		if (currentState.currentDepthStencil && currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
-		{
-			// TODO: Need to write a StencilOperation4 to replace this
-			for (unsigned z = 0; z < 4; ++z)
-			{
-				if (pixelWriteMask & (1 << z) )
-					StencilZFailOperation(x4.m128i_u32[z], y4.m128i_u32[z]);
-			}
-		}
-		break;
+	}
+
+	__m128 depth4;
+	if (pixelWriteMask & 0x1)
+		depth4.m128_f32[0] = pixelShader->outputRegisters[0].oDepth;
+	if (pixelWriteMask & 0x2)
+		depth4.m128_f32[1] = pixelShader->outputRegisters[1].oDepth;
+	if (pixelWriteMask & 0x4)
+		depth4.m128_f32[2] = pixelShader->outputRegisters[2].oDepth;
+	if (pixelWriteMask & 0x8)
+		depth4.m128_f32[3] = pixelShader->outputRegisters[3].oDepth;
+	depth4 = _mm_add_ps(depth4, currentState.currentRenderStates.depthBiasSplatted);
+	currentState.currentDepthStencil->SetDepth4<pixelWriteMask>(x4, y4, depth4);
+}
+
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::PostShadePixel4_WriteOutputStencil(const __m128i x4, const __m128i y4) const
+{
+	if (pixelWriteMask == 0x0)
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+		return;
+	}
+
+	// TODO: Need to write a StencilOperation4 to replace this
+	for (unsigned z = 0; z < 4; ++z)
+	{
+		if (pixelWriteMask & (1 << z) )
+			PostShadePixel_WriteOutputStencil(x4.m128i_u32[z], y4.m128i_u32[z]);
 	}
 }
 

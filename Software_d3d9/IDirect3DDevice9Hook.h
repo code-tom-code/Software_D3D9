@@ -1158,10 +1158,48 @@ public:
 	// Must be called before shading a pixel to reset the pixel shader state machine!
 	void PreShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
 
-	void ShadePixel(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const;
-	
-	template <const unsigned pixelWriteMask>
-	void ShadePixel4(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
+	void ShadePixel_FailStencil(const unsigned x, const unsigned y) const;
+	void ShadePixel_FailDepth(const unsigned x, const unsigned y) const;
+	void ShadePixel_RunShader(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const;
+	void PostShadePixel_DiscardTest(const unsigned x, const unsigned y, const PS_2_0_OutputRegisters& pixelShaderOutput) const;
+	void PostShadePixel_AlphaTest(const unsigned x, const unsigned y, const PS_2_0_OutputRegisters& pixelShaderOutput) const;
+	void PostShadePixel_WriteOutput(const unsigned x, const unsigned y, const PS_2_0_OutputRegisters& pixelShaderOutput) const;
+	void PostShadePixel_Discard(const unsigned x, const unsigned y) const;
+	void PostShadePixel_FailAlphaTest(const unsigned x, const unsigned y) const;
+	void PostShadePixel_WriteOutputColor(const unsigned x, const unsigned y, const PS_2_0_OutputRegisters& pixelOutputColor) const;
+	void PostShadePixel_WriteOutputDepth(const unsigned x, const unsigned y, const float pixelOutputDepth) const;
+	void PostShadePixel_WriteOutputStencil(const unsigned x, const unsigned y) const;
+
+	template <const unsigned char pixelWriteMask>
+	void ShadePixel4_FailStencil(const __m128i x4, const __m128i y4) const;
+
+	template <const unsigned char pixelWriteMask>
+	void ShadePixel4_FailDepth(const __m128i x4, const __m128i y4) const;
+
+	template <const unsigned char pixelWriteMask>
+	void ShadePixel4_RunShader(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
+
+	template <const unsigned char pixelWriteMask>
+	void PostShadePixel4_DiscardTest(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
+
+	template <const unsigned char pixelWriteMask>
+	void PostShadePixel4_AlphaTest(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
+
+	template <const unsigned char pixelWriteMask>
+	void PostShadePixel4_WriteOutput(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
+
+	void PostShadePixel4_Discard(const unsigned char pixelDiscardMask) const;
+
+	void PostShadePixel4_FailAlphaTest(const unsigned char pixelsFailAlphaTestMask) const;
+
+	template <const unsigned char pixelWriteMask>
+	void PostShadePixel4_WriteOutputColor(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
+
+	template <const unsigned char pixelWriteMask>
+	void PostShadePixel4_WriteOutputDepth(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
+
+	template <const unsigned char pixelWriteMask>
+	void PostShadePixel4_WriteOutputStencil(const __m128i x4, const __m128i y4) const;
 
 	template <const unsigned char channelWriteMask>
 	void LoadBlend(D3DXVECTOR4& outBlend, const D3DBLEND blendMode, const D3DXVECTOR4& srcColor, const D3DXVECTOR4& dstColor) const;

@@ -43,7 +43,7 @@ __declspec(align(16) ) struct PS_2_0_RuntimeRegisters
 	int aL; // Loop Counter Register (only exists in ps_3_0 and up)
 };
 
-enum pixelOutputStatus
+enum pixelOutputStatus : unsigned // This needs to be a 32-bit enum so that we can use gather4 on it
 {
 	normalWrite,
 	discard, // TEXKILL
