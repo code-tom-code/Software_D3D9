@@ -2845,14 +2845,10 @@ const __m128 depthScale16 = { 65535.0f, 65535.0f, 65535.0f, 65535.0f };
 const __m128 depthScale24 = { 16777215.0f, 16777215.0f, 16777215.0f, 16777215.0f };
 const __m128 depthScale32 = { 4294967295.0f, 4294967295.0f, 4294967295.0f, 4294967295.0f };
 
-template void IDirect3DSurface9Hook::SetDepth4<0x1>(const __m128i x4, const __m128i y4, const __m128 depth4);
-template void IDirect3DSurface9Hook::SetDepth4<0x2>(const __m128i x4, const __m128i y4, const __m128 depth4);
 template void IDirect3DSurface9Hook::SetDepth4<0x3>(const __m128i x4, const __m128i y4, const __m128 depth4);
-template void IDirect3DSurface9Hook::SetDepth4<0x4>(const __m128i x4, const __m128i y4, const __m128 depth4);
 template void IDirect3DSurface9Hook::SetDepth4<0x5>(const __m128i x4, const __m128i y4, const __m128 depth4);
 template void IDirect3DSurface9Hook::SetDepth4<0x6>(const __m128i x4, const __m128i y4, const __m128 depth4);
 template void IDirect3DSurface9Hook::SetDepth4<0x7>(const __m128i x4, const __m128i y4, const __m128 depth4);
-template void IDirect3DSurface9Hook::SetDepth4<0x8>(const __m128i x4, const __m128i y4, const __m128 depth4);
 template void IDirect3DSurface9Hook::SetDepth4<0x9>(const __m128i x4, const __m128i y4, const __m128 depth4);
 template void IDirect3DSurface9Hook::SetDepth4<0xA>(const __m128i x4, const __m128i y4, const __m128 depth4);
 template void IDirect3DSurface9Hook::SetDepth4<0xB>(const __m128i x4, const __m128i y4, const __m128 depth4);
@@ -2864,9 +2860,52 @@ template void IDirect3DSurface9Hook::SetDepth4<0xF>(const __m128i x4, const __m1
 template <const unsigned char pixelWriteMask>
 void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const __m128 depth4)
 {
-	const __m128i pixelIndex = _mm_add_epi32(_mm_mullo_epi32(y4, InternalWidthSplatted), x4);
+	switch (pixelWriteMask)
+	{
+	case 0x0:
+	case 0x1:
+	case 0x2:
+	case 0x4:
+	case 0x8:
+#ifdef _DEBUG
+		__debugbreak();
+#else
+		__assume(0);
+#endif
+	}
 
-	// Sadly we don't have scatter instructions in AVX2, so four consecutive writes is the best we can do
+	__m128i pixelIndex4;
+	unsigned pixelIndex1; // Only used in the 0x3 and 0xC cases
+
+	// Note: This code will need to be updated when depth buffers, stencil buffers, and render targets are quad-swizzled
+	switch (pixelWriteMask)
+	{
+	default:
+#ifdef _DEBUG
+		__debugbreak();
+#else
+		__assume(0);
+#endif
+	case 0x3: // top row two, one write
+		pixelIndex1 = x4.m128i_u32[0] + y4.m128i_u32[0] * InternalWidth;
+		break;
+	case 0xC: // bottom row two, one write
+		pixelIndex1 = x4.m128i_u32[0] + y4.m128i_u32[2] * InternalWidth;
+		break;
+	case 0x5: // two writes
+	case 0x6: // two writes
+	case 0x9: // two writes
+	case 0xA: // two writes
+	case 0x7: // top row two, one bottom, two writes
+	case 0xB: // top row two, one bottom, two writes
+	case 0xD: // top row one, bottom row two, two writes
+	case 0xE: // top row one, bottom row two, two writes
+	case 0xF: // top row two, bottom row two, two writes
+		pixelIndex4 = _mm_add_epi32(_mm_mullo_epi32(y4, InternalWidthSplatted), x4);
+		break;
+	}
+
+	// Sadly we don't have scatter instructions in AVX2, so one or two consecutive writes is the best we can do if our write-mask isn't 0xF
 	switch (InternalFormat)
 	{
 	case D3DFMT_D15S1:
@@ -2875,11 +2914,58 @@ void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const 
 
 		const __m128 scaledDepth4 = _mm_mul_ps(depthScale15, depth4);
 		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
+		__m128i shuffledUDepth16_4;
+		switch (pixelWriteMask)
+		{
+		default:
+#ifdef _DEBUG
+			__debugbreak();
+#else
+			__assume(0);
+#endif
+		case 0x5: // two writes
+		case 0x6: // two writes
+		case 0x9: // two writes
+		case 0xA: // two writes
+			break;
+		case 0x3: // top row two, one write
+		case 0x7: // top row two, one bottom, two writes
+		case 0xB: // top row two, one bottom, two writes
+		case 0xC: // bottom row two, one write
+		case 0xD: // top row one, bottom row two, two writes
+		case 0xE: // top row one, bottom row two, two writes
+		case 0xF: // top row two, bottom row two, two writes
+			shuffledUDepth16_4 = _mm_shufflelo_epi16(uDepth4, _MM_SHUFFLE(3, 2, 1, 0) ); // Shuffle (8 16-bit words) from: { X, 0, Y, 0, Z, 0, W, 0 } to { X, Y, Z, W, Z, 0, W, 0 }
+			break;
+		}
 
-		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
-		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
-		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
-		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		if (pixelWriteMask == 0x3)
+		{
+			*(unsigned* const)(pixels + pixelIndex1) = shuffledUDepth16_4.m128i_u32[0];
+		}
+		else if ( (pixelWriteMask & 0x3) == 0x3)
+		{
+			*(unsigned* const)(pixels + pixelIndex4.m128i_u32[0]) = shuffledUDepth16_4.m128i_u32[0];
+		}
+		else
+		{
+			if (pixelWriteMask & 0x1) pixels[pixelIndex4.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+			if (pixelWriteMask & 0x2) pixels[pixelIndex4.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		}
+
+		if (pixelWriteMask == 0xC)
+		{
+			*(unsigned* const)(pixels + pixelIndex1) = shuffledUDepth16_4.m128i_u32[1];
+		}
+		else if ( (pixelWriteMask & 0xC) == 0xC)
+		{
+			*(unsigned* const)(pixels + pixelIndex4.m128i_u32[2]) = shuffledUDepth16_4.m128i_u32[1];
+		}
+		else
+		{
+			if (pixelWriteMask & 0x4) pixels[pixelIndex4.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+			if (pixelWriteMask & 0x8) pixels[pixelIndex4.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		}
 	}
 		break;
 	case D3DFMT_D16:
@@ -2890,10 +2976,58 @@ void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const 
 		const __m128 scaledDepth4 = _mm_mul_ps(depthScale16, depth4);
 		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
 
-		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
-		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
-		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
-		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		__m128i shuffledUDepth16_4;
+		switch (pixelWriteMask)
+		{
+		default:
+#ifdef _DEBUG
+			__debugbreak();
+#else
+			__assume(0);
+#endif
+		case 0x5: // two writes
+		case 0x6: // two writes
+		case 0x9: // two writes
+		case 0xA: // two writes
+			break;
+		case 0x3: // top row two, one write
+		case 0x7: // top row two, one bottom, two writes
+		case 0xB: // top row two, one bottom, two writes
+		case 0xC: // bottom row two, one write
+		case 0xD: // top row one, bottom row two, two writes
+		case 0xE: // top row one, bottom row two, two writes
+		case 0xF: // top row two, bottom row two, two writes
+			shuffledUDepth16_4 = _mm_shufflelo_epi16(uDepth4, _MM_SHUFFLE(3, 2, 1, 0) ); // Shuffle (8 16-bit words) from: { X, 0, Y, 0, Z, 0, W, 0 } to { X, Y, Z, W, Z, 0, W, 0 }
+			break;
+		}
+
+		if (pixelWriteMask == 0x3)
+		{
+			*(unsigned* const)(pixels + pixelIndex1) = shuffledUDepth16_4.m128i_u32[0];
+		}
+		else if ( (pixelWriteMask & 0x3) == 0x3)
+		{
+			*(unsigned* const)(pixels + pixelIndex4.m128i_u32[0]) = shuffledUDepth16_4.m128i_u32[0];
+		}
+		else
+		{
+			if (pixelWriteMask & 0x1) pixels[pixelIndex4.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+			if (pixelWriteMask & 0x2) pixels[pixelIndex4.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		}
+
+		if (pixelWriteMask == 0xC)
+		{
+			*(unsigned* const)(pixels + pixelIndex1) = shuffledUDepth16_4.m128i_u32[1];
+		}
+		else if ( (pixelWriteMask & 0xC) == 0xC)
+		{
+			*(unsigned* const)(pixels + pixelIndex4.m128i_u32[2]) = shuffledUDepth16_4.m128i_u32[1];
+		}
+		else
+		{
+			if (pixelWriteMask & 0x4) pixels[pixelIndex4.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+			if (pixelWriteMask & 0x8) pixels[pixelIndex4.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		}
 	}
 		break;
 	case D3DFMT_D24FS8:
@@ -2906,10 +3040,33 @@ void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const 
 		const __m128 scaledDepth4 = _mm_mul_ps(depthScale24, depth4);
 		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
 
-		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
-		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
-		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
-		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		if (pixelWriteMask == 0x3)
+		{
+			_mm_storel_epi64( (__m128i* const)(pixels + pixelIndex1), uDepth4);
+		}
+		else if ( (pixelWriteMask & 0x3) == 0x3)
+		{
+			_mm_storel_epi64( (__m128i* const)(pixels + pixelIndex4.m128i_u32[0]), uDepth4);
+		}
+		else
+		{
+			if (pixelWriteMask & 0x1) pixels[pixelIndex4.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+			if (pixelWriteMask & 0x2) pixels[pixelIndex4.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		}
+
+		if (pixelWriteMask == 0xC)
+		{
+			_mm_storeh_pi( (__m64* const)(pixels + pixelIndex1), _mm_castsi128_ps(uDepth4) );
+		}
+		else if ( (pixelWriteMask & 0xC) == 0xC)
+		{
+			_mm_storeh_pi( (__m64* const)(pixels + pixelIndex4.m128i_u32[2]), _mm_castsi128_ps(uDepth4) );
+		}
+		else
+		{
+			if (pixelWriteMask & 0x4) pixels[pixelIndex4.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+			if (pixelWriteMask & 0x8) pixels[pixelIndex4.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		}
 	}
 		break;
 	case D3DFMT_D32:
@@ -2921,20 +3078,66 @@ void IDirect3DSurface9Hook::SetDepth4(const __m128i x4, const __m128i y4, const 
 		const __m128 scaledDepth4 = _mm_mul_ps(depthScale32, depth4);
 		const __m128i uDepth4 = _mm_cvtps_epi32(scaledDepth4);
 
-		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = uDepth4.m128i_u32[0];
-		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = uDepth4.m128i_u32[1];
-		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = uDepth4.m128i_u32[2];
-		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		if (pixelWriteMask == 0x3)
+		{
+			_mm_storel_epi64( (__m128i* const)(pixels + pixelIndex1), uDepth4);
+		}
+		else if ( (pixelWriteMask & 0x3) == 0x3)
+		{
+			_mm_storel_epi64( (__m128i* const)(pixels + pixelIndex4.m128i_u32[0]), uDepth4);
+		}
+		else
+		{
+			if (pixelWriteMask & 0x1) pixels[pixelIndex4.m128i_u32[0] ] = uDepth4.m128i_u32[0];
+			if (pixelWriteMask & 0x2) pixels[pixelIndex4.m128i_u32[1] ] = uDepth4.m128i_u32[1];
+		}
+
+		if (pixelWriteMask == 0xC)
+		{
+			_mm_storeh_pi( (__m64* const)(pixels + pixelIndex1), _mm_castsi128_ps(uDepth4) );
+		}
+		else if ( (pixelWriteMask & 0xC) == 0xC)
+		{
+			_mm_storeh_pi( (__m64* const)(pixels + pixelIndex4.m128i_u32[2]), _mm_castsi128_ps(uDepth4) );
+		}
+		else
+		{
+			if (pixelWriteMask & 0x4) pixels[pixelIndex4.m128i_u32[2] ] = uDepth4.m128i_u32[2];
+			if (pixelWriteMask & 0x8) pixels[pixelIndex4.m128i_u32[3] ] = uDepth4.m128i_u32[3];
+		}
 	}
 		break;
 	case D3DFMT_D32F_LOCKABLE:
 	{
 		float* const pixels = (float* const)surfaceBytesRaw;
 
-		if (pixelWriteMask & 0x1) pixels[pixelIndex.m128i_u32[0] ] = depth4.m128_f32[0];
-		if (pixelWriteMask & 0x2) pixels[pixelIndex.m128i_u32[1] ] = depth4.m128_f32[1];
-		if (pixelWriteMask & 0x4) pixels[pixelIndex.m128i_u32[2] ] = depth4.m128_f32[2];
-		if (pixelWriteMask & 0x8) pixels[pixelIndex.m128i_u32[3] ] = depth4.m128_f32[3];
+		if (pixelWriteMask == 0x3)
+		{
+			_mm_storel_pi( (__m64* const)(pixels + pixelIndex1), depth4);
+		}
+		else if ( (pixelWriteMask & 0x3) == 0x3)
+		{
+			_mm_storel_pi( (__m64* const)(pixels + pixelIndex4.m128i_u32[0]), depth4);
+		}
+		else
+		{
+			if (pixelWriteMask & 0x1) pixels[pixelIndex4.m128i_u32[0] ] = depth4.m128_f32[0];
+			if (pixelWriteMask & 0x2) pixels[pixelIndex4.m128i_u32[1] ] = depth4.m128_f32[1];
+		}
+
+		if (pixelWriteMask == 0xC)
+		{
+			_mm_storeh_pi( (__m64* const)(pixels + pixelIndex1), depth4);
+		}
+		else if ( (pixelWriteMask & 0xC) == 0xC)
+		{
+			_mm_storeh_pi( (__m64* const)(pixels + pixelIndex4.m128i_u32[2]), depth4);
+		}
+		else
+		{
+			if (pixelWriteMask & 0x4) pixels[pixelIndex4.m128i_u32[2] ] = depth4.m128_f32[2];
+			if (pixelWriteMask & 0x8) pixels[pixelIndex4.m128i_u32[3] ] = depth4.m128_f32[3];
+		}
 	}
 		break;
 	default:
