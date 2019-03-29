@@ -501,6 +501,15 @@ __declspec(align(16) ) struct RenderStates
 	__declspec(align(16) ) D3DXVECTOR4 cachedInvBlendFactor;
 	__declspec(align(16) ) __m128 depthBiasSplatted;
 	__declspec(align(16) ) __m128 alphaRefSplatted;
+
+	enum _simplifiedAlphaBlendMode
+	{
+		noAlphaBlending = 0, // Alpha blending disabled
+		alphaBlending, // D3DBLEND_SRCALPHA, D3DBLEND_INVSRCALPHA
+		additiveBlending, // D3DBLEND_ONE, D3DBLEND_ONE
+		multiplicativeBlending, // D3DBLEND_DESTCOLOR, D3DBLEND_ZERO or D3DBLEND_ZERO, D3DBLEND_SRCCOLOR
+		otherAlphaBlending // Any other mode with alpha blending enabled (including separate alpha blend modes)
+	} simplifiedAlphaBlendMode;
 };
 
 __declspec(align(16) ) struct Transforms

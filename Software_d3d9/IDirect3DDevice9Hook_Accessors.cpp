@@ -1042,6 +1042,50 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetRenderSt
 	case D3DRS_DEPTHBIAS:
 		currentState.currentRenderStates.depthBiasSplatted = _mm_set1_ps(currentState.currentRenderStates.renderStatesUnion.namedStates.depthBias);
 		break;
+
+		// Alpha blend type caching:
+	case D3DRS_ALPHABLENDENABLE:
+	case D3DRS_SEPARATEALPHABLENDENABLE:
+	case D3DRS_SRCBLEND:
+	case D3DRS_DESTBLEND:
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable)
+		{
+			// Separate alpha blending
+			if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable)
+			{
+				currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::otherAlphaBlending;
+			}
+			// Unified alpha blending
+			else
+			{
+				if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
+					currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+				{
+					currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::alphaBlending;
+				}
+				else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
+						currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+				{
+					currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::additiveBlending;
+				}
+				else if ( (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_DESTCOLOR &&
+						currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ZERO) || 
+						(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ZERO &&
+						currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_SRCCOLOR) ) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+				{
+					currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::multiplicativeBlending;
+				}
+				else
+				{
+					currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::otherAlphaBlending;
+				}
+			}
+		}
+		else
+		{
+			currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::noAlphaBlending;
+		}
+		break;
 	}
 
 	return ret;

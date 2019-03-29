@@ -969,6 +969,7 @@ RenderStates::RenderStates() : cachedAlphaRefFloat(0.0f)
 	cachedInvBlendFactor = D3DXVECTOR4(1.0f, 1.0f, 1.0f, 1.0f) - cachedBlendFactor;
 	depthBiasSplatted = _mm_set1_ps(0.0f);
 	alphaRefSplatted = _mm_set1_ps(0.0f);
+	simplifiedAlphaBlendMode = noAlphaBlending;
 }
 
 /*** IUnknown methods ***/
@@ -5498,10 +5499,12 @@ static inline void DitherColor4(const __m128i x4, const __m128i y4, D3DXVECTOR4 
 template <const unsigned char channelWriteMask>
 void IDirect3DDevice9Hook::ROPBlendWriteMask(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const
 {
-	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable)
+	if (currentState.currentRenderStates.simplifiedAlphaBlendMode > RenderStates::noAlphaBlending)
 	{
-		// Alpha blend skip / Additive blend skip test:
-		ROPBlendWriteMask_AlphaBlendTest<channelWriteMask>(outSurface, x, y, value);
+		if (currentState.currentRenderStates.simplifiedAlphaBlendMode != RenderStates::otherAlphaBlending)
+			ROPBlendWriteMask_AlphaBlendTest<channelWriteMask>(outSurface, x, y, value); // Alpha blend skip / Additive blend skip test
+		else
+			ROPBlendWriteMask_AlphaBlend<channelWriteMask>(outSurface, x, y, value);
 	}
 	else // Super simple - no alpha blending at all!
 	{
@@ -5512,31 +5515,37 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask(IDirect3DSurface9Hook* const outSur
 template <const unsigned char channelWriteMask>
 void IDirect3DDevice9Hook::ROPBlendWriteMask_AlphaBlendTest(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const
 {
-	// Alpha blend skip:
-	if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
-		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+	switch (currentState.currentRenderStates.simplifiedAlphaBlendMode)
+	{
+	default:
+	case RenderStates::otherAlphaBlending:
+	case RenderStates::noAlphaBlending:
+#ifdef _DEBUG
+		__debugbreak();
+#else
+		__assume(0);
+#endif
+		return;
+	case RenderStates::alphaBlending:
 	{
 		if (value.w == 0.0f)
 			return;
 	}
-	// Additive blend skip
-	else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
-		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
+		break;
+	case RenderStates::additiveBlending:
 	{
 		// TODO: SIMDify this check
 		if (value.x == 0.0f && value.y == 0.0f && value.z == 0.0f)
 			return;
 	}
-	// Multiplicative blend skip
-	else if (
-		(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_DESTCOLOR &&
-		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ZERO) || 
-		(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ZERO &&
-		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_SRCCOLOR) )
+		break;
+	case RenderStates::multiplicativeBlending:
 	{
 		// TODO: SIMDify this check
 		if (value.x == 1.0f && value.y == 1.0f && value.z == 1.0f)
 			return;
+	}
+		break;
 	}
 
 	ROPBlendWriteMask_AlphaBlend<channelWriteMask>(outSurface, x, y, value);
@@ -5603,9 +5612,12 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask_NoAlphaBlend(IDirect3DSurface9Hook*
 template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
 void IDirect3DDevice9Hook::ROPBlendWriteMask4(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const
 {
-	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable)
+	if (currentState.currentRenderStates.simplifiedAlphaBlendMode > RenderStates::noAlphaBlending)
 	{
-		ROPBlendWriteMask4_AlphaBlendTest<channelWriteMask, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		if (currentState.currentRenderStates.simplifiedAlphaBlendMode != RenderStates::otherAlphaBlending)
+			ROPBlendWriteMask4_AlphaBlendTest<channelWriteMask, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		else
+			ROPBlendWriteMask4_AlphaBlend<channelWriteMask, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
 	}
 	else // Super simple - no alpha blending at all!
 	{
@@ -5623,15 +5635,24 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask4_AlphaBlendTest(IDirect3DSurface9Ho
 {
 	// Alpha blend skip:
 	unsigned char failAlphaBlendMask = 0x00;
-	if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
-		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+	switch (currentState.currentRenderStates.simplifiedAlphaBlendMode)
+	{
+	default:
+	case RenderStates::otherAlphaBlending:
+	case RenderStates::noAlphaBlending:
+#ifdef _DEBUG
+		__debugbreak();
+#else
+		__assume(0);
+#endif
+		return;
+	case RenderStates::alphaBlending:
 	{
 		const __declspec(align(16) ) __m128 alphaValue4 = _mm_i32gather_ps(&(outputRegisters[0].oC[RTIndex].w), gatherAlphaValues4, 4);
 		failAlphaBlendMask = (const unsigned char)_mm_movemask_ps(_mm_cmpeq_ps(alphaValue4, *(const __m128* const)&zeroVec) );
 	}
-	// Additive blend skip
-	else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
-		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
+		break;
+	case RenderStates::additiveBlending:
 	{
 		__declspec(align(16) ) __m128i masks;
 		if (pixelWriteMask & 0x1)
@@ -5645,12 +5666,8 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask4_AlphaBlendTest(IDirect3DSurface9Ho
 
 		failAlphaBlendMask = (const unsigned char)_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(_mm_and_si128(masks, sevenVec), sevenVec) ) );
 	}
-	// Multiplicative blend skip
-	else if (
-		(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_DESTCOLOR &&
-		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ZERO) ||
-		(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ZERO &&
-		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_SRCCOLOR) ) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
+		break;
+	case RenderStates::multiplicativeBlending:
 	{
 		__declspec(align(16) ) __m128i masks;
 		if (pixelWriteMask & 0x1)
@@ -5663,6 +5680,8 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask4_AlphaBlendTest(IDirect3DSurface9Ho
 			masks.m128i_u32[3] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[3].oC[RTIndex]), *(const __m128* const)&staticColorWhiteOpaque) );
 
 		failAlphaBlendMask = (const unsigned char)_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(_mm_and_si128(masks, sevenVec), sevenVec) ) );
+	}
+		break;
 	}
 
 	const unsigned char newPixelWriteMask = pixelWriteMask & (~failAlphaBlendMask);
