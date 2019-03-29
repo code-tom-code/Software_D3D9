@@ -2382,6 +2382,172 @@ void IDirect3DSurface9Hook::GetPixelVec(const unsigned x, const unsigned y, D3DX
 	}
 }
 
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x1, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x2, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x3, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x4, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x5, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x6, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x7, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x8, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0x9, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xA, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xB, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xC, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xD, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xE, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0x3>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0x5>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0x6>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0x7>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0x9>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0xA>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0xB>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0xC>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0xD>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0xE>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+template void IDirect3DSurface9Hook::GetPixelVec4<0xF, false, 0xF>(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const;
+
 template <const unsigned char writeMask, const bool sRGBSurface, const unsigned char pixelWriteMask/* = 0xF*/>
 void IDirect3DSurface9Hook::GetPixelVec4(const __m128i x4, const __m128i y4, D3DXVECTOR4 (&outColor4)[4]) const
 {
@@ -3216,7 +3382,6 @@ const __m128i IDirect3DSurface9Hook::GetStencil4(const __m128i x4, const __m128i
 }
 
 // Don't define the <0> version of this function. Anybody calling it is a dummy because it doesn't write anything anyway.
-// template void IDirect3DSurface9Hook::SetPixelVec<0>(const unsigned x, const unsigned y, const D3DXVECTOR4& color);
 template void IDirect3DSurface9Hook::SetPixelVec<1>(const unsigned x, const unsigned y, const D3DXVECTOR4& color);
 template void IDirect3DSurface9Hook::SetPixelVec<2>(const unsigned x, const unsigned y, const D3DXVECTOR4& color);
 template void IDirect3DSurface9Hook::SetPixelVec<3>(const unsigned x, const unsigned y, const D3DXVECTOR4& color);
@@ -3327,6 +3492,173 @@ void IDirect3DSurface9Hook::SetPixelVec(const unsigned x, const unsigned y, cons
 	}
 }
 
+// Don't define the <0> version of this function. Anybody calling it is a dummy because it doesn't write anything anyway.
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0x3>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0x5>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0x6>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0x7>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0x9>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0xA>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0xB>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0xC>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0xD>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0xE>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x1, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x2, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x3, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x4, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x5, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x6, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x7, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x8, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0x9, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xA, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xB, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xC, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xD, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xE, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+template void IDirect3DSurface9Hook::SetPixelVec4<0xF, 0xF>(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
+
 template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
 void IDirect3DSurface9Hook::SetPixelVec4(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4])
 {
@@ -3338,37 +3670,44 @@ void IDirect3DSurface9Hook::SetPixelVec4(const __m128i x4, const __m128i y4, con
 		return;
 	}
 
-	if (pixelWriteMask == 0)
+	// See if we can drop down to non-quad operations if possible:
+	switch (pixelWriteMask)
 	{
+	default:
+	case 0x0:
 #ifdef _DEBUG
 		__debugbreak(); // Don't call this with 0 write masks!
+#else
+		__assume(0);
 #endif
 		return;
-	}
-
-	// See if we can drop down to non-quad operations if possible:
-	if (pixelWriteMask == 0x1)
-	{
+	case 0x1:
 		SetPixelVec<channelWriteMask>(x4.m128i_u32[0], y4.m128i_u32[0], color[0]);
 		return;
-	}
-	else if (pixelWriteMask == 0x2)
-	{
+	case 0x2:
 		SetPixelVec<channelWriteMask>(x4.m128i_u32[1], y4.m128i_u32[1], color[1]);
 		return;
-	}
-	else if (pixelWriteMask == 0x4)
-	{
+	case 0x4:
 		SetPixelVec<channelWriteMask>(x4.m128i_u32[2], y4.m128i_u32[2], color[2]);
 		return;
-	}
-	else if (pixelWriteMask == 0x8)
-	{
+	case 0x8:
 		SetPixelVec<channelWriteMask>(x4.m128i_u32[3], y4.m128i_u32[3], color[3]);
 		return;
+	case 0x3:
+	case 0x5:
+	case 0x6:
+	case 0x7:
+	case 0x9:
+	case 0xA:
+	case 0xB:
+	case 0xC:
+	case 0xD:
+	case 0xE:
+	case 0xF:
+		break;
 	}
 
-	const __m128i pixelIndex = _mm_add_epi32(_mm_mullo_epi32(y4vec, InternalWidthSplatted), x4vec);
+	const __m128i pixelIndex = _mm_add_epi32(_mm_mullo_epi32(y4, InternalWidthSplatted), x4);
 	switch (InternalFormat)
 	{
 	default:

@@ -1128,12 +1128,34 @@ public:
 	void RenderOutput(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
 
 	// Handles blending and write-masking
+	template <const unsigned char pixelWriteMask>
+	void RenderOutput4(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const;
+
+	// Handles blending and write-masking
 	template <const unsigned char channelWriteMask>
 	void ROPBlendWriteMask(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
 
+	template <const unsigned char channelWriteMask>
+	void ROPBlendWriteMask_AlphaBlendTest(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
+
+	template <const unsigned char channelWriteMask>
+	void ROPBlendWriteMask_AlphaBlend(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
+
+	template <const unsigned char channelWriteMask>
+	void ROPBlendWriteMask_NoAlphaBlend(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
+
 	// Handles blending and write-masking
 	template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
-	void ROPBlendWriteMask4(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&value)[4]) const;
+	void ROPBlendWriteMask4(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const;
+
+	template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+	void ROPBlendWriteMask4_AlphaBlendTest(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const;
+
+	template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+	void ROPBlendWriteMask4_AlphaBlend(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const;
+
+	template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+	void ROPBlendWriteMask4_NoAlphaBlend(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const;
 
 	// Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
 	void InterpolateStreamIntoRegisters(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, const __m128 barycentricInterpolants, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ, const float pixelZ) const;
@@ -1700,7 +1722,7 @@ inline void Float4ToD3DCOLOR4Clamp4(const D3DXVECTOR4 (&color4)[4], const __m128
 		return;
 	}
 
-	const __m128 float4color4[4] =
+	const __m128 (&float4color4)[4] =
 	{
 		*(const __m128* const)&color4[0],
 		*(const __m128* const)&color4[1],
@@ -1708,7 +1730,7 @@ inline void Float4ToD3DCOLOR4Clamp4(const D3DXVECTOR4 (&color4)[4], const __m128
 		*(const __m128* const)&color4[3]
 	};
 
-	const __m128 float4colorClamped4 = 
+	const __m128 float4colorClamped4[4] = 
 	{
 		_mm_min_ps(float4color4[0], saturateMax),
 		_mm_min_ps(float4color4[1], saturateMax),
@@ -1751,7 +1773,7 @@ inline void Float4ToD3DCOLOR4Clamp4(const D3DXVECTOR4 (&color4)[4], const __m128
 }
 
 template <const unsigned char channelWriteMask = 0xF, const unsigned char pixelWriteMask>
-inline const __m128i Float4ToX8R8G8B8_4Clamp4(const D3DXVECTOR4 (&color4)[4], const __m128i outColorAddresses4)
+inline void Float4ToX8R8G8B8_4Clamp4(const D3DXVECTOR4 (&color4)[4], const __m128i outColorAddresses4)
 {
 	if (pixelWriteMask == 0)
 	{
@@ -1761,7 +1783,7 @@ inline const __m128i Float4ToX8R8G8B8_4Clamp4(const D3DXVECTOR4 (&color4)[4], co
 		return;
 	}
 
-	Float4ToD3DCOLOR4Clamp4<channelWriteMask & 0x7>(color4, outColorAddresses4);
+	Float4ToD3DCOLOR4Clamp4<channelWriteMask & 0x7, pixelWriteMask>(color4, outColorAddresses4);
 }
 
 struct A16B16G16R16
@@ -2007,35 +2029,35 @@ inline void Float4ToA16B16G16R16F4(const D3DXVECTOR4 (&color)[4], const __m128i 
 
 	if (pixelWriteMask & 0x1)
 	{
-		D3DXFLOAT16& outColor = *(writeAddresses[0]);
-		if (channelWriteMask & 0x1) outColor.r = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[0]);
-		if (channelWriteMask & 0x2) outColor.g = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[1]);
-		if (channelWriteMask & 0x4) outColor.b = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[2]);
-		if (channelWriteMask & 0x8)	outColor.a = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[3]);
+		D3DXFLOAT16* const outColor = writeAddresses[0];
+		if (channelWriteMask & 0x1) outColor[0] = *(const D3DXFLOAT16* const)&(half4Color4[0].m128i_u16[0]);
+		if (channelWriteMask & 0x2) outColor[1] = *(const D3DXFLOAT16* const)&(half4Color4[0].m128i_u16[1]);
+		if (channelWriteMask & 0x4) outColor[2] = *(const D3DXFLOAT16* const)&(half4Color4[0].m128i_u16[2]);
+		if (channelWriteMask & 0x8)	outColor[3] = *(const D3DXFLOAT16* const)&(half4Color4[0].m128i_u16[3]);
 	}
 	if (pixelWriteMask & 0x2)
 	{
-		D3DXFLOAT16& outColor = *(writeAddresses[1]);
-		if (channelWriteMask & 0x1) outColor.r = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[0]);
-		if (channelWriteMask & 0x2) outColor.g = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[1]);
-		if (channelWriteMask & 0x4) outColor.b = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[2]);
-		if (channelWriteMask & 0x8)	outColor.a = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[3]);
+		D3DXFLOAT16* const outColor = writeAddresses[1];
+		if (channelWriteMask & 0x1) outColor[0] = *(const D3DXFLOAT16* const)&(half4Color4[1].m128i_u16[0]);
+		if (channelWriteMask & 0x2) outColor[1] = *(const D3DXFLOAT16* const)&(half4Color4[1].m128i_u16[1]);
+		if (channelWriteMask & 0x4) outColor[2] = *(const D3DXFLOAT16* const)&(half4Color4[1].m128i_u16[2]);
+		if (channelWriteMask & 0x8)	outColor[3] = *(const D3DXFLOAT16* const)&(half4Color4[1].m128i_u16[3]);
 	}
 	if (pixelWriteMask & 0x4)
 	{
-		D3DXFLOAT16& outColor = *(writeAddresses[2]);
-		if (channelWriteMask & 0x1) outColor.r = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[0]);
-		if (channelWriteMask & 0x2) outColor.g = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[1]);
-		if (channelWriteMask & 0x4) outColor.b = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[2]);
-		if (channelWriteMask & 0x8)	outColor.a = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[3]);
+		D3DXFLOAT16* const outColor = writeAddresses[2];
+		if (channelWriteMask & 0x1) outColor[0] = *(const D3DXFLOAT16* const)&(half4Color4[2].m128i_u16[0]);
+		if (channelWriteMask & 0x2) outColor[1] = *(const D3DXFLOAT16* const)&(half4Color4[2].m128i_u16[1]);
+		if (channelWriteMask & 0x4) outColor[2] = *(const D3DXFLOAT16* const)&(half4Color4[2].m128i_u16[2]);
+		if (channelWriteMask & 0x8)	outColor[3] = *(const D3DXFLOAT16* const)&(half4Color4[2].m128i_u16[3]);
 	}
 	if (pixelWriteMask & 0x8)
 	{
-		D3DXFLOAT16& outColor = *(writeAddresses[3]);
-		if (channelWriteMask & 0x1) outColor.r = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[0]);
-		if (channelWriteMask & 0x2) outColor.g = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[1]);
-		if (channelWriteMask & 0x4) outColor.b = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[2]);
-		if (channelWriteMask & 0x8)	outColor.a = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[3]);
+		D3DXFLOAT16* const outColor = writeAddresses[3];
+		if (channelWriteMask & 0x1) outColor[0] = *(const D3DXFLOAT16* const)&(half4Color4[3].m128i_u16[0]);
+		if (channelWriteMask & 0x2) outColor[1] = *(const D3DXFLOAT16* const)&(half4Color4[3].m128i_u16[1]);
+		if (channelWriteMask & 0x4) outColor[2] = *(const D3DXFLOAT16* const)&(half4Color4[3].m128i_u16[2]);
+		if (channelWriteMask & 0x8)	outColor[3] = *(const D3DXFLOAT16* const)&(half4Color4[3].m128i_u16[3]);
 	}
 }
 
@@ -2178,7 +2200,7 @@ inline void Float4ToA32B32G32R32F4(const D3DXVECTOR4 (&color)[4], const __m128i 
 	{
 		if (pixelWriteMask & (1 << x) )
 		{
-			A32B32G32R32F& outColor = outColor4[x];
+			A32B32G32R32F& outColor = *outColor4[x];
 			const D3DXVECTOR4& thisColor = color[x];
 			if (channelWriteMask & 0x1)
 				outColor.r = thisColor.x;
@@ -2362,7 +2384,7 @@ inline void Float4ToR16F4(const D3DXVECTOR4 (&color)[4], const __m128i outColorA
 		return;
 	}
 
-	if ( (channelWriteMask & 0x1) != 1)
+	if ( (channelWriteMask & 0x1) != 0x1)
 		return;
 
 	const __m128 float4Color4[4] = 
@@ -2390,25 +2412,13 @@ inline void Float4ToR16F4(const D3DXVECTOR4 (&color)[4], const __m128i outColorA
 	};
 
 	if (pixelWriteMask & 0x1)
-	{
-		if (channelWriteMask & 0x1)
-			outColor = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[0]);
-	}
+		*outColors4[0] = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[0]);
 	if (pixelWriteMask & 0x2)
-	{
-		if (channelWriteMask & 0x1)
-			outColor = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[1]);
-	}
+		*outColors4[1] = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[1]);
 	if (pixelWriteMask & 0x4)
-	{
-		if (channelWriteMask & 0x1)
-			outColor = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[2]);
-	}
+		*outColors4[2] = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[2]);
 	if (pixelWriteMask & 0x8)
-	{
-		if (channelWriteMask & 0x1)
-			outColor = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[3]);
-	}
+		*outColors4[3] = *(const D3DXFLOAT16* const)&(half4Color.m128i_u16[3]);
 }
 
 template <const unsigned char writeMask = 0xF>

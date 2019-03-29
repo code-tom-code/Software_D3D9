@@ -4534,19 +4534,19 @@ void IDirect3DDevice9Hook::LoadBlend4(D3DXVECTOR4 (&outBlend)[4], const D3DBLEND
 		case D3DBLEND_BLENDFACTOR    :
 		{
 			const __m128 blendFactor = *(const __m128* const)&(currentState.currentRenderStates.cachedBlendFactor);
-			if (pixelWriteMask & 0x1) *(__m128* const)(outBlend[0]) = blendFactor;
-			if (pixelWriteMask & 0x2) *(__m128* const)(outBlend[1]) = blendFactor;
-			if (pixelWriteMask & 0x4) *(__m128* const)(outBlend[2]) = blendFactor;
-			if (pixelWriteMask & 0x8) *(__m128* const)(outBlend[3]) = blendFactor;
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outBlend[0]) = blendFactor;
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outBlend[1]) = blendFactor;
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outBlend[2]) = blendFactor;
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outBlend[3]) = blendFactor;
 		}
 			return;
 		case D3DBLEND_INVBLENDFACTOR:
 		{
 			const __m128 invBlendFactor = *(const __m128* const)&(currentState.currentRenderStates.cachedInvBlendFactor);
-			if (pixelWriteMask & 0x1) *(__m128* const)(outBlend[0]) = invBlendFactor;
-			if (pixelWriteMask & 0x2) *(__m128* const)(outBlend[1]) = invBlendFactor;
-			if (pixelWriteMask & 0x4) *(__m128* const)(outBlend[2]) = invBlendFactor;
-			if (pixelWriteMask & 0x8) *(__m128* const)(outBlend[3]) = invBlendFactor;
+			if (pixelWriteMask & 0x1) *(__m128* const)&(outBlend[0]) = invBlendFactor;
+			if (pixelWriteMask & 0x2) *(__m128* const)&(outBlend[1]) = invBlendFactor;
+			if (pixelWriteMask & 0x4) *(__m128* const)&(outBlend[2]) = invBlendFactor;
+			if (pixelWriteMask & 0x8) *(__m128* const)&(outBlend[3]) = invBlendFactor;
 		}
 			return;
 		}
@@ -5341,10 +5341,10 @@ void IDirect3DDevice9Hook::AlphaBlend4(D3DXVECTOR4 (&outVec)[4], const D3DBLENDO
 	case D3DBLENDOP_MAX        :
 	{
 		__m128 maxVec4[4];
-		if (pixelWriteMask & 0x1) minVec4[0] = _mm_max_ps(combinedSrc[0], combinedDst[0]);
-		if (pixelWriteMask & 0x2) minVec4[1] = _mm_max_ps(combinedSrc[1], combinedDst[1]);
-		if (pixelWriteMask & 0x4) minVec4[2] = _mm_max_ps(combinedSrc[2], combinedDst[2]);
-		if (pixelWriteMask & 0x8) minVec4[3] = _mm_max_ps(combinedSrc[3], combinedDst[3]);
+		if (pixelWriteMask & 0x1) maxVec4[0] = _mm_max_ps(combinedSrc[0], combinedDst[0]);
+		if (pixelWriteMask & 0x2) maxVec4[1] = _mm_max_ps(combinedSrc[1], combinedDst[1]);
+		if (pixelWriteMask & 0x4) maxVec4[2] = _mm_max_ps(combinedSrc[2], combinedDst[2]);
+		if (pixelWriteMask & 0x8) maxVec4[3] = _mm_max_ps(combinedSrc[3], combinedDst[3]);
 
 		if (pixelWriteMask & 0x1)
 		{
@@ -5521,198 +5521,282 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask(IDirect3DSurface9Hook* const outSur
 {
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable)
 	{
-		// Alpha blend skip:
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
-			currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
-		{
-			if (value.w == 0.0f)
-				return;
-		}
-		// Additive blend skip
-		else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
-			currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
-		{
-			if (value.x == 0.0f && value.y == 0.0f && value.z == 0.0f)
-				return;
-		}
-
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable) // Have to run alpha blending twice for separate alpha
-		{
-			D3DXVECTOR4 dstColor, finalColor;
-			outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
-
-			D3DXVECTOR4 srcBlendColor, dstBlendColor;
-			LoadBlend<channelWriteMask & 0x7>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
-			LoadBlend<channelWriteMask & 0x7>(dstBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
-			AlphaBlend<channelWriteMask & 0x7>(finalColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlendColor, dstBlendColor, value, dstColor);
-
-			if (channelWriteMask & 0x8)
-			{
-				D3DXVECTOR4 srcBlendAlpha, dstBlendAlpha, finalAlpha;
-				LoadBlend<channelWriteMask & 0x8>(srcBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlendAlpha, value, dstColor);
-				LoadBlend<channelWriteMask & 0x8>(dstBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlendAlpha, value, dstColor);
-				AlphaBlend<channelWriteMask & 0x8>(finalAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOpAlpha, srcBlendAlpha, dstBlendAlpha, value, dstColor);
-				finalColor.w = finalAlpha.w;
-			}
-
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
-				DitherColor(x, y, finalColor, outSurface);
-
-			outSurface->SetPixelVec<channelWriteMask>(x, y, finalColor);
-		}
-		else // Simple alpha blending without separate alpha
-		{
-			__declspec(align(16) ) D3DXVECTOR4 dstColor;
-			outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
-
-			__declspec(align(16) ) D3DXVECTOR4 srcBlend;
-			__declspec(align(16) ) D3DXVECTOR4 dstBlend;
-			LoadBlend<channelWriteMask>(srcBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
-			LoadBlend<channelWriteMask>(dstBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
-			AlphaBlend<channelWriteMask>(dstColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlend, dstBlend, value, dstColor);
-
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
-				DitherColor(x, y, dstColor, outSurface);
-
-			outSurface->SetPixelVec<channelWriteMask>(x, y, dstColor);
-		}
+		// Alpha blend skip / Additive blend skip test:
+		ROPBlendWriteMask_AlphaBlendTest<channelWriteMask>(outSurface, x, y, value);
 	}
 	else // Super simple - no alpha blending at all!
 	{
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
-		{
-			D3DXVECTOR4 ditheredColor = value;
-			DitherColor(x, y, ditheredColor, outSurface);
-			outSurface->SetPixelVec<channelWriteMask>(x, y, ditheredColor);
-		}
-		else
-			outSurface->SetPixelVec<channelWriteMask>(x, y, value);
+		ROPBlendWriteMask_NoAlphaBlend<channelWriteMask>(outSurface, x, y, value);
 	}
 }
 
-static const unsigned char pixelBitCount[16] =
+template <const unsigned char channelWriteMask>
+void IDirect3DDevice9Hook::ROPBlendWriteMask_AlphaBlendTest(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const
 {
-	0, // 0x0
-	1, // 0x1
-	1, // 0x2
-	2, // 0x3
-	1, // 0x4
-	2, // 0x5
-	2, // 0x6
-	3, // 0x7
-	1, // 0x8
-	2, // 0x9
-	2, // 0xA
-	3, // 0xB
-	2, // 0xC
-	3, // 0xD
-	3, // 0xE
-	4 // 0xF
-};
+	// Alpha blend skip:
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
+		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+	{
+		if (value.w == 0.0f)
+			return;
+	}
+	// Additive blend skip
+	else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
+		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
+	{
+		// TODO: SIMDify this check
+		if (value.x == 0.0f && value.y == 0.0f && value.z == 0.0f)
+			return;
+	}
+
+	ROPBlendWriteMask_AlphaBlend<channelWriteMask>(outSurface, x, y, value);
+}
+
+template <const unsigned char channelWriteMask>
+void IDirect3DDevice9Hook::ROPBlendWriteMask_AlphaBlend(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const
+{
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable) // Have to run alpha blending twice for separate alpha
+	{
+		D3DXVECTOR4 dstColor, finalColor;
+		outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
+
+		D3DXVECTOR4 srcBlendColor, dstBlendColor;
+		LoadBlend<channelWriteMask & 0x7>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
+		LoadBlend<channelWriteMask & 0x7>(dstBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
+		AlphaBlend<channelWriteMask & 0x7>(finalColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlendColor, dstBlendColor, value, dstColor);
+
+		if (channelWriteMask & 0x8)
+		{
+			D3DXVECTOR4 srcBlendAlpha, dstBlendAlpha, finalAlpha;
+			LoadBlend<channelWriteMask & 0x8>(srcBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlendAlpha, value, dstColor);
+			LoadBlend<channelWriteMask & 0x8>(dstBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlendAlpha, value, dstColor);
+			AlphaBlend<channelWriteMask & 0x8>(finalAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOpAlpha, srcBlendAlpha, dstBlendAlpha, value, dstColor);
+			finalColor.w = finalAlpha.w;
+		}
+
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+			DitherColor(x, y, finalColor, outSurface);
+
+		outSurface->SetPixelVec<channelWriteMask>(x, y, finalColor);
+	}
+	else // Simple alpha blending without separate alpha
+	{
+		__declspec(align(16) ) D3DXVECTOR4 dstColor;
+		outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
+
+		__declspec(align(16) ) D3DXVECTOR4 srcBlend;
+		__declspec(align(16) ) D3DXVECTOR4 dstBlend;
+		LoadBlend<channelWriteMask>(srcBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
+		LoadBlend<channelWriteMask>(dstBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
+		AlphaBlend<channelWriteMask>(dstColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlend, dstBlend, value, dstColor);
+
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+			DitherColor(x, y, dstColor, outSurface);
+
+		outSurface->SetPixelVec<channelWriteMask>(x, y, dstColor);
+	}
+}
+
+template <const unsigned char channelWriteMask>
+void IDirect3DDevice9Hook::ROPBlendWriteMask_NoAlphaBlend(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const
+{
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+	{
+		D3DXVECTOR4 ditheredColor = value;
+		DitherColor(x, y, ditheredColor, outSurface);
+		outSurface->SetPixelVec<channelWriteMask>(x, y, ditheredColor);
+	}
+	else
+		outSurface->SetPixelVec<channelWriteMask>(x, y, value);
+}
 
 template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
-void IDirect3DDevice9Hook::ROPBlendWriteMask4(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&value)[4]) const
+void IDirect3DDevice9Hook::ROPBlendWriteMask4(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const
 {
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable)
 	{
-		// Alpha blend skip:
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
-			currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
-		{
-			DWORD skipAlphaValue = 0x00000000;
-			if (pixelWriteMask & 0x1)
-				skipAlphaValue |= *(const DWORD* const)&value[0].w;
-			if (pixelWriteMask & 0x2)
-				skipAlphaValue |= *(const DWORD* const)&value[1].w;
-			if (pixelWriteMask & 0x4)
-				skipAlphaValue |= *(const DWORD* const)&value[2].w;
-			if (pixelWriteMask & 0x8)
-				skipAlphaValue |= *(const DWORD* const)&value[3].w;
-
-			if (!(skipAlphaValue & 0x7FFFFFFF) )
-				return;
-		}
-		// Additive blend skip
-		else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
-			currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
-		{
-			__m128 valueBits = _mm_setzero_ps();
-			if (pixelWriteMask & 0x1)
-				valueBits = _mm_or_ps(*(const __m128* const)&(value[0]), valueBits);
-			if (pixelWriteMask & 0x2)
-				valueBits = _mm_or_ps(*(const __m128* const)&(value[1]), valueBits);
-			if (pixelWriteMask & 0x4)
-				valueBits = _mm_or_ps(*(const __m128* const)&(value[2]), valueBits);
-			if (pixelWriteMask & 0x8)
-				valueBits = _mm_or_ps(*(const __m128* const)&(value[3]), valueBits);
-
-			const DWORD skipColorValue = valueBits.m128_u32[0] | valueBits.m128_u32[1] | valueBits.m128_u32[2];
-			if (!(skipColorValue & 0x7FFFFFFF) )
-				return;
-		}
-
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable) // Have to run alpha blending twice for separate alpha
-		{
-			__declspec(align(16) ) D3DXVECTOR4 dstColor[4];
-			__declspec(align(16) ) D3DXVECTOR4 finalColor[4];
-
-			outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
-
-			__declspec(align(16) ) D3DXVECTOR4 srcBlendColor[4];
-			__declspec(align(16) ) D3DXVECTOR4 dstBlendColor[4];
-			LoadBlend4<channelWriteMask & 0x7>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
-			LoadBlend4<channelWriteMask & 0x7>(dstBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
-			AlphaBlend4<channelWriteMask & 0x7>(finalColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlendColor, dstBlendColor, value, dstColor);
-
-			if (channelWriteMask & 0x8)
-			{
-				__declspec(align(16) ) D3DXVECTOR4 srcBlendAlpha[4];
-				__declspec(align(16) ) D3DXVECTOR4 dstBlendAlpha[4];
-				__declspec(align(16) ) D3DXVECTOR4 finalAlpha[4];
-				LoadBlend4<channelWriteMask & 0x8, pixelWriteMask>(srcBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlendAlpha, value, dstColor);
-				LoadBlend4<channelWriteMask & 0x8, pixelWriteMask>(dstBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlendAlpha, value, dstColor);
-				AlphaBlend4<channelWriteMask & 0x8, pixelWriteMask>(finalAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOpAlpha, srcBlendAlpha, dstBlendAlpha, value, dstColor);
-				finalColor.w = finalAlpha.w;
-			}
-
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
-				DitherColor4(x4, y4, finalColor, outSurface);
-
-			outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, finalColor);
-		}
-		else // Simple alpha blending without separate alpha
-		{
-			__declspec(align(16) ) D3DXVECTOR4 dstColor[4];
-			outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
-
-			__declspec(align(16) ) D3DXVECTOR4 srcBlend[4];
-			__declspec(align(16) ) D3DXVECTOR4 dstBlend[4];
-			LoadBlend4<channelWriteMask, pixelWriteMask>(srcBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
-			LoadBlend4<channelWriteMask, pixelWriteMask>(dstBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, value, dstColor);
-			AlphaBlend4<channelWriteMask, pixelWriteMask>(dstColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlend, dstBlend, value, dstColor);
-
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
-				DitherColor4(x4, y4, dstColor, outSurface);
-
-			outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, dstColor);
-		}
+		ROPBlendWriteMask4_AlphaBlendTest<channelWriteMask, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
 	}
 	else // Super simple - no alpha blending at all!
 	{
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+		ROPBlendWriteMask4_NoAlphaBlend<channelWriteMask, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+	}
+}
+
+static_assert(sizeof(PS_2_0_OutputRegisters) % sizeof(float) == 0, "Error! Unexpected struct size!");
+static const unsigned gatherAlphaValues4bytes[4] = { 0, sizeof(PS_2_0_OutputRegisters) / sizeof(float), 2 * sizeof(PS_2_0_OutputRegisters) / sizeof(float), 3 * sizeof(PS_2_0_OutputRegisters) / sizeof(float) };
+static const __m128i gatherAlphaValues4 = *(const __m128i* const)gatherAlphaValues4bytes;
+static const __m128i additiveBlendCompareByteShuffle = _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 12, 8, 4, 0);
+
+template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::ROPBlendWriteMask4_AlphaBlendTest(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const
+{
+	// Alpha blend skip:
+	unsigned char failAlphaBlendMask = 0x00;
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
+		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+	{
+		const __declspec(align(16) ) __m128 alphaValue4 = _mm_i32gather_ps(&(outputRegisters[0].oC[RTIndex].w), gatherAlphaValues4, 4);
+		failAlphaBlendMask = (const unsigned char)_mm_movemask_ps(_mm_cmpeq_ps(alphaValue4, *(const __m128* const)&zeroVec) );
+	}
+	// Additive blend skip
+	else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
+		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
+	{
+		__declspec(align(16) ) __m128i masks;
+		if (pixelWriteMask & 0x1)
+			masks.m128i_u32[0] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[0].oC[RTIndex]), *(const __m128* const)&zeroVec) );
+		if (pixelWriteMask & 0x2)
+			masks.m128i_u32[1] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[1].oC[RTIndex]), *(const __m128* const)&zeroVec) );
+		if (pixelWriteMask & 0x4)
+			masks.m128i_u32[2] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[2].oC[RTIndex]), *(const __m128* const)&zeroVec) );
+		if (pixelWriteMask & 0x8)
+			masks.m128i_u32[3] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[3].oC[RTIndex]), *(const __m128* const)&zeroVec) );
+
+		failAlphaBlendMask = (const unsigned char)_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(_mm_and_si128(masks, sevenVec), sevenVec) ) );
+	}
+
+	const unsigned char newPixelWriteMask = pixelWriteMask & (~failAlphaBlendMask);
+	switch (newPixelWriteMask)
+	{
+	default:
+#ifdef _DEBUG
+		__debugbreak();
+#else
+		__assume(0);
+#endif
+	case 0x0:
+		return; // No pixels left, we're done!
+	case 0x1:
+		ROPBlendWriteMask_AlphaBlend<channelWriteMask>(outSurface, x4.m128i_u32[0], y4.m128i_u32[0], *(const D3DXVECTOR4* const)&(outputRegisters[0].oC[RTIndex]) );
+		return;
+	case 0x2:
+		ROPBlendWriteMask_AlphaBlend<channelWriteMask>(outSurface, x4.m128i_u32[1], y4.m128i_u32[1], *(const D3DXVECTOR4* const)&(outputRegisters[1].oC[RTIndex]) );
+		return;
+	case 0x4:
+		ROPBlendWriteMask_AlphaBlend<channelWriteMask>(outSurface, x4.m128i_u32[2], y4.m128i_u32[2], *(const D3DXVECTOR4* const)&(outputRegisters[2].oC[RTIndex]) );
+		return;
+	case 0x8:
+		ROPBlendWriteMask_AlphaBlend<channelWriteMask>(outSurface, x4.m128i_u32[3], y4.m128i_u32[3], *(const D3DXVECTOR4* const)&(outputRegisters[3].oC[RTIndex]) );
+		return;
+	case 0x3:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0x3>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0x5:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0x5>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0x6:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0x6>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0x7:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0x7>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0x9:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0x9>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0xA:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0xA>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0xB:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0xB>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0xC:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0xC>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0xD:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0xD>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0xE:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0xE>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	case 0xF:
+		ROPBlendWriteMask4_AlphaBlend<channelWriteMask, 0xF>(outSurface, x4, y4, outputRegisters, RTIndex);
+		return;
+	}
+}
+
+template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::ROPBlendWriteMask4_AlphaBlend(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const
+{
+	// TODO: This kinda sucks. We should make a version of the blend functions that can blend pixels without copying them first
+	__declspec(align(16) ) D3DXVECTOR4 colorCopy[4];
+	if (pixelWriteMask & 0x1) colorCopy[0] = *(const D3DXVECTOR4* const)&(outputRegisters[0].oC[RTIndex]);
+	if (pixelWriteMask & 0x2) colorCopy[1] = *(const D3DXVECTOR4* const)&(outputRegisters[1].oC[RTIndex]);
+	if (pixelWriteMask & 0x4) colorCopy[2] = *(const D3DXVECTOR4* const)&(outputRegisters[2].oC[RTIndex]);
+	if (pixelWriteMask & 0x8) colorCopy[3] = *(const D3DXVECTOR4* const)&(outputRegisters[3].oC[RTIndex]);
+
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable) // Have to run alpha blending twice for separate alpha
+	{
+		__declspec(align(16) ) D3DXVECTOR4 dstColor[4];
+		__declspec(align(16) ) D3DXVECTOR4 finalColor[4];
+
+		outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
+
+		__declspec(align(16) ) D3DXVECTOR4 srcBlendColor[4];
+		__declspec(align(16) ) D3DXVECTOR4 dstBlendColor[4];
+		LoadBlend4<channelWriteMask & 0x7, pixelWriteMask>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, colorCopy, dstColor);
+		LoadBlend4<channelWriteMask & 0x7, pixelWriteMask>(dstBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, colorCopy, dstColor);
+		AlphaBlend4<channelWriteMask & 0x7, pixelWriteMask>(finalColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlendColor, dstBlendColor, colorCopy, dstColor);
+
+		if (channelWriteMask & 0x8)
 		{
-			D3DXVECTOR4 ditheredColor[4] = 
-			{
-				value[0],
-				value[1],
-				value[2],
-				value[3]
-			};
-			DitherColor4(x4, y4, ditheredColor, outSurface);
-			outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, ditheredColor);
+			__declspec(align(16) ) D3DXVECTOR4 srcBlendAlpha[4];
+			__declspec(align(16) ) D3DXVECTOR4 dstBlendAlpha[4];
+			__declspec(align(16) ) D3DXVECTOR4 finalAlpha[4];
+			LoadBlend4<channelWriteMask & 0x8, pixelWriteMask>(srcBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlendAlpha, colorCopy, dstColor);
+			LoadBlend4<channelWriteMask & 0x8, pixelWriteMask>(dstBlendAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlendAlpha, colorCopy, dstColor);
+			AlphaBlend4<channelWriteMask & 0x8, pixelWriteMask>(finalAlpha, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOpAlpha, srcBlendAlpha, dstBlendAlpha, colorCopy, dstColor);
+			if (pixelWriteMask & 0x1) finalColor[0].w = finalAlpha[0].w;
+			if (pixelWriteMask & 0x2) finalColor[1].w = finalAlpha[1].w;
+			if (pixelWriteMask & 0x4) finalColor[2].w = finalAlpha[2].w;
+			if (pixelWriteMask & 0x8) finalColor[3].w = finalAlpha[3].w;
 		}
-		else
-			outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, value);
+
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+			DitherColor4(x4, y4, finalColor, outSurface);
+
+		outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, finalColor);
+	}
+	else // Simple alpha blending without separate alpha
+	{
+		__declspec(align(16) ) D3DXVECTOR4 dstColor[4];
+		outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
+
+		__declspec(align(16) ) D3DXVECTOR4 srcBlend[4];
+		__declspec(align(16) ) D3DXVECTOR4 dstBlend[4];
+		LoadBlend4<channelWriteMask, pixelWriteMask>(srcBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, colorCopy, dstColor);
+		LoadBlend4<channelWriteMask, pixelWriteMask>(dstBlend, currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend, colorCopy, dstColor);
+		AlphaBlend4<channelWriteMask, pixelWriteMask>(dstColor, currentState.currentRenderStates.renderStatesUnion.namedStates.blendOp, srcBlend, dstBlend, colorCopy, dstColor);
+
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+			DitherColor4(x4, y4, dstColor, outSurface);
+
+		outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, dstColor);
+	}
+}
+
+template <const unsigned char channelWriteMask, const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::ROPBlendWriteMask4_NoAlphaBlend(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const
+{
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.ditherEnable)
+	{
+		__declspec(align(16) ) D3DXVECTOR4 ditheredColor[4];
+		if (pixelWriteMask & 0x1) ditheredColor[0] = *(const D3DXVECTOR4* const)&(outputRegisters[0].oC[RTIndex]);
+		if (pixelWriteMask & 0x2) ditheredColor[1] = *(const D3DXVECTOR4* const)&(outputRegisters[1].oC[RTIndex]);
+		if (pixelWriteMask & 0x4) ditheredColor[2] = *(const D3DXVECTOR4* const)&(outputRegisters[2].oC[RTIndex]);
+		if (pixelWriteMask & 0x8) ditheredColor[3] = *(const D3DXVECTOR4* const)&(outputRegisters[3].oC[RTIndex]);
+		DitherColor4(x4, y4, ditheredColor, outSurface);
+		outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, ditheredColor);
+	}
+	else
+	{
+		// TODO: This kinda sucks. We should make a version of SetPixelVec4 that can write out pixels without copying them first
+		__declspec(align(16) ) D3DXVECTOR4 colorCopy[4];
+		if (pixelWriteMask & 0x1) colorCopy[0] = *(const D3DXVECTOR4* const)&(outputRegisters[0].oC[RTIndex]);
+		if (pixelWriteMask & 0x2) colorCopy[1] = *(const D3DXVECTOR4* const)&(outputRegisters[1].oC[RTIndex]);
+		if (pixelWriteMask & 0x4) colorCopy[2] = *(const D3DXVECTOR4* const)&(outputRegisters[2].oC[RTIndex]);
+		if (pixelWriteMask & 0x8) colorCopy[3] = *(const D3DXVECTOR4* const)&(outputRegisters[3].oC[RTIndex]);
+		outSurface->SetPixelVec4<channelWriteMask, pixelWriteMask>(x4, y4, colorCopy);
 	}
 }
 
@@ -5780,6 +5864,108 @@ void IDirect3DDevice9Hook::RenderOutput(IDirect3DSurface9Hook* const outSurface,
 #endif
 	case 15:
 		ROPBlendWriteMask<15>(outSurface, x, y, value);
+		break;
+	}
+}
+
+template <const unsigned char pixelWriteMask>
+void IDirect3DDevice9Hook::RenderOutput4(IDirect3DSurface9Hook* const outSurface, const __m128i x4, const __m128i y4, const PS_2_0_OutputRegisters (&outputRegisters)[4], const unsigned char RTIndex) const
+{
+	// Increment pixels written stat (even if write mask is 0)
+	switch (pixelWriteMask)
+	{
+	default:
+	case 0x0:
+#ifdef _DEBUG
+		__debugbreak();
+#else
+		__assume(0);
+#endif
+		return;
+	case 0x1:
+	case 0x2:
+	case 0x4:
+	case 0x8:
+		++frameStats.numPixelsWritten;
+		break;
+	case 0x3:
+	case 0x5:
+	case 0x6:
+	case 0x9:
+	case 0xA:
+	case 0xC:
+		frameStats.numPixelsWritten += 2;
+		break;
+	case 0x7:
+	case 0xB:
+	case 0xD:
+	case 0xE:
+		frameStats.numPixelsWritten += 3;
+		break;
+	case 0xF:
+		frameStats.numPixelsWritten += 4;
+		break;
+	}
+
+	switch (currentState.currentRenderStates.renderStatesUnion.namedStates.colorWriteEnable)
+	{
+	case 0:
+#ifdef _DEBUG
+		__debugbreak(); // Should never be here
+#else
+		__assume(0);
+#endif
+		return;
+	case 1:
+		ROPBlendWriteMask4<1, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 2:
+		ROPBlendWriteMask4<2, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 3:
+		ROPBlendWriteMask4<3, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 4:
+		ROPBlendWriteMask4<4, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 5:
+		ROPBlendWriteMask4<5, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 6:
+		ROPBlendWriteMask4<6, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 7:
+		ROPBlendWriteMask4<7, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 8:
+		ROPBlendWriteMask4<8, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 9:
+		ROPBlendWriteMask4<9, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 10:
+		ROPBlendWriteMask4<10, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 11:
+		ROPBlendWriteMask4<11, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 12:
+		ROPBlendWriteMask4<12, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 13:
+		ROPBlendWriteMask4<13, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	case 14:
+		ROPBlendWriteMask4<14, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
+		break;
+	default:
+#ifdef _DEBUG
+		DbgBreakPrint("Error: Unexpected write mask!");
+#else
+		__assume(0);
+#endif
+	case 15:
+		ROPBlendWriteMask4<15, pixelWriteMask>(outSurface, x4, y4, outputRegisters, RTIndex);
 		break;
 	}
 }
@@ -7067,27 +7253,6 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters4(PShaderEngine* const 
 #endif
 }
 
-
-/*
-Last big chunks before pixel4 is ready:
-StencilOperation
-Interpreter engine
-Job forking
-
-Enum for why a pixel was culled:
-0) NormalWrite (no cull)
-1) Rasterizer skip (polygon edge)
-2) Early Z skip
-3) Interpolated Z nearclip
-4) Interpolated Z farclip
-5) Pixel outside of depthstencil buffer
-6) Fail stencil test
-7) Fail Z test
-8) texkill (discard)
-9) alpha test
-10) alpha blend skip (0 alpha)
-11) additive blend skip (0 color)
-*/
 void IDirect3DDevice9Hook::ShadePixel_RunShader(const unsigned x, const unsigned y, PShaderEngine* const pixelShader) const
 {
 	++frameStats.numPixelsShaded;
@@ -7186,7 +7351,7 @@ void IDirect3DDevice9Hook::PostShadePixel_WriteOutputColor(const unsigned x, con
 {
 	const unsigned xCoord = x >> SUBPIXEL_ACCURACY_BITS;
 	const unsigned yCoord = y >> SUBPIXEL_ACCURACY_BITS;
-	for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
+	for (unsigned char rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
 	{
 		IDirect3DSurface9Hook* const currentRenderTarget = currentState.currentRenderTargets[rt];
 		if (!currentRenderTarget)
@@ -7530,18 +7695,13 @@ void IDirect3DDevice9Hook::PostShadePixel4_WriteOutputColor(const __m128i x4, co
 		break;
 	}
 
-	for (unsigned rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
+	for (unsigned char rt = 0; rt < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++rt)
 	{
 		IDirect3DSurface9Hook* const currentRenderTarget = currentState.currentRenderTargets[rt];
 		if (!currentRenderTarget)
 			continue;
 
-		// TODO: Need to write a RenderOutput4 to replace this
-		for (unsigned z = 0; z < 4; ++z)
-		{
-			if (pixelWriteMask & (1 << z) )
-				RenderOutput(currentRenderTarget, x4.m128i_u32[z], y4.m128i_u32[z], *(const D3DXVECTOR4* const)&(pixelShader->outputRegisters[z].oC[rt]) );
-		}
+		RenderOutput4<pixelWriteMask>(currentRenderTarget, x4, y4, pixelShader->outputRegisters, rt);
 	}
 }
 
