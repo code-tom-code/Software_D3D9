@@ -5527,6 +5527,17 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask_AlphaBlendTest(IDirect3DSurface9Hoo
 		if (value.x == 0.0f && value.y == 0.0f && value.z == 0.0f)
 			return;
 	}
+	// Multiplicative blend skip
+	else if (
+		(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_DESTCOLOR &&
+		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ZERO) || 
+		(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ZERO &&
+		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_SRCCOLOR) )
+	{
+		// TODO: SIMDify this check
+		if (value.x == 1.0f && value.y == 1.0f && value.z == 1.0f)
+			return;
+	}
 
 	ROPBlendWriteMask_AlphaBlend<channelWriteMask>(outSurface, x, y, value);
 }
@@ -5631,6 +5642,25 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask4_AlphaBlendTest(IDirect3DSurface9Ho
 			masks.m128i_u32[2] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[2].oC[RTIndex]), *(const __m128* const)&zeroVec) );
 		if (pixelWriteMask & 0x8)
 			masks.m128i_u32[3] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[3].oC[RTIndex]), *(const __m128* const)&zeroVec) );
+
+		failAlphaBlendMask = (const unsigned char)_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(_mm_and_si128(masks, sevenVec), sevenVec) ) );
+	}
+	// Multiplicative blend skip
+	else if (
+		(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_DESTCOLOR &&
+		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ZERO) ||
+		(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ZERO &&
+		currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_SRCCOLOR) ) // TODO: Check for the less common Min/Max/Reversesubtract blend ops
+	{
+		__declspec(align(16) ) __m128i masks;
+		if (pixelWriteMask & 0x1)
+			masks.m128i_u32[0] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[0].oC[RTIndex]), *(const __m128* const)&staticColorWhiteOpaque) );
+		if (pixelWriteMask & 0x2)
+			masks.m128i_u32[1] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[1].oC[RTIndex]), *(const __m128* const)&staticColorWhiteOpaque) );
+		if (pixelWriteMask & 0x4)
+			masks.m128i_u32[2] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[2].oC[RTIndex]), *(const __m128* const)&staticColorWhiteOpaque) );
+		if (pixelWriteMask & 0x8)
+			masks.m128i_u32[3] = _mm_movemask_ps(_mm_cmpeq_ps(*(const __m128* const)&(outputRegisters[3].oC[RTIndex]), *(const __m128* const)&staticColorWhiteOpaque) );
 
 		failAlphaBlendMask = (const unsigned char)_mm_movemask_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(_mm_and_si128(masks, sevenVec), sevenVec) ) );
 	}
