@@ -6042,15 +6042,22 @@ void IDirect3DDevice9Hook::SetupPixel(PShaderEngine* const pixelEngine, const vo
 		}
 	}
 
+	// Precompute some vectors that will be used for all of attribute interpolation
+	const __m128 floatBarycentricsInvZ = _mm_mul_ps(invZ, barycentricInterpolants);
+	const __m128 floatBarycentricsInvZ_X = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(0, 0, 0, 0) );
+	const __m128 floatBarycentricsInvZ_Y = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(1, 1, 1, 1) );
+	const __m128 floatBarycentricsInvZ_Z = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(2, 2, 2, 2) );
 	if (setupFromShader)
 	{
-		InterpolateShaderIntoRegisters(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, 
-			*(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth);
+		InterpolateShaderIntoRegisters(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping,  
+			*(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, pixelDepth,
+			floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z);
 	}
 	else
 	{
-		InterpolateStreamIntoRegisters(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, 
-			(const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth);
+		InterpolateStreamIntoRegisters(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, 
+			(const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, pixelDepth,
+			floatBarycentricsInvZ_X, floatBarycentricsInvZ_Y, floatBarycentricsInvZ_Z);
 	}
 
 	ShadePixel_RunShader(x, y, pixelEngine);
@@ -6101,104 +6108,162 @@ void IDirect3DDevice9Hook::SetupPixel4(PShaderEngine* const pixelEngine, const v
 		}
 	}
 
+	// Precompute some vectors that will be used for all of attribute interpolation
+	const __m128 floatBarycentricsInvZ4[4] = 
+	{
+		(pixelWriteMask & 0x1) ? _mm_mul_ps(invZ, barycentricInterpolants[0]) : _mm_setzero_ps(),
+		(pixelWriteMask & 0x2) ? _mm_mul_ps(invZ, barycentricInterpolants[1]) : _mm_setzero_ps(),
+		(pixelWriteMask & 0x4) ? _mm_mul_ps(invZ, barycentricInterpolants[2]) : _mm_setzero_ps(),
+		(pixelWriteMask & 0x8) ? _mm_mul_ps(invZ, barycentricInterpolants[3]) : _mm_setzero_ps()
+	};
+	const __m128 floatBarycentricsInvZ_X4[4] = 
+	{
+		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(0, 0, 0, 0) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(0, 0, 0, 0) )
+	};
+	const __m128 floatBarycentricsInvZ_Y4[4] = 
+	{
+		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(1, 1, 1, 1) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(1, 1, 1, 1) )
+	};
+	const __m128 floatBarycentricsInvZ_Z4[4] = 
+	{
+		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(2, 2, 2, 2) ),
+		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(2, 2, 2, 2) )
+	};
+
 	switch (pixelWriteMask)
 	{
 	case 0x1:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0x1>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0x1>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0x1>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0x1>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0x1>(x4, y4, pixelEngine);
 		break;
 	case 0x2:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0x2>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0x2>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0x2>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0x2>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0x2>(x4, y4, pixelEngine);
 		break;
 	case 0x3:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0x3>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0x3>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0x3>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0x3>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0x3>(x4, y4, pixelEngine);
 		break;
 	case 0x4:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0x4>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0x4>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0x4>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0x4>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0x4>(x4, y4, pixelEngine);
 		break;
 	case 0x5:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0x5>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0x5>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0x5>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0x5>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0x5>(x4, y4, pixelEngine);
 		break;
 	case 0x6:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0x6>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0x6>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0x6>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0x6>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0x6>(x4, y4, pixelEngine);
 		break;
 	case 0x7:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0x7>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0x7>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0x7>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0x7>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0x7>(x4, y4, pixelEngine);
 		break;
 	case 0x8:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0x8>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0x8>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0x8>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0x8>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0x8>(x4, y4, pixelEngine);
 		break;
 	case 0x9:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0x9>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0x9>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0x9>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0x9>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0x9>(x4, y4, pixelEngine);
 		break;
 	case 0xA:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0xA>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0xA>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0xA>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0xA>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0xA>(x4, y4, pixelEngine);
 		break;
 	case 0xB:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0xB>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0xB>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0xB>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0xB>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0xB>(x4, y4, pixelEngine);
 		break;
 	case 0xC:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0xC>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0xC>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0xC>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0xC>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0xC>(x4, y4, pixelEngine);
 		break;
 	case 0xD:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0xD>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0xD>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0xD>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0xD>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0xD>(x4, y4, pixelEngine);
 		break;
 	case 0xE:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0xE>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0xE>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0xE>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0xE>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0xE>(x4, y4, pixelEngine);
 		break;
 	default:
@@ -6209,9 +6274,11 @@ void IDirect3DDevice9Hook::SetupPixel4(PShaderEngine* const pixelEngine, const v
 #endif
 	case 0xF:
 		if (setupFromShader)
-			InterpolateShaderIntoRegisters4<0xF>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, barycentricInterpolants, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, invZ, pixelDepth4);
+			InterpolateShaderIntoRegisters4<0xF>(pixelEngine, *(const VStoPSMapping* const)shaderOrStreamMapping, *(const VS_2_0_OutputRegisters* const)v0, *(const VS_2_0_OutputRegisters* const)v1, *(const VS_2_0_OutputRegisters* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		else
-			InterpolateStreamIntoRegisters4<0xF>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, barycentricInterpolants, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, invZ, pixelDepth4);
+			InterpolateStreamIntoRegisters4<0xF>(pixelEngine, *(const DeclarationSemanticMapping* const)shaderOrStreamMapping, (const BYTE* const)v0, (const BYTE* const)v1, (const BYTE* const)v2, 
+				pixelDepth4, floatBarycentricsInvZ_X4, floatBarycentricsInvZ_Y4, floatBarycentricsInvZ_Z4);
 		ShadePixel4_RunShader<0xF>(x4, y4, pixelEngine);
 		break;
 	}
@@ -6298,14 +6365,9 @@ static inline void InterpolateVertexAttribute_PerspectiveCorrect4(const D3DXVECT
 }
 
 // Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
-void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, const __m128 barycentricInterpolants, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ, const float pixelZ) const
+void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, 
+	const float pixelZ, const __m128 floatBarycentricsInvZ_X, const __m128 floatBarycentricsInvZ_Y, const __m128 floatBarycentricsInvZ_Z) const
 {
-	// Precompute some vectors that will be used for all of attribute interpolation
-	const __m128 floatBarycentricsInvZ = _mm_mul_ps(invZ, barycentricInterpolants);
-	const __m128 floatBarycentricsInvZ_X = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(0, 0, 0, 0) );
-	const __m128 floatBarycentricsInvZ_Y = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(1, 1, 1, 1) );
-	const __m128 floatBarycentricsInvZ_Z = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(2, 2, 2, 2) );
-
 	const ShaderInfo& pixelShaderInfo = currentState.currentPixelShader->GetShaderInfo();
 	if (pixelShaderInfo.shaderMajorVersion == 1)
 	{
@@ -6527,38 +6589,9 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters(PShaderEngine* const p
 
 // Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
 template <const unsigned char pixelWriteMask>
-void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters4(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, const __m128 (&barycentricInterpolants)[4], CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, const __m128 invZ, const __m128 pixelZ4) const
+void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters4(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, 
+	const __m128 pixelZ4, const __m128 (&floatBarycentricsInvZ_X4)[4], const __m128 (&floatBarycentricsInvZ_Y4)[4], const __m128 (&floatBarycentricsInvZ_Z4)[4]) const
 {
-	// Precompute some vectors that will be used for all of attribute interpolation
-	const __m128 floatBarycentricsInvZ4[4] = 
-	{
-		(pixelWriteMask & 0x1) ? _mm_mul_ps(invZ, barycentricInterpolants[0]) : _mm_setzero_ps(),
-		(pixelWriteMask & 0x2) ? _mm_mul_ps(invZ, barycentricInterpolants[1]) : _mm_setzero_ps(),
-		(pixelWriteMask & 0x4) ? _mm_mul_ps(invZ, barycentricInterpolants[2]) : _mm_setzero_ps(),
-		(pixelWriteMask & 0x8) ? _mm_mul_ps(invZ, barycentricInterpolants[3]) : _mm_setzero_ps()
-	};
-	const __m128 floatBarycentricsInvZ_X4[4] = 
-	{
-		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(0, 0, 0, 0) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(0, 0, 0, 0) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(0, 0, 0, 0) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(0, 0, 0, 0) )
-	};
-	const __m128 floatBarycentricsInvZ_Y4[4] = 
-	{
-		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(1, 1, 1, 1) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(1, 1, 1, 1) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(1, 1, 1, 1) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(1, 1, 1, 1) )
-	};
-	const __m128 floatBarycentricsInvZ_Z4[4] = 
-	{
-		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(2, 2, 2, 2) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(2, 2, 2, 2) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(2, 2, 2, 2) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(2, 2, 2, 2) )
-	};
-
 	const ShaderInfo& pixelShaderInfo = currentState.currentPixelShader->GetShaderInfo();
 	if (pixelShaderInfo.shaderMajorVersion == 1)
 	{
@@ -6903,14 +6936,9 @@ void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInte
 
 // Handles interpolating pixel shader input registers from vertex shader output registers
 // TODO: Like InterpolateStreamIntoRegisters, have this function fill with (1,1,1,1) for input color usage registers or (0,0,0,0) for other usages if the vertex shader doesn't write to the corresponding output registers
-void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const __m128 barycentricInterpolants, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ, const float pixelZ) const
+void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
+	const float pixelZ, const __m128 floatBarycentricsInvZ_X, const __m128 floatBarycentricsInvZ_Y, const __m128 floatBarycentricsInvZ_Z) const
 {
-	// Precompute some vectors that will be used for all of attribute interpolation
-	const __m128 floatBarycentricsInvZ = _mm_mul_ps(invZ, barycentricInterpolants);
-	const __m128 floatBarycentricsInvZ_X = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(0, 0, 0, 0) );
-	const __m128 floatBarycentricsInvZ_Y = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(1, 1, 1, 1) );
-	const __m128 floatBarycentricsInvZ_Z = _mm_permute_ps(floatBarycentricsInvZ, _MM_SHUFFLE(2, 2, 2, 2) );
-
 	const ShaderInfo& pixelShaderInfo = currentState.currentPixelShader->GetShaderInfo();
 	if (pixelShaderInfo.shaderMajorVersion == 1)
 	{
@@ -7044,38 +7072,9 @@ void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters(PShaderEngine* const p
 // Handles interpolating pixel shader input registers from vertex shader output registers
 // TODO: Like InterpolateStreamIntoRegisters, have this function fill with (1,1,1,1) for input color usage registers or (0,0,0,0) for other usages if the vertex shader doesn't write to the corresponding output registers
 template <const unsigned char pixelWriteMask>
-void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters4(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const __m128 (&barycentricInterpolants)[4], const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, const __m128 invZ, const __m128 pixelZ4) const
+void IDirect3DDevice9Hook::InterpolateShaderIntoRegisters4(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
+	const __m128 pixelZ4, const __m128 (&floatBarycentricsInvZ_X4)[4], const __m128 (&floatBarycentricsInvZ_Y4)[4], const __m128 (&floatBarycentricsInvZ_Z4)[4]) const
 {
-	// Precompute some vectors that will be used for all of attribute interpolation
-	const __m128 floatBarycentricsInvZ4[4] = 
-	{
-		(pixelWriteMask & 0x1) ? _mm_mul_ps(invZ, barycentricInterpolants[0]) : _mm_setzero_ps(),
-		(pixelWriteMask & 0x2) ? _mm_mul_ps(invZ, barycentricInterpolants[1]) : _mm_setzero_ps(),
-		(pixelWriteMask & 0x4) ? _mm_mul_ps(invZ, barycentricInterpolants[2]) : _mm_setzero_ps(),
-		(pixelWriteMask & 0x8) ? _mm_mul_ps(invZ, barycentricInterpolants[3]) : _mm_setzero_ps()
-	};
-	const __m128 floatBarycentricsInvZ_X4[4] = 
-	{
-		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(0, 0, 0, 0) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(0, 0, 0, 0) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(0, 0, 0, 0) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(0, 0, 0, 0) )
-	};
-	const __m128 floatBarycentricsInvZ_Y4[4] = 
-	{
-		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(1, 1, 1, 1) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(1, 1, 1, 1) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(1, 1, 1, 1) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(1, 1, 1, 1) )
-	};
-	const __m128 floatBarycentricsInvZ_Z4[4] = 
-	{
-		_mm_permute_ps(floatBarycentricsInvZ4[0], _MM_SHUFFLE(2, 2, 2, 2) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[1], _MM_SHUFFLE(2, 2, 2, 2) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[2], _MM_SHUFFLE(2, 2, 2, 2) ),
-		_mm_permute_ps(floatBarycentricsInvZ4[3], _MM_SHUFFLE(2, 2, 2, 2) )
-	};
-
 	const ShaderInfo& pixelShaderInfo = currentState.currentPixelShader->GetShaderInfo();
 	if (pixelShaderInfo.shaderMajorVersion == 1)
 	{
@@ -8206,8 +8205,8 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 
 	// Cull triangles that intersect the guard band:
 	// TODO: Replace with real triangle clipping!
-	if (_mm_movemask_ps(_mm_or_ps(_mm_cmplt_ps(bounds, guardBandMin), _mm_cmpgt_ps(bounds, guardBandMax) ) ) )
-		return;
+	//if (_mm_movemask_ps(_mm_or_ps(_mm_cmplt_ps(bounds, guardBandMin), _mm_cmpgt_ps(bounds, guardBandMax) ) ) )
+		//return;
 
 	// Clip screenspace bounds to the screen size:
 	topleft = _mm_max_ps(topleft, *(const __m128* const)&zeroVec);
