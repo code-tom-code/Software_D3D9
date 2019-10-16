@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef RUN_SHADERS_IN_WARPS
-
 // Absolute-value: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/abs---vs
 static INTRINSIC_INLINE void abs4(D3DXVECTOR4 (&dst)[4], const D3DXVECTOR4 (&src)[4])
 {
@@ -1171,8 +1169,6 @@ static INTRINSIC_INLINE void sub4(D3DXVECTOR4 (&dst)[4], const D3DXVECTOR4 (&src
 	dst[2].w = src0[2].w - src1[2].w;
 	dst[3].w = src0[3].w - src1[3].w;
 }
-
-#endif // #ifdef RUN_SHADERS_IN_WARPS
 
 // Texture sample functions (tex2D, tex2Dgrad, tex2Dlod):
 template <const unsigned char writeMask>
