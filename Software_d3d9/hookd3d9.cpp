@@ -16,7 +16,92 @@
 
 HINSTANCE hLThisDLL = 0;
 HINSTANCE hL = 0;
-FARPROC p[16] = {0};
+
+// Undocumented enum!
+enum Force9on12Mode : UINT
+{
+	Force9on12Mode_D3D9_Default = 0, // This will create a true D3D9 device (no 9on12 layer)
+	Force9on12Mode_D3D9on12 = 1, // This will create a D3D9on12 device
+	Force9on12Mode_D3D9_Unknown = 2 // I am not sure what this does, but it seems to act almost exactly like Force9on12Mode_D3D9_Default (value "0")
+};
+
+// Undocumented struct
+typedef struct _D3D9ON12_ARGS
+{
+	// Who knows what's in here!
+} D3D9ON12_ARGS;
+
+// Undocumented enum
+typedef enum _D3DSVERROR_ID
+{
+} D3DSVERROR_ID;
+
+typedef HRESULT (CALLBACK *IDirect3DShaderValidator9_InstructionCallback)(LPCSTR, UINT messageType, D3DSVERROR_ID messageID, UINT, LPCSTR lpMessage, LPVOID lParam);
+
+// This is an undocumented interface returned from the exported function Direct3DShaderValidatorCreate9()
+struct DECLSPEC_NOVTABLE IDirect3DShaderValidator9 : public IUnknown
+{
+	/*** IUnknown methods ***/
+    STDMETHOD(QueryInterface)(THIS_ REFIID riid, void** ppvObj) PURE;
+    STDMETHOD_(ULONG, AddRef)(THIS) PURE;
+    STDMETHOD_(ULONG, Release)(THIS) PURE;
+
+	/*** IDirect3DShaderValidator9 methods ***/
+	STDMETHOD(Begin)(THIS_ IDirect3DShaderValidator9_InstructionCallback lpCallbackFunc, LPVOID lParam, DWORD unknown) PURE;
+	STDMETHOD(Instruction)(THIS_ CONST char* unknownString, UINT unknown, const DWORD* pdwInst /*Pointer to the instruction token*/, DWORD dwCount /*The instruction length, in DWORD tokens*/) PURE;
+	STDMETHOD(End)(THIS) PURE;
+};
+
+typedef int (WINAPI *D3DPERF_BeginEventType)(D3DCOLOR col, LPCWSTR wszName);
+typedef int (WINAPI *D3DPERF_EndEventType)(void);
+typedef DWORD (WINAPI *D3DPERF_GetStatusType)(void);
+typedef BOOL (WINAPI *D3DPERF_QueryRepeatFrameType)(void);
+typedef void (WINAPI *D3DPERF_SetMarkerType)(D3DCOLOR col, LPCWSTR wszName);
+typedef void (WINAPI *D3DPERF_SetOptionsType)(DWORD dwOptions);
+typedef void (WINAPI *D3DPERF_SetRegionType)(D3DCOLOR col, LPCWSTR wszName);
+typedef void (WINAPI *DebugSetLevelType)(void);
+typedef void (WINAPI *DebugSetMuteType)(void);
+typedef HRESULT (WINAPI *Direct3D9EnableMaximizedWindowedModeShimType)(BOOL ShimEnable);
+typedef IDirect3D9* (WINAPI *Direct3DCreate9Type)(_In_ UINT SDKVersion);
+typedef HRESULT (WINAPI *Direct3DCreate9ExType)(_In_ UINT SDKVersion, _Out_ IDirect3D9Ex**);
+typedef IDirect3DShaderValidator9* (WINAPI *Direct3DShaderValidatorCreate9Type)(void);
+typedef void (WINAPI *PSGPErrorType)(class D3DFE_PROCESSVERTICES* verticesPtr, enum PSGPERRORID errID, UINT UnknownUInt);
+typedef void (WINAPI *PSGPSampleTextureType)(class D3DFE_PROCESSVERTICES* verticesPtr, UINT UnknownUInt1, float (*const UnknownFloats1)[4], unsigned int UnknownUInt2, float (*const UnknownFloats2)[4]);
+typedef void (WINAPI *Direct3D9ForceHybridEnumerationType)(_In_ BOOL ForceHybridEnumeration);
+typedef void (WINAPI *Direct3D9SetMaximizedWindowedModeShimType)(_In_ BOOL unknown0, _In_ BOOL unknown1);
+typedef INT (WINAPI *Direct3D9SetSwapEffectUpgradeShimType)(_In_ BOOL ShimEnable);
+typedef void (WINAPI *Direct3D9Force9on12Type)(_In_ Force9on12Mode Mode);
+typedef IDirect3D9* (WINAPI *Direct3DCreate9on12Type)(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* Args, _In_ UINT ArgsCount);
+typedef HRESULT (WINAPI *Direct3DCreate9on12ExType)(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* Args, _In_ UINT ArgsCount, _Inout_ IDirect3D9Ex** UnusedOutPtr);
+typedef void (WINAPI *Direct3D9SetMaximizedWindowHwndOverrideType)(_In_ BOOL Override);
+typedef void (WINAPI *Direct3D9SetVendorIDLieFor9on12Type)(_In_ BOOL VendorIDLie);
+
+// All of these function pointer values will be pulled from the real d3d9.dll using GetProcAddress().
+// Not all of these functions may exist if we are running versions of Windows older than Windows 10, so in
+// those cases we'll just ignore the function calls entirely if possible.
+static D3DPERF_BeginEventType Real_D3DPERF_BeginEvent = NULL;
+static D3DPERF_EndEventType Real_D3DPERF_EndEvent = NULL;
+static D3DPERF_GetStatusType Real_D3DPERF_GetStatus = NULL;
+static D3DPERF_QueryRepeatFrameType Real_D3DPERF_QueryRepeatFrame = NULL;
+static D3DPERF_SetMarkerType Real_D3DPERF_SetMarker = NULL;
+static D3DPERF_SetOptionsType Real_D3DPERF_SetOptions = NULL;
+static D3DPERF_SetRegionType Real_D3DPERF_SetRegion = NULL;
+static DebugSetLevelType Real_DebugSetLevel = NULL;
+static DebugSetMuteType Real_DebugSetMute = NULL;
+static Direct3D9EnableMaximizedWindowedModeShimType Real_Direct3D9EnableMaximizedWindowedModeShim = NULL;
+static Direct3DCreate9Type Real_Direct3DCreate9 = NULL;
+static Direct3DCreate9ExType Real_Direct3DCreate9Ex = NULL;
+static Direct3DShaderValidatorCreate9Type Real_Direct3DShaderValidatorCreate9 = NULL;
+static PSGPErrorType Real_PSGPError = NULL;
+static PSGPSampleTextureType Real_PSGPSampleTexture = NULL;
+static Direct3D9ForceHybridEnumerationType Real_Direct3D9ForceHybridEnumeration = NULL;
+static Direct3D9SetMaximizedWindowedModeShimType Real_Direct3D9SetMaximizedWindowedModeShim = NULL;
+static Direct3D9SetSwapEffectUpgradeShimType Real_Direct3D9SetSwapEffectUpgradeShim = NULL;
+static Direct3D9Force9on12Type Real_Direct3D9Force9on12 = NULL;
+static Direct3DCreate9on12Type Real_Direct3DCreate9on12 = NULL;
+static Direct3DCreate9on12ExType Real_Direct3DCreate9on12Ex = NULL;
+static Direct3D9SetMaximizedWindowHwndOverrideType Real_Direct3D9SetMaximizedWindowHwndOverride = NULL;
+static Direct3D9SetVendorIDLieFor9on12Type Real_Direct3D9SetVendorIDLieFor9on12 = NULL;
 
 #ifdef _DEBUG
 
@@ -46,6 +131,7 @@ typedef enum _REAL_THREAD_INFORMATION_CLASS {
 } REAL_THREAD_INFORMATION_CLASS, *PREAL_THREAD_INFORMATION_CLASS;
 typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
 
+#ifdef _M_IX86
 extern "C" __declspec(naked) void __stdcall NtSetInformationThreadHook(IN HANDLE ThreadHandle, IN REAL_THREAD_INFORMATION_CLASS ThreadInformationClass, IN PVOID ThreadInformation, IN ULONG ThreadInformationLength)
 {
 	// Uhhhhh, have to do this because for some reason C++ thinks that our parameters are each slid down by 1 (ThreadHandle is really ThreadInformationClass and ThreadInformation is really ThreadInformationLength, etc.)
@@ -147,15 +233,18 @@ static inline void HookNtSetInformationThread()
 		DbgBreakPrint("Error: Fail in VirtualProtect");
 	}
 }
+#endif // #ifdef _M_IX86
 
 void CircumventSteamAntiDebugging(void)
 {
 	// Having a message box here was convenient for debugging steam stuff, but it really messes up some applications to have a message box pop up during a DllMain!
 	//MessageBoxA(NULL, NULL, NULL, NULL);
 
+#ifdef _M_IX86
 	HookIsDebuggerPresent();
 
 	HookNtSetInformationThread();
+#endif // #ifdef _M_IX86
 
 	// No need to separately hook ZwSetInformationThread because ntdll aliases them to the exact same function call
 	//HookZwSetInformationThread();
@@ -164,7 +253,54 @@ void CircumventSteamAntiDebugging(void)
 }
 #endif
 
-__declspec(dllexport) BOOL WINAPI DllMain(_In_ HINSTANCE hInst, _In_ DWORD reason, _In_ LPVOID /*lpvReserved*/)
+// x64 on x64: "C:\Windows\System32"
+// x86 on x64: "C:\Windows\SysWoW64"
+// x86 on x86: "C:\Windows\System32"
+static inline const char* const GetSystemDirectoryHelper()
+{
+	static char systemDirectoryBuffer[MAX_PATH] = {0};
+
+	if (systemDirectoryBuffer[0] != '\0')
+		return systemDirectoryBuffer;
+
+#ifdef _M_IX86 // x86 target
+	BOOL isRunningWoW64Process = FALSE;
+	if (!IsWow64Process(GetCurrentProcess(), &isRunningWoW64Process) )
+	{
+#ifdef _DEBUG
+		__debugbreak(); // Should never be here!
+#endif
+		return NULL;
+	}
+
+	if (isRunningWoW64Process)
+	{
+		if (GetSystemWow64DirectoryA(systemDirectoryBuffer, sizeof(systemDirectoryBuffer) / sizeof(systemDirectoryBuffer[0]) ) < 2)
+		{
+#ifdef _DEBUG
+			__debugbreak(); // Should never be here!
+#endif
+			return NULL;
+		}
+		return systemDirectoryBuffer;
+	}
+#elif defined(_M_X64) // x64 target
+#else // Other target (ARM target perhaps?)
+	#error Error: Only x86 and x64 are currently supported!
+#endif // #ifdef _M_IX86
+
+	if (GetSystemDirectoryA(systemDirectoryBuffer, sizeof(systemDirectoryBuffer) / sizeof(systemDirectoryBuffer[0]) ) < 2)
+	{
+#ifdef _DEBUG
+		__debugbreak(); // Should never be here!
+#endif
+		return NULL;
+	}
+
+	return systemDirectoryBuffer;
+}
+
+BOOL WINAPI DllMain(_In_ HINSTANCE hInst, _In_ DWORD reason, _In_ LPVOID /*lpvReserved*/)
 {
 #ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
 	static TIMECAPS timeCaps = {0};
@@ -187,29 +323,41 @@ __declspec(dllexport) BOOL WINAPI DllMain(_In_ HINSTANCE hInst, _In_ DWORD reaso
 		timeBeginPeriod(timeCaps.wPeriodMin);
 #endif // #ifdef INCREASE_SYSTEM_SCHEDULER_RESOLUTION
 
-		// x86 32-bit version:
-		// TODO: Don't hardcode this path
-		hL = LoadLibraryA("C:\\Windows\\SysWOW64\\d3d9.dll");
+		char loadLibraryBuffer[MAX_PATH + 16] = {0};
+#pragma warning(push)
+#pragma warning(disable:4996) // warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+		strcpy(loadLibraryBuffer, GetSystemDirectoryHelper() );
+		strcat(loadLibraryBuffer, "\\d3d9.dll");
+#pragma warning(pop)
+
+		hL = LoadLibraryA(loadLibraryBuffer);
 
 		if (!hL)
 			return FALSE;
 
-		p[0] = GetProcAddress(hL, "D3DPERF_BeginEvent");
-		p[1] = GetProcAddress(hL, "D3DPERF_EndEvent");
-		p[2] = GetProcAddress(hL, "D3DPERF_GetStatus");
-		p[3] = GetProcAddress(hL, "D3DPERF_QueryRepeatFrame");
-		p[4] = GetProcAddress(hL, "D3DPERF_SetMarker");
-		p[5] = GetProcAddress(hL, "D3DPERF_SetOptions");
-		p[6] = GetProcAddress(hL, "D3DPERF_SetRegion");
-		p[7] = GetProcAddress(hL, "DebugSetLevel");
-		p[8] = GetProcAddress(hL, "DebugSetMute");
-		p[9] = GetProcAddress(hL, "Direct3D9EnableMaximizedWindowedModeShim");
-		p[10] = GetProcAddress(hL, "Direct3DCreate9");
-		p[11] = GetProcAddress(hL, "Direct3DCreate9Ex");
-		p[12] = GetProcAddress(hL, "Direct3DShaderValidatorCreate9");
-		p[13] = GetProcAddress(hL, "PSGPError");
-		p[14] = GetProcAddress(hL, "PSGPSampleTexture");
-		p[15] = GetProcAddress(hL, (LPCSTR)LOWORD(16u) ); // Apparently this is some undocumented function added in the Windows 8.1 update: "DWORD Direct3D9ForceHybridEnumeration(UINT)"
+		Real_D3DPERF_BeginEvent = (const D3DPERF_BeginEventType)GetProcAddress(hL, "D3DPERF_BeginEvent");
+		Real_D3DPERF_EndEvent = (const D3DPERF_EndEventType)GetProcAddress(hL, "D3DPERF_EndEvent");
+		Real_D3DPERF_GetStatus = (const D3DPERF_GetStatusType)GetProcAddress(hL, "D3DPERF_GetStatus");
+		Real_D3DPERF_QueryRepeatFrame = (const D3DPERF_QueryRepeatFrameType)GetProcAddress(hL, "D3DPERF_QueryRepeatFrame");
+		Real_D3DPERF_SetMarker = (const D3DPERF_SetMarkerType)GetProcAddress(hL, "D3DPERF_SetMarker");
+		Real_D3DPERF_SetOptions = (const D3DPERF_SetOptionsType)GetProcAddress(hL, "D3DPERF_SetOptions");
+		Real_D3DPERF_SetRegion = (const D3DPERF_SetRegionType)GetProcAddress(hL, "D3DPERF_SetRegion");
+		Real_DebugSetLevel = (const DebugSetLevelType)GetProcAddress(hL, "DebugSetLevel");
+		Real_DebugSetMute = (const DebugSetMuteType)GetProcAddress(hL, "DebugSetMute");
+		Real_Direct3D9EnableMaximizedWindowedModeShim = (const Direct3D9EnableMaximizedWindowedModeShimType)GetProcAddress(hL, "Direct3D9EnableMaximizedWindowedModeShim");
+		Real_Direct3DCreate9 = (const Direct3DCreate9Type)GetProcAddress(hL, "Direct3DCreate9");
+		Real_Direct3DCreate9Ex = (const Direct3DCreate9ExType)GetProcAddress(hL, "Direct3DCreate9Ex");
+		Real_Direct3DShaderValidatorCreate9 = (const Direct3DShaderValidatorCreate9Type)GetProcAddress(hL, "Direct3DShaderValidatorCreate9");
+		Real_PSGPError = (const PSGPErrorType)GetProcAddress(hL, "PSGPError");
+		Real_PSGPSampleTexture = (const PSGPSampleTextureType)GetProcAddress(hL, "PSGPSampleTexture");
+		Real_Direct3D9ForceHybridEnumeration = (const Direct3D9ForceHybridEnumerationType)GetProcAddress(hL, (LPCSTR)LOWORD(16u) ); // "void Direct3D9ForceHybridEnumeration(BOOL)"
+		Real_Direct3D9SetMaximizedWindowedModeShim = (const Direct3D9SetMaximizedWindowedModeShimType)GetProcAddress(hL, (LPCSTR)LOWORD(17u) ); // "void Direct3D9SetMaximizedWindowedModeShim()"
+		Real_Direct3D9SetSwapEffectUpgradeShim = (const Direct3D9SetSwapEffectUpgradeShimType)GetProcAddress(hL, (LPCSTR)LOWORD(18u) ); // "void Direct3D9SetSwapEffectUpgradeShim()"
+		Real_Direct3D9Force9on12 = (const Direct3D9Force9on12Type)GetProcAddress(hL, (LPCSTR)LOWORD(19u) ); // "void Direct3D9Force9on12()"
+		Real_Direct3DCreate9on12 = (const Direct3DCreate9on12Type)GetProcAddress(hL, (LPCSTR)LOWORD(20u) ); // "IDirect3D9* Direct3DCreate9on12()"
+		Real_Direct3DCreate9on12Ex = (const Direct3DCreate9on12ExType)GetProcAddress(hL, (LPCSTR)LOWORD(21u) ); // "HRESULT Direct3DCreate9on12Ex()"
+		Real_Direct3D9SetMaximizedWindowHwndOverride = (const Direct3D9SetMaximizedWindowHwndOverrideType)GetProcAddress(hL, (LPCSTR)LOWORD(22u) ); // "void Direct3D9SetMaximizedWindowHwndOverride()"
+		Real_Direct3D9SetVendorIDLieFor9on12 = (const Direct3D9SetVendorIDLieFor9on12Type)GetProcAddress(hL, (LPCSTR)LOWORD(23u) ); // "void Direct3D9SetVendorIDLieFor9on12(BOOL)"
 	}
 
 	if (reason == DLL_PROCESS_DETACH)
@@ -225,99 +373,75 @@ __declspec(dllexport) BOOL WINAPI DllMain(_In_ HINSTANCE hInst, _In_ DWORD reaso
 }
 
 // D3DPERF_BeginEvent
-extern "C" int WINAPI __E__0__(D3DCOLOR col, LPCWSTR wszName)
+extern "C" int WINAPI HookD3DPERF_BeginEvent(D3DCOLOR col, LPCWSTR wszName)
 {
-	typedef int (WINAPI *D3DPERF_BeginEventType)(D3DCOLOR col, LPCWSTR wszName);
-	D3DPERF_BeginEventType beginEventPtr = (D3DPERF_BeginEventType)p[0];
-	int ret = (*beginEventPtr)(col, wszName);
+	int ret = (*Real_D3DPERF_BeginEvent)(col, wszName);
 	return ret;
 }
 
 // D3DPERF_EndEvent
-extern "C" int WINAPI __E__1__(void)
+extern "C" int WINAPI HookD3DPERF_EndEvent(void)
 {
-	typedef int (WINAPI *D3DPERF_EndEventType)(void);
-	D3DPERF_EndEventType endEventPtr = (D3DPERF_EndEventType)p[1];
-	int ret = (*endEventPtr)();
+	int ret = (*Real_D3DPERF_EndEvent)();
 	return ret;
 }
 
 // D3DPERF_GetStatus
-extern "C" DWORD WINAPI __E__2__(void)
+extern "C" DWORD WINAPI HookD3DPERF_GetStatus(void)
 {
-	typedef DWORD (WINAPI *D3DPERF_GetStatusType)(void);
-	D3DPERF_GetStatusType getStatusPtr = (D3DPERF_GetStatusType)p[2];
-	DWORD ret = (*getStatusPtr)();
+	DWORD ret = (*Real_D3DPERF_GetStatus)();
 	return ret;
 }
 
 // D3DPERF_QueryRepeatFrame
-extern "C" BOOL WINAPI __E__3__(void)
+extern "C" BOOL WINAPI HookD3DPERF_QueryRepeatFrame(void)
 {
-	typedef BOOL (WINAPI *D3DPERF_QueryRepeatFrameType)(void);
-	D3DPERF_QueryRepeatFrameType queryRepeatFramePtr = (D3DPERF_QueryRepeatFrameType)p[3];
-	BOOL ret = (*queryRepeatFramePtr)();
+	BOOL ret = (*Real_D3DPERF_QueryRepeatFrame)();
 	return ret;
 }
 
 // D3DPERF_SetMarker
-extern "C" void WINAPI __E__4__(D3DCOLOR col, LPCWSTR wszName)
+extern "C" void WINAPI HookD3DPERF_SetMarker(D3DCOLOR col, LPCWSTR wszName)
 {
-	typedef void (WINAPI *D3DPERF_SetMarker)(D3DCOLOR col, LPCWSTR wszName);
-	D3DPERF_SetMarker setMarkerPtr = (D3DPERF_SetMarker)p[4];
-	(*setMarkerPtr)(col, wszName);
+	(*Real_D3DPERF_SetMarker)(col, wszName);
 }
 
 // D3DPERF_SetOptions
-extern "C" void WINAPI __E__5__(DWORD dwOptions)
+extern "C" void WINAPI HookD3DPERF_SetOptions(DWORD dwOptions)
 {
-	typedef void (WINAPI *D3DPERF_SetOptions)(DWORD dwOptions);
-	D3DPERF_SetOptions setOptionsPtr = (D3DPERF_SetOptions)p[5];
-	(*setOptionsPtr)(dwOptions);
+	(*Real_D3DPERF_SetOptions)(dwOptions);
 }
 
 // D3DPERF_SetRegion
-extern "C" void WINAPI __E__6__(D3DCOLOR col, LPCWSTR wszName)
+extern "C" void WINAPI HookD3DPERF_SetRegion(D3DCOLOR col, LPCWSTR wszName)
 {
-	typedef void (WINAPI *D3DPERF_SetRegion)(D3DCOLOR col, LPCWSTR wszName);
-	D3DPERF_SetRegion setRegionPtr = (D3DPERF_SetRegion)p[6];
-	(*setRegionPtr)(col, wszName);
+	(*Real_D3DPERF_SetRegion)(col, wszName);
 }
 
 // DebugSetLevel
-extern "C" __declspec(naked) void __stdcall __E__7__()
+extern "C" void WINAPI HookDebugSetLevel()
 {
-__asm
-	{
-	jmp p[7*4];
-	}
+	(*Real_DebugSetLevel)();
 }
 
 // DebugSetMute
-extern "C" __declspec(naked) void __stdcall __E__8__()
+extern "C" void WINAPI HookDebugSetMute()
 {
-__asm
-	{
-	jmp p[8*4];
-	}
+	(*Real_DebugSetMute)();
 }
 
 // Direct3D9EnableMaximizedWindowedModeShim
-extern "C" __declspec(naked) void __stdcall __E__9__()
+extern "C"  HRESULT WINAPI HookDirect3D9EnableMaximizedWindowedModeShim(BOOL ShimEnable)
 {
-__asm
-	{
-	jmp p[9*4];
-	}
+	HRESULT ret = (*Real_Direct3D9EnableMaximizedWindowedModeShim)(ShimEnable);
+	return ret;
 }
 
 // Direct3DCreate9
-extern "C" IDirect3D9* WINAPI __E__10__(_In_ UINT SDKVersion)
+extern "C" IDirect3D9* WINAPI HookDirect3DCreate9(_In_ UINT SDKVersion)
 {	
 	// Pre-hook code
-	typedef IDirect3D9* (WINAPI *Direct3DCreate9Type)(_In_ UINT SDKVersion);
-	Direct3DCreate9Type d3dCreate9Ptr = (Direct3DCreate9Type)p[10];
-	IDirect3D9* ret = (*d3dCreate9Ptr)(SDKVersion);
+	IDirect3D9* ret = (*Real_Direct3DCreate9)(SDKVersion);
 	// Post-hook code
 
 	if (!ret)
@@ -330,50 +454,86 @@ extern "C" IDirect3D9* WINAPI __E__10__(_In_ UINT SDKVersion)
 }
 
 // Direct3DCreate9Ex
-extern "C" HRESULT WINAPI __E__11__(_In_ UINT SDKVersion, _Out_ IDirect3D9Ex** ppD3D)
+extern "C" HRESULT WINAPI HookDirect3DCreate9Ex(_In_ UINT SDKVersion, _Out_ IDirect3D9Ex** ppD3D)
 {
 	// Pre-hook code
-	typedef HRESULT (WINAPI *Direct3DCreate9ExType)(_In_ UINT SDKVersion, _Out_ IDirect3D9Ex**);
-	Direct3DCreate9ExType d3dCreate9ExPtr = (Direct3DCreate9ExType)p[11];
-	HRESULT ret = (*d3dCreate9ExPtr)(SDKVersion, ppD3D);
+	HRESULT ret = (*Real_Direct3DCreate9Ex)(SDKVersion, ppD3D);
 	// Post-hook code
 	//MessageBoxA(NULL, "Direct3DCreate9Ex", NULL, NULL);
 	return ret;
 }
 
 // Direct3DShaderValidatorCreate9
-extern "C" __declspec(naked) void __stdcall __E__12__()
+extern "C" IDirect3DShaderValidator9* WINAPI HookDirect3DShaderValidatorCreate9(void)
 {
-__asm
-	{
-	jmp p[12*4];
-	}
+	IDirect3DShaderValidator9* ret = (*Real_Direct3DShaderValidatorCreate9)();
+	return ret;
 }
 
 // PSGPError
-extern "C" __declspec(naked) void __stdcall __E__13__()
+extern "C" void __stdcall HookPSGPError(class D3DFE_PROCESSVERTICES* verticesPtr, enum PSGPERRORID errID, UINT UnknownUInt)
 {
-__asm
-	{
-	jmp p[13*4];
-	}
+	(*Real_PSGPError)(verticesPtr, errID, UnknownUInt);
 }
 
 // PSGPSampleTexture
-extern "C" __declspec(naked) void __stdcall __E__14__()
+extern "C" void __stdcall HookPSGPSampleTexture(class D3DFE_PROCESSVERTICES* verticesPtr, UINT UnknownUInt1, float (*const UnknownFloats1)[4], unsigned int UnknownUInt2, float (*const UnknownFloats2)[4])
 {
-__asm
-	{
-	jmp p[14*4];
-	}
+	(*Real_PSGPSampleTexture)(verticesPtr, UnknownUInt1, UnknownFloats1, UnknownUInt2, UnknownFloats2);
 }
 
-// ___XXX___16
-extern "C" __declspec(naked) void __stdcall __E__15__()
+// Direct3D9ForceHybridEnumeration
+extern "C" void __stdcall HookDirect3D9ForceHybridEnumeration(UINT ForceHybridEnumeration)
 {
-__asm
-	{
-	jmp p[15*4];
-	}
+	(*Real_Direct3D9ForceHybridEnumeration)(ForceHybridEnumeration);
 }
 
+// Direct3D9SetMaximizedWindowedModeShim
+extern "C" void __stdcall HookDirect3D9SetMaximizedWindowedModeShim(BOOL a, BOOL b)
+{
+	(*Real_Direct3D9SetMaximizedWindowedModeShim)(a, b);
+}
+
+// Direct3D9SetSwapEffectUpgradeShim
+extern "C" INT __stdcall HookDirect3D9SetSwapEffectUpgradeShim(BOOL ShimEnable)
+{
+	INT ret = (*Real_Direct3D9SetSwapEffectUpgradeShim)(ShimEnable);
+	return ret;
+}
+
+// Direct3D9Force9on12
+// Sets a global value in d3d9.dll that, when set to "1", causes future calls to Direct3DCreate9 and Direct3DCreate9Ex to be internally
+// turned into calls to Direct3DCreate9on12 and Direct3DCreate9on12Ex respectively, thus transparently creating D3D9on12 devices
+// for the callers without any user code modifications (except for the one initial call to Direct3D9Force9on12() ).
+// Note that this does not transform any existing D3D9 or D3D9Ex devices into D3D9on12/D3D9on12Ex devices, it only affects
+// devices created after the force is enabled.
+extern "C" void __stdcall HookDirect3D9Force9on12(_In_ Force9on12Mode Mode)
+{
+	(*Real_Direct3D9Force9on12)(Mode);
+}
+
+// Direct3DCreate9on12
+extern "C" IDirect3D9* __stdcall HookDirect3DCreate9on12(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* Args, _In_ UINT ArgsCount)
+{
+	IDirect3D9* ret = (*Real_Direct3DCreate9on12)(SDKVersion, Args, ArgsCount);
+	return ret;
+}
+
+// Direct3DCreate9on12Ex
+extern "C" HRESULT __stdcall HookDirect3DCreate9on12Ex(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* Args, _In_ UINT ArgsCount, _Inout_ IDirect3D9Ex** OutExPtr)
+{
+	HRESULT ret = (*Real_Direct3DCreate9on12Ex)(SDKVersion, Args, ArgsCount, OutExPtr);
+	return ret;
+}
+
+// Direct3D9SetMaximizedWindowHwndOverride
+extern "C" void __stdcall HookDirect3D9SetMaximizedWindowHwndOverride(_In_ BOOL Override)
+{
+	(*Real_Direct3D9SetMaximizedWindowHwndOverride)(Override);
+}
+
+// Direct3D9SetVendorIDLieFor9on12
+extern "C" void __stdcall HookDirect3D9SetVendorIDLieFor9on12(_In_ BOOL VendorIDLie)
+{
+	(*Real_Direct3D9SetVendorIDLieFor9on12)(VendorIDLie);
+}

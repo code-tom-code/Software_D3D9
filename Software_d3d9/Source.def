@@ -1,18 +1,47 @@
 LIBRARY d3d9
 EXPORTS
-D3DPERF_BeginEvent=__E__0__ @20
-D3DPERF_EndEvent=__E__1__ @21
-D3DPERF_GetStatus=__E__2__ @22
-D3DPERF_QueryRepeatFrame=__E__3__ @23
-D3DPERF_SetMarker=__E__4__ @24
-D3DPERF_SetOptions=__E__5__ @25
-D3DPERF_SetRegion=__E__6__ @26
-DebugSetLevel=__E__7__ @27
-DebugSetMute=__E__8__ @28
-Direct3D9EnableMaximizedWindowedModeShim=__E__9__ @29
-Direct3DCreate9=__E__10__ @30
-Direct3DCreate9Ex=__E__11__ @31
-Direct3DShaderValidatorCreate9=__E__12__ @17
-PSGPError=__E__13__ @18
-PSGPSampleTexture=__E__14__ @19
-___XXX___16=__E__15__ @16 NONAME
+
+; Export ordinal numbers taken from the Windows 10 1809 version of d3d9.dll
+
+; Functions exported by name go here:
+D3DPERF_BeginEvent=HookD3DPERF_BeginEvent @27
+D3DPERF_EndEvent=HookD3DPERF_EndEvent @28
+D3DPERF_GetStatus=HookD3DPERF_GetStatus @29
+D3DPERF_QueryRepeatFrame=HookD3DPERF_QueryRepeatFrame @30
+D3DPERF_SetMarker=HookD3DPERF_SetMarker @31
+D3DPERF_SetOptions=HookD3DPERF_SetOptions @32
+D3DPERF_SetRegion=HookD3DPERF_SetRegion @33
+DebugSetLevel=HookDebugSetLevel @34
+DebugSetMute=HookDebugSetMute @35
+Direct3D9EnableMaximizedWindowedModeShim=HookDirect3D9EnableMaximizedWindowedModeShim @36
+Direct3DCreate9=HookDirect3DCreate9 @37
+Direct3DCreate9Ex=HookDirect3DCreate9Ex @38
+Direct3DShaderValidatorCreate9=HookDirect3DShaderValidatorCreate9 @24
+PSGPError=HookPSGPError @25
+PSGPSampleTexture=HookPSGPSampleTexture @26
+
+; Functions exported only by ordinal (hence the NONAME specifier) go here:
+
+; Ordinal 16 = Direct3D9ForceHybridEnumeration
+Direct3D9ForceHybridEnumeration=HookDirect3D9ForceHybridEnumeration @16 NONAME
+
+; Ordinal 17 = Direct3D9SetMaximizedWindowedModeShim
+Direct3D9SetMaximizedWindowedModeShim=HookDirect3D9SetMaximizedWindowedModeShim @17 NONAME
+
+; Ordinal 18 = Direct3D9SetSwapEffectUpgradeShim
+Direct3D9SetSwapEffectUpgradeShim=HookDirect3D9SetSwapEffectUpgradeShim @18 NONAME
+
+; Ordinal 19 = Direct3D9Force9on12
+Direct3D9Force9on12=HookDirect3D9Force9on12 @19 NONAME
+
+; Ordinal 20 = Direct3DCreate9on12
+Direct3DCreate9on12=HookDirect3DCreate9on12 @20 NONAME
+
+; Ordinal 21 = Direct3DCreate9on12Ex
+Direct3DCreate9on12Ex=HookDirect3DCreate9on12Ex @21 NONAME
+
+; Ordinal 22 = Direct3D9SetMaximizedWindowHwndOverride
+Direct3D9SetMaximizedWindowHwndOverride=HookDirect3D9SetMaximizedWindowHwndOverride @22 NONAME
+
+; Ordinal 23 = Direct3D9SetVendorIDLieFor9on12
+Direct3D9SetVendorIDLieFor9on12=HookDirect3D9SetVendorIDLieFor9on12 @23 NONAME
