@@ -2037,6 +2037,7 @@ void outputRegisterWriteTracker::SetAddOrSkip(const D3DSHADER_PARAM_REGISTER_TYP
 	newWriteOperation.writeInstruction = _writeInstruction;
 	newWriteOperation.registerParameterToken = &dstParameter;
 	newWriteOperation.optionalRelativeAddressingDestParameterToken = optionalRelativeRegister;
+	newWriteOperation.instructionSourceParameterTokens = (const srcParameterToken* const)(&dstParameter + 1);
 	newWriteOperation.operationWriteMask = writeMask;
 	thisRegWriteState.writeOperations.push_back(newWriteOperation);
 

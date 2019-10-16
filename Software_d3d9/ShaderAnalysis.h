@@ -89,13 +89,14 @@ struct outputRegisterWriteTracker
 
 	struct outputRegisterWriteOperation
 	{
-		outputRegisterWriteOperation() : writeInstruction(NULL), registerParameterToken(NULL), optionalRelativeAddressingDestParameterToken(NULL), operationWriteMask(0xF)
+		outputRegisterWriteOperation() : writeInstruction(NULL), registerParameterToken(NULL), optionalRelativeAddressingDestParameterToken(NULL), instructionSourceParameterTokens(NULL), operationWriteMask(0xF)
 		{
 		}
 
 		const instructionToken* writeInstruction;
 		const dstParameterToken* registerParameterToken;
 		const dstParameterToken* optionalRelativeAddressingDestParameterToken;
+		const srcParameterToken* instructionSourceParameterTokens;
 		BYTE operationWriteMask;
 	};
 
