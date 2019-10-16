@@ -197,6 +197,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSurface9Hook::GetContain
 #ifdef _DEBUG
 void IDirect3DSurface9Hook::ValidateRealObjectDesc() const
 {
+	if (!realObject)
+		return;
+
 	D3DSURFACE_DESC desc = {};
 	HRESULT ret = realObject->GetDesc(&desc);
 	if (FAILED(ret) )
