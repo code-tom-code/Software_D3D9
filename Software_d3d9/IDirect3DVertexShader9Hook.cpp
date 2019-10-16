@@ -26,17 +26,13 @@ void IDirect3DVertexShader9Hook::CreateVertexShader(const DWORD* const pFunction
 
 	switch (tempVertexShaderInfo.shaderMajorVersion)
 	{
+	case 1:
 	case 2:
 	case 3:
 		// We're good!
 		break;
 	default:
-		// This is not a VS_2_0 or VS_3_0 shader!
-		if (tempVertexShaderInfo.shaderMinorVersion == 1 && tempVertexShaderInfo.shaderMajorVersion == 1)
-		{
-			// Temporarily allow VS_1_1 shaders just to see if they work
-		}
-		else
+		// This is not a valid D3D9 shader!
 		{
 			__debugbreak();
 		}

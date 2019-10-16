@@ -26,17 +26,13 @@ void IDirect3DPixelShader9Hook::CreatePixelShader(const DWORD* const pFunction)
 
 	switch (tempPixelShaderInfo.shaderMajorVersion)
 	{
+	case 1:
 	case 2:
 	case 3:
 		// We're good!
 		break;
 	default:
-		// This is not a PS_2_0 or PS_3_0 shader!
-		if (tempPixelShaderInfo.shaderMinorVersion == 3 && tempPixelShaderInfo.shaderMajorVersion == 1)
-		{
-			// Temporarily test PS_1_3 shaders just to see if they'll work
-		}
-		else
+		// This is not a valid D3D9 shader!
 		{
 			__debugbreak();
 		}
