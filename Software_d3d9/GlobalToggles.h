@@ -28,6 +28,17 @@
 // #define DEBUG_VERTEX_OUT_POSITIONS 1
 #endif
 
+// Uncomment to enable showing the shader compilation window when compiling (does not play nicely with fullscreen windows)
+// #define DEBUG_SHOW_SHADERCOMPILE_WINDOW 1
+
+// These are useful for debugging: Forcing windowed mode, and forcing no VSync
+#ifdef _DEBUG
+	#define OVERRIDE_FORCE_WINDOWED_MODE 1
+#endif
+#ifdef _DEBUG
+	#define OVERRIDE_FORCE_NO_VSYNC 1
+#endif
+
 // If this is not defined, all shaders will run in solo threads rather than warps (usually of at least 2x2 pixels or vertices)
 #define RUN_SHADERS_IN_WARPS 1
 
