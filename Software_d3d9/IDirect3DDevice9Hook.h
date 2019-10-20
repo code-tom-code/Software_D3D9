@@ -1377,6 +1377,9 @@ protected:
 	// For debug-printing efficiently
 	HANDLE hConsoleHandle;
 
+	std::vector<unsigned>* alreadyShadedVerts32;
+	std::vector<unsigned short>* alreadyShadedVerts16;
+
 	// This is the data that gets directly consumed by occlusion queries (D3DQUERYTYPE_OCCLUSION).
 	// Aligned and volatile here because this variable is accessed by multiple threads using Interlocked operations
 	volatile __declspec(align(16) ) DWORD numPixelsPassedZTest;

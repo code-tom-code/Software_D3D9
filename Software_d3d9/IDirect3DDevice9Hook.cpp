@@ -3277,9 +3277,6 @@ const primitivePixelJobData* const IDirect3DDevice9Hook::GetNewPrimitiveJobData(
 	return &newPrimitiveData;
 }
 
-static std::vector<unsigned> alreadyShadedVerts32;
-static std::vector<unsigned short> alreadyShadedVerts16;
-
 struct vertJobCollector
 {
 	VS_2_0_OutputRegisters* outputRegs;
@@ -3371,7 +3368,7 @@ void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDec
 		{
 		case D3DFMT_INDEX16:
 		{
-			alreadyShadedVerts16.clear();
+			alreadyShadedVerts16->clear();
 
 			const unsigned short* const bufferShorts = (const unsigned short* const)indexBuffer;
 			for (unsigned x = 0; x < numOutputVerts; ++x)
@@ -3379,27 +3376,29 @@ void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDec
 				// Uhhhh, this isn't correct except for point-lists, line-lists, and triangle-lists:
 				const unsigned short index = bufferShorts[x + startIndex] + BaseVertexIndex;
 
-				if (index >= alreadyShadedVerts16.size() )
+				if (index >= alreadyShadedVerts16->size() )
 				{
-					alreadyShadedVerts16.resize(index + 1, 0xFFFF);
-					alreadyShadedVerts16Ptr = &alreadyShadedVerts16.front();
+					alreadyShadedVerts16->resize(index + 1, 0xFFFF);
+					alreadyShadedVerts16Ptr = &alreadyShadedVerts16->front();
 				}
 
 				if (alreadyShadedVerts16Ptr[index] != 0xFFFF)
 				{
 					// Do fix-ups after the loop, but only shade vertices once
-					outputBufferPtr++;
 					++frameStats.numVertsReused;
 				}
 				else
 				{
 					vertJobCollector newJob;
-					newJob.outputRegs = outputBufferPtr++;
+					newJob.outputRegs = outputBufferPtr;
 					newJob.vertexIndex = index;
 					vertJobsToShade.push_back(newJob);
 
 					alreadyShadedVerts16Ptr[index] = x;
 				}
+
+				// Increment the registers pointer
+				++outputBufferPtr;
 			}
 		}
 			break;
@@ -3411,7 +3410,7 @@ void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDec
 #endif
 		case D3DFMT_INDEX32:
 		{
-			alreadyShadedVerts32.clear();
+			alreadyShadedVerts32->clear();
 
 			const unsigned* const bufferLongs = (const unsigned* const)indexBuffer;
 			for (unsigned x = 0; x < numOutputVerts; ++x)
@@ -3419,28 +3418,29 @@ void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDec
 				// Uhhhh, this isn't correct except for point-lists, line-lists, and triangle-lists:
 				const unsigned index = bufferLongs[x + startIndex] + BaseVertexIndex;
 
-				if (index >= alreadyShadedVerts32.size() )
+				if (index >= alreadyShadedVerts32->size() )
 				{
-					alreadyShadedVerts32.resize(index + 1, 0xFFFFFFFF);
-					alreadyShadedVerts32Ptr = &alreadyShadedVerts32.front();
+					alreadyShadedVerts32->resize(index + 1, 0xFFFFFFFF);
+					alreadyShadedVerts32Ptr = &alreadyShadedVerts32->front();
 				}
 
 				if (alreadyShadedVerts32Ptr[index] != 0xFFFFFFFF)
 				{
 					// Do fix-ups after the loop, but only shade vertices once
-					outputBufferPtr++;
-
 					++frameStats.numVertsReused;
 				}
 				else
 				{
 					vertJobCollector newJob;
-					newJob.outputRegs = outputBufferPtr++;
+					newJob.outputRegs = outputBufferPtr;
 					newJob.vertexIndex = index;
 					vertJobsToShade.push_back(newJob);
 
 					alreadyShadedVerts32Ptr[index] = x;
 				}
+
+				// Increment the registers pointer
+				++outputBufferPtr;
 			}
 		}
 			break;
@@ -3452,9 +3452,12 @@ void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDec
 		{
 			// Uhhhh, this isn't correct except for point-lists, line-lists, and triangle-lists:
 			vertJobCollector newJob;
-			newJob.outputRegs = outputBufferPtr++;
+			newJob.outputRegs = outputBufferPtr;
 			newJob.vertexIndex = x + BaseVertexIndex;
 			vertJobsToShade.push_back(newJob);
+
+			// Increment the registers pointer
+			++outputBufferPtr;
 		}
 	}
 
@@ -9353,6 +9356,9 @@ IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D
 	FVFToVertDeclCache = new std::map<DWORD, IDirect3DVertexDeclaration9Hook*>;
 #endif
 
+	alreadyShadedVerts32 = new std::vector<unsigned>();
+	alreadyShadedVerts16 = new std::vector<unsigned short>();
+
 	currentState.currentSoftUPStream.vertexBuffer = new IDirect3DVertexBuffer9Hook(NULL, this);
 	currentState.currentSoftUPStream.vertexBuffer->MarkSoftBufferUP(true);
 
@@ -9379,6 +9385,12 @@ IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D
 	delete FVFToVertDeclCache;
 	FVFToVertDeclCache = NULL;
 #endif
+
+	delete alreadyShadedVerts32;
+	alreadyShadedVerts32 = NULL;
+
+	delete alreadyShadedVerts16;
+	alreadyShadedVerts16 = NULL;
 
 	if (processedVertexBuffer)
 	{
