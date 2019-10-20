@@ -8200,6 +8200,208 @@ void IDirect3DDevice9Hook::RasterizePointFromShader(const VStoPSMapping& vs_psMa
 	// Do nothing, point rasterization is not yet implemented
 }
 
+template <const unsigned char integerBits, const unsigned char fractionBits, typename baseType = unsigned>
+union TFixed
+{
+	struct _splitFormat
+	{
+		baseType fracPart : fractionBits;
+		baseType intPart : integerBits;
+	} splitFormat;
+
+	baseType whole;
+
+	TFixed<integerBits, fractionBits, baseType> operator+(const TFixed<integerBits, fractionBits, baseType>& other) const
+	{
+		TFixed<integerBits, fractionBits, baseType> ret;
+		ret.whole = whole + other.whole;
+		return ret;
+	}
+
+	TFixed<integerBits, fractionBits, baseType> operator-(const TFixed<integerBits, fractionBits, baseType>& other) const
+	{
+		TFixed<integerBits, fractionBits, baseType> ret;
+		ret.whole = whole - other.whole;
+		return ret;
+	}
+
+	TFixed<integerBits, fractionBits, baseType> operator*(const TFixed<integerBits, fractionBits, baseType>& other) const
+	{
+		TFixed<integerBits, fractionBits, baseType> ret;
+		unsigned __int64 longWhole = whole;
+		unsigned __int64 longOtherWhole = other.whole;
+		unsigned __int64 longProduct = longWhole * longOtherWhole;
+		unsigned __int64 deshiftedProduct = longProduct >> fractionBits;
+		ret.whole = (const baseType)deshiftedProduct;
+		return ret;
+	}
+
+	const bool operator==(const TFixed<integerBits, fractionBits, baseType>& other) const
+	{
+		return other.whole == whole;
+	}
+};
+
+template <const unsigned char integerBits, const unsigned char fractionBits, typename baseType>
+static const float ConvertFixedToFloat(TFixed<integerBits, fractionBits, baseType> fixed)
+{
+	float conv = 0.0f;
+
+	baseType fracStorage = fixed.splitFormat.fracPart;
+	for (unsigned x = 1; x < fractionBits; ++x)
+	{
+		if (fracStorage & (1 << (fractionBits - x) ) )
+		{
+			conv += (1.0f / (1 << x) );
+		}
+	}
+
+	float intConv = (const float)(fixed.splitFormat.intPart);
+
+	if (fixed.splitFormat.intPart & (1 << (integerBits - 1) ) )
+	{
+		// Negative number
+		return ( (signed short)(fixed.splitFormat.intPart) + conv);
+	}
+	else
+	{
+		// Positive number
+		return (fixed.splitFormat.intPart) + conv;
+	}
+}
+
+template <const unsigned char integerBits, const unsigned char fractionBits, typename baseType>
+static TFixed<integerBits, fractionBits, baseType> ConvertFloatToFixed(const float inFloat)
+{
+	const unsigned intPart = (const unsigned)inFloat;
+	float fracPart = inFloat - intPart;
+
+	TFixed<integerBits, fractionBits, baseType> ret;
+	ret.whole = 0;
+
+	ret.splitFormat.intPart = intPart;
+	for (unsigned x = 0; x < fractionBits; ++x)
+	{
+		const float thisTestBit = 1.0f / (1 << (x + 1) );
+		if (fracPart > thisTestBit)
+		{
+			ret.splitFormat.fracPart |= (1 << (fractionBits - (x + 1) ) );
+			fracPart -= thisTestBit;
+		}
+	}
+
+	return ret;
+}
+
+void NormalizeToRecipRange(const TFixed<16, 16> input, TFixed<16, 16>& outNormalizedFixed, int& normalizeFactor)
+{
+	if (input.splitFormat.intPart != 0)
+	{
+		unsigned long firstBitIndex = 0; // Starts at the LSB.
+		_BitScanReverse(&firstBitIndex, input.splitFormat.intPart);
+		normalizeFactor = firstBitIndex + 1;
+		outNormalizedFixed.whole = input.whole >> normalizeFactor;
+	}
+	else if (input.whole == 0)
+	{
+		outNormalizedFixed.whole = -1;
+		normalizeFactor = 0;
+	}
+	else
+	{
+		unsigned long firstBitIndex = 0; // Starts at the LSB, even though it scans backwards.
+		_BitScanReverse(&firstBitIndex, input.splitFormat.fracPart);
+		normalizeFactor = -(int)(16 - firstBitIndex - 1);
+		outNormalizedFixed.whole = input.whole << -normalizeFactor;
+	}
+}
+
+void UnNormalizeToRecipRange(const TFixed<16, 16> normalizedInput, TFixed<16, 16>& outRenormalized, const int normalizeFactor)
+{
+	if (normalizeFactor > 0)
+	{
+		outRenormalized.whole = normalizedInput.whole >> normalizeFactor;
+	}
+	else if (normalizeFactor == 0)
+	{
+		outRenormalized = normalizedInput;
+	}
+	else
+	{
+		outRenormalized.whole = normalizedInput.whole << -normalizeFactor;
+	}
+}
+
+float FloatReciprocal(float input)
+{
+	const float approx0result = (48.0f / 17.0f) - (input * (32.0f / 17.0f) );
+	float lastIterResult = approx0result;
+	float currentIterResult;
+	for (unsigned iters = 0; iters < 2; ++iters)
+	{
+		currentIterResult = lastIterResult * (2.0f - input * lastIterResult);
+		lastIterResult = currentIterResult;
+	}
+	return currentIterResult;
+}
+
+static inline void TestSetMinMax(const TFixed<16, 16, unsigned>& inTestVal, signed short& minSet, signed short& maxSet)
+{
+	const signed short val = (signed short)(inTestVal.splitFormat.intPart);
+	if (val < minSet)
+		minSet = val;
+	if (val > maxSet)
+		maxSet = val;
+}
+
+// Newton-Raphson iteration using Q16.16 fixed-point numbers, with some help from this resource: http://www.cs.utsa.edu/~wagner/CS3343/newton/division.html
+TFixed<16, 16> FixedReciprocal(TFixed<16, 16> input) // +0.xxxxxxxxdec = +0.xxxxhex, Q0.16 unsigned. Value between (0.5, 1.0)
+{
+	// Initial approximation is 48/17 - 32/17 * input
+	TFixed<16, 16> approx0mul = ConvertFloatToFixed<16, 16, unsigned>(32.0f / 17.0f); // +1.8823529411764705882352941176471dec = +1.e1e1hex, Q1.16 unsigned
+
+	TFixed<16, 16> approx0add = ConvertFloatToFixed<16, 16, unsigned>(48.0f / 17.0f); // +2.8235294117647058823529411764706dec = +2.d2d2hex, Q2.16 unsigned
+
+	TFixed<16, 16> approx0mulresult = (input * approx0mul); // Q0.16 * Q1.16 = Q1.16 unsigned, value range between (0.941176 and 1.882353)
+
+	TFixed<16, 16> approx0result = approx0add - approx0mulresult; // Q2.16 - Q1.16 = Q1.16, value range between (0.941176 and 1.882353 again)
+
+	TFixed<16, 16> lastIterResult = approx0result;
+	TFixed<16, 16> currentIterResult;
+
+	// Each iteration computes: currentIterResult = lastIterResult * (2.0f - (input * lastIterResult) )
+	// 5 iterations here is experimentally derived as being the maximum number of iterations before the result stabilizes
+	for (unsigned iters = 0; iters < 5; ++iters)
+	{
+		TFixed<16, 16> intermedMul = input * lastIterResult; // Q0.16 * Q1.16 = Q1.16, value range for first iteration between (0.470588 and 1.882353)
+
+		TFixed<16, 16, unsigned> fixedTwo = ConvertFloatToFixed<16, 16, unsigned>(2.0f); // Q2.16 unsigned (technically could be 2.0)
+		TFixed<16, 16> intermedSubtract = fixedTwo - intermedMul; // Q2.16 - Q1.16 = Q1.16, value range for first iteration between (0.117647 and 1.529411)
+
+		currentIterResult = lastIterResult * intermedSubtract; // Q1.16 * Q1.16 = Q1.16, value range for first iteration between (0.110727 and 2.878891) (don't worry this never actually goes over 1.9 in practice so it'll fit into a Q1.16)
+
+		lastIterResult = currentIterResult;
+	}
+
+	return currentIterResult;
+}
+
+static inline const float BarycentricInverse(const int twiceTriangleArea)
+{
+	// Float version:
+	//return 1.0f / twiceTriangleArea;
+
+	// Fixed-point version:
+	TFixed<16, 16> input = ConvertFloatToFixed<16, 16, unsigned>( (const float)twiceTriangleArea);
+	TFixed<16, 16> normalizedInput;
+	int normalizeFactor = 0;
+	NormalizeToRecipRange(input, normalizedInput, normalizeFactor);
+	TFixed<16, 16> recip = FixedReciprocal(normalizedInput);
+	TFixed<16, 16, unsigned> output;
+	UnNormalizeToRecipRange(recip, output, normalizeFactor);
+	return ConvertFixedToFloat(output);
+}
+
 template <const bool rasterizerUsesEarlyZTest, const bool shadeFromShader>
 void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine, const void* const mappingData, const void* const v0, const void* const v1, const void* const v2,
 	const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const
