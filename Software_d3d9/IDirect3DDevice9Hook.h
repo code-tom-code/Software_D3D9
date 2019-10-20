@@ -510,6 +510,8 @@ __declspec(align(16) ) struct RenderStates
 		multiplicativeBlending, // D3DBLEND_DESTCOLOR, D3DBLEND_ZERO or D3DBLEND_ZERO, D3DBLEND_SRCCOLOR
 		otherAlphaBlending // Any other mode with alpha blending enabled (including separate alpha blend modes)
 	} simplifiedAlphaBlendMode;
+
+	bool alphaBlendNeedsDestRead;
 };
 
 __declspec(align(16) ) struct Transforms
@@ -1261,7 +1263,9 @@ public:
 #endif // #ifdef MULTITHREAD_SHADING
 
 	void CreateNewPixelShadeJob(const unsigned x, const unsigned y, const __m128i barycentricAdjusted, const primitivePixelJobData* const primitiveData) const;
+#ifdef RUN_SHADERS_IN_WARPS
 	void CreateNewPixelShadeJob4(const __m128i x4, const __m128i y4, const __m128i (&barycentricsAdjusted4)[4], const primitivePixelJobData* const primitiveData) const;
+#endif
 
 	// TODO: Find another way to do this other than mutable
 	mutable __declspec(align(16) ) primitivePixelJobData allPrimitiveJobData[1024 * 1024];

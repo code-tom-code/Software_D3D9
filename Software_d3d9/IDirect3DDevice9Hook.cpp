@@ -970,6 +970,7 @@ RenderStates::RenderStates() : cachedAlphaRefFloat(0.0f)
 	depthBiasSplatted = _mm_set1_ps(0.0f);
 	alphaRefSplatted = _mm_set1_ps(0.0f);
 	simplifiedAlphaBlendMode = noAlphaBlending;
+	alphaBlendNeedsDestRead = true;
 }
 
 /*** IUnknown methods ***/
@@ -1535,6 +1536,12 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Clear(THIS_
 			// TODO: Stencil buffer clear value range validation (should only allow between 0 and 2^n)
 		}
 	}
+
+	// TODO: If Scissor Test is enabled (D3DRS_SCISSORTEST), then clip input rects against scissor rect. Why?
+	// Because in D3D9 (but not 10 and up), the Clear() call *is* affected by scissor testing.
+	// Source: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/scissor-test
+
+	// TODO: Clip the clear rect against the viewport rect (in the case that the viewport rect is smaller than the render target)
 
 	if (Count > 0)
 	{
@@ -3164,6 +3171,7 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 #endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 }
 
+#ifdef RUN_SHADERS_IN_WARPS
 void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m128i y4, const __m128i (&barycentricsAdjusted4)[4], const primitivePixelJobData* const primitiveData) const
 {
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
@@ -3219,6 +3227,7 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m12
 			currentDrawCallData.pixelData.offsetIntoVertexForOPosition_Bytes, verts.v0, verts.v1, verts.v2, invZ);
 #endif // #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
 }
+#endif // RUN_SHADERS_IN_WARPS
 
 template <const bool shadeFromShader>
 const primitivePixelJobData* const IDirect3DDevice9Hook::GetNewPrimitiveJobData(const void* const v0, const void* const v1, const void* const v2, const float barycentricNormalizeFactor, const UINT primitiveID, const bool VFace,
@@ -3309,7 +3318,9 @@ template <const bool useVertexBuffer, const D3DFORMAT indexFormat>
 void IDirect3DDevice9Hook::ProcessVerticesToBufferInner(const IDirect3DVertexDeclaration9Hook* const decl, const DeclarationSemanticMapping& mapping, const BYTE* const indexBuffer,
 	const D3DPRIMITIVETYPE PrimitiveType, const INT BaseVertexIndex, const UINT MinVertexIndex, const UINT startIndex, const UINT primCount, const void* const vertStreamBytes, const unsigned short vertStreamStride) const
 {
+	// How many processed verts does this draw call output?
 	const unsigned numOutputVerts = GetNumVertsUsed(PrimitiveType, primCount);
+
 #ifdef _DEBUG
 	if (numOutputVerts < 3)
 	{
@@ -5556,8 +5567,10 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask_AlphaBlend(IDirect3DSurface9Hook* c
 {
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable) // Have to run alpha blending twice for separate alpha
 	{
+		// Read the dest color in from the rendertarget (read can be skipped if our alpha-blending mode is set up such that we know we'll never use the read data)
 		D3DXVECTOR4 dstColor, finalColor;
-		outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
+		if (currentState.currentRenderStates.alphaBlendNeedsDestRead)
+			outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
 
 		D3DXVECTOR4 srcBlendColor, dstBlendColor;
 		LoadBlend<channelWriteMask & 0x7>(srcBlendColor, currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend, value, dstColor);
@@ -5580,8 +5593,10 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask_AlphaBlend(IDirect3DSurface9Hook* c
 	}
 	else // Simple alpha blending without separate alpha
 	{
+		// Read the dest color in from the rendertarget (read can be skipped if our alpha-blending mode is set up such that we know we'll never use the read data)
 		__declspec(align(16) ) D3DXVECTOR4 dstColor;
-		outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
+		if (currentState.currentRenderStates.alphaBlendNeedsDestRead)
+			outSurface->GetPixelVec<channelWriteMask, false>(x, y, dstColor);
 
 		__declspec(align(16) ) D3DXVECTOR4 srcBlend;
 		__declspec(align(16) ) D3DXVECTOR4 dstBlend;
@@ -5758,7 +5773,9 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask4_AlphaBlend(IDirect3DSurface9Hook* 
 		__declspec(align(16) ) D3DXVECTOR4 dstColor[4];
 		__declspec(align(16) ) D3DXVECTOR4 finalColor[4];
 
-		outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
+		// Read the dest color in from the rendertarget (read can be skipped if our alpha-blending mode is set up such that we know we'll never use the read data)
+		if (currentState.currentRenderStates.alphaBlendNeedsDestRead)
+			outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
 
 		__declspec(align(16) ) D3DXVECTOR4 srcBlendColor[4];
 		__declspec(align(16) ) D3DXVECTOR4 dstBlendColor[4];
@@ -5787,8 +5804,10 @@ void IDirect3DDevice9Hook::ROPBlendWriteMask4_AlphaBlend(IDirect3DSurface9Hook* 
 	}
 	else // Simple alpha blending without separate alpha
 	{
+		// Read the dest color in from the rendertarget (read can be skipped if our alpha-blending mode is set up such that we know we'll never use the read data)
 		__declspec(align(16) ) D3DXVECTOR4 dstColor[4];
-		outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
+		if (currentState.currentRenderStates.alphaBlendNeedsDestRead)
+			outSurface->GetPixelVec4<channelWriteMask, false, pixelWriteMask>(x4, y4, dstColor);
 
 		__declspec(align(16) ) D3DXVECTOR4 srcBlend[4];
 		__declspec(align(16) ) D3DXVECTOR4 dstBlend[4];
@@ -8231,18 +8250,8 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	}
 
 	bounds = _mm_shuffle_ps(topleft, botright, _MM_SHUFFLE(1, 0, 1, 0) );
-	bounds = _mm_mul_ps(bounds, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF);
-
-	const __m128i i0vec = _mm_cvtps_epi32(_mm_mul_ps(pos0vec, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF) );
-	const __m128i i1vec = _mm_cvtps_epi32(_mm_mul_ps(pos1vec, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF) );
-	const __m128i i2vec = _mm_cvtps_epi32(_mm_mul_ps(pos2vec, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF) );
-	int2 i0, i1, i2;
-	i0.x = i0vec.m128i_i32[0];
-	i0.y = i0vec.m128i_i32[1];
-	i1.x = i1vec.m128i_i32[0];
-	i1.y = i1vec.m128i_i32[1];
-	i2.x = i2vec.m128i_i32[0];
-	i2.y = i2vec.m128i_i32[1];
+	if (SUBPIXEL_ACCURACY_BIASMULT != 1)
+		bounds = _mm_mul_ps(bounds, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF);
 
 	const __m128i intBounds = _mm_cvtps_epi32(bounds);
 
@@ -8262,8 +8271,24 @@ void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine,
 	if (maxNumPixels < 1)
 		return;
 
+	const __m128i i0vec = (SUBPIXEL_ACCURACY_BIASMULT != 1) ? _mm_cvtps_epi32(_mm_mul_ps(pos0vec, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF) ) : _mm_cvtps_epi32(pos0vec);
+	const __m128i i1vec = (SUBPIXEL_ACCURACY_BIASMULT != 1) ? _mm_cvtps_epi32(_mm_mul_ps(pos1vec, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF) ) : _mm_cvtps_epi32(pos1vec);
+	const __m128i i2vec = (SUBPIXEL_ACCURACY_BIASMULT != 1) ? _mm_cvtps_epi32(_mm_mul_ps(pos2vec, SUBPIXEL_ACCURACY_BIASMULT_SPLATTEDF) ) : _mm_cvtps_epi32(pos2vec);
+	int2 i0, i1, i2;
+	i0.x = i0vec.m128i_i32[0];
+	i0.y = i0vec.m128i_i32[1];
+	i1.x = i1vec.m128i_i32[0];
+	i1.y = i1vec.m128i_i32[1];
+	i2.x = i2vec.m128i_i32[0];
+	i2.y = i2vec.m128i_i32[1];
+
+	// Cull backfacing triangles!
 	const int twiceTriangleArea = computeEdgeSidedness(i0.x, i0.y, i1.x, i1.y, i2.x, i2.y);
-	const float barycentricNormalizeFactor = 1.0f / twiceTriangleArea;
+	if (twiceTriangleArea <= 0)
+		return;
+
+	const float barycentricNormalizeFactor = 1.0f / twiceTriangleArea; // BarycentricInverse(twiceTriangleArea);
+	//printf("TwiceArea: %i; Real: %f; Fixed: %f\n", twiceTriangleArea, 1.0f / twiceTriangleArea, barycentricNormalizeFactor);
 
 	const __m128i y0011 = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(i0vec), _mm_castsi128_ps(i1vec), _MM_SHUFFLE(1, 1, 1, 1) ) ); // Shuffles to be: i0.y, i0.y, i1.y, i1.y
 	const __m128i y012 = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(y0011), _mm_castsi128_ps(i2vec), _MM_SHUFFLE(0, 1, 2, 0) ) ); // Shuffles to be: i0.y, i1.y, i2.y, i2.x
@@ -9411,11 +9436,19 @@ const bool DeviceState::CurrentStateHasInputVertexColor1(void) const
 
 void IDirect3DDevice9Hook::ModifyPresentParameters(D3DPRESENT_PARAMETERS& modifiedParams)
 {
+#ifdef OVERRIDE_FORCE_WINDOWED_MODE
 	modifiedParams.Windowed = TRUE; // Force Windowed mode
 	modifiedParams.FullScreen_RefreshRateInHz = 0;
 	//modifiedParams.BackBufferFormat = D3DFMT_UNKNOWN;
+#endif // #ifdef OVERRIDE_FORCE_WINDOWED_MODE
+
+#ifdef OVERRIDE_FORCE_NO_VSYNC
 	modifiedParams.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE; // For performance, you're gonna want this enabled
+#endif // #ifdef OVERRIDE_FORCE_NO_VSYNC
+
 //#ifdef _DEBUG
+
+	// We don't yet support multisampling
 	modifiedParams.MultiSampleType = D3DMULTISAMPLE_NONE;
 	modifiedParams.MultiSampleQuality = 0;
 	modifiedParams.Flags &= (~D3DPRESENTFLAG_DEVICECLIP); // Remove the DEVICECLIP flag so that there aren't weird artifacts when rendering into a window that spans multiple monitors

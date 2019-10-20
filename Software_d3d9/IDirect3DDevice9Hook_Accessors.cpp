@@ -1007,6 +1007,20 @@ static inline const bool IsRenderStateValidForD3D9(const D3DRENDERSTATETYPE Stat
 }
 #endif // #ifdef _DEBUG
 
+static inline const bool DoesSrcBlendRequireDestData(const D3DBLEND srcBlend)
+{
+	switch (srcBlend)
+	{
+	default:
+		return false;
+	case D3DBLEND_DESTALPHA:
+	case D3DBLEND_INVDESTALPHA:
+	case D3DBLEND_DESTCOLOR:
+	case D3DBLEND_INVDESTCOLOR:
+		return true;
+	}
+}
+
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetRenderState(THIS_ D3DRENDERSTATETYPE State, DWORD Value)
 {
 	HRESULT ret = d3d9dev->SetRenderState(State, Value);
@@ -1054,6 +1068,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetRenderSt
 			if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable)
 			{
 				currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::otherAlphaBlending;
+				currentState.currentRenderStates.alphaBlendNeedsDestRead = true; // TODO: Figure this out for reals rather than defaulting to this conservative "true" value
 			}
 			// Unified alpha blending
 			else
@@ -1080,10 +1095,14 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetRenderSt
 					currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::otherAlphaBlending;
 				}
 			}
+
+			currentState.currentRenderStates.alphaBlendNeedsDestRead = (currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend > D3DBLEND_ZERO)
+				|| DoesSrcBlendRequireDestData(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend);
 		}
 		else
 		{
 			currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::noAlphaBlending;
+			currentState.currentRenderStates.alphaBlendNeedsDestRead = false;
 		}
 		break;
 	}
@@ -1581,13 +1600,16 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexDe
 	const IDirect3DVertexDeclaration9Hook* const oldVertDecl = currentState.currentVertexDecl;
 	if (oldVertDecl != hook)
 	{
-		// Set dirty flags on stream-ends for used streams for this decl:
-		const std::vector<DebuggableD3DVERTEXELEMENT9>& elements = hook->GetElementsInternal();
-		const unsigned numElements = elements.size() - 1; // Minus one here because we want to ignore the D3DDECL_END element
-		for (unsigned x = 0; x < numElements; ++x)
+		// Set dirty flags on stream-ends for used streams for this new decl:
+		if (hook != NULL)
 		{
-			const DebuggableD3DVERTEXELEMENT9& thisElement = elements[x];
-			currentState.currentStreamEnds[thisElement.Stream].SetDirty();
+			const std::vector<DebuggableD3DVERTEXELEMENT9>& elements = hook->GetElementsInternal();
+			const unsigned numElements = elements.size() - 1; // Minus one here because we want to ignore the D3DDECL_END element
+			for (unsigned x = 0; x < numElements; ++x)
+			{
+				const DebuggableD3DVERTEXELEMENT9& thisElement = elements[x];
+				currentState.currentStreamEnds[thisElement.Stream].SetDirty();
+			}
 		}
 	}
 
@@ -1732,9 +1754,12 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetVertexSh
 	{
 		DbgBreakPrint("Error: Internal vertex shader doesn't match vertex shader (one is non-NULL and the other is NULL)");
 	}
-	if (realShader != currentState.currentVertexShader->GetUnderlyingVertexShader() )
+	if (realShader != NULL)
 	{
-		DbgBreakPrint("Error: Internal vertex shader doesn't match vertex shader");
+		if (realShader != currentState.currentVertexShader->GetUnderlyingVertexShader() )
+		{
+			DbgBreakPrint("Error: Internal vertex shader doesn't match vertex shader");
+		}
 	}
 #endif
 
@@ -2131,9 +2156,12 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetPixelSha
 	{
 		DbgBreakPrint("Error: Internal pixel shader doesn't match pixel shader (one is non-NULL and the other is NULL)");
 	}
-	if (realShader != currentState.currentPixelShader->GetUnderlyingPixelShader() )
+	if (realShader != NULL)
 	{
-		DbgBreakPrint("Error: Internal pixel shader doesn't match pixel shader");
+		if (realShader != currentState.currentPixelShader->GetUnderlyingPixelShader() )
+		{
+			DbgBreakPrint("Error: Internal pixel shader doesn't match pixel shader");
+		}
 	}
 #endif
 
@@ -2351,6 +2379,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetRenderTa
 		// In the case of a successful render-target set, the viewport is automatically resized to the
 		// size of the largest set render-target:
 		AutoResizeViewport();
+
+		// TODO: Reset the scissor rect as well
+		// "IDirect3DDevice9::SetRenderTarget resets the scissor rectangle to the full render target, analogous to the viewport reset."
+		// Source: https://docs.microsoft.com/en-us/windows/desktop/direct3d9/scissor-test
 	}
 
 	return ret;
