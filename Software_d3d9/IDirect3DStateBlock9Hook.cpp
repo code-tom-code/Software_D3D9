@@ -63,12 +63,28 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DStateBlock9Hook::GetDevi
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DStateBlock9Hook::Capture(THIS)
 {
+#ifdef _DEBUG
+	char buffer[256];
+#pragma warning(push)
+#pragma warning(disable:4996)
+	sprintf(buffer, "IDirect3DStateBlock9::Capture()\n");
+#pragma warning(pop)
+	OutputDebugStringA(buffer);
+#endif
 	HRESULT ret = realObject->Capture();
 	return ret;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DStateBlock9Hook::Apply(THIS)
 {
+#ifdef _DEBUG
+	char buffer[256];
+#pragma warning(push)
+#pragma warning(disable:4996)
+	sprintf(buffer, "IDirect3DStateBlock9::Apply()\n");
+#pragma warning(pop)
+	OutputDebugStringA(buffer);
+#endif
 	HRESULT ret = realObject->Apply();
 	return ret;
 }

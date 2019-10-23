@@ -169,6 +169,15 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::CreateOffsc
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::CreateStateBlock(THIS_ D3DSTATEBLOCKTYPE Type, IDirect3DStateBlock9** ppSB)
 {
+#ifdef _DEBUG
+	char buffer[256];
+#pragma warning(push)
+#pragma warning(disable:4996)
+	sprintf(buffer, "CreateStateBlock(Type: %u)\n", Type);
+#pragma warning(pop)
+	OutputDebugStringA(buffer);
+#endif
+
 	LPDIRECT3DSTATEBLOCK9 realStateBlock = NULL;
 	HRESULT ret = d3d9dev->CreateStateBlock(Type, &realStateBlock);
 	if (FAILED(ret) )

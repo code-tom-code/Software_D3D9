@@ -167,6 +167,7 @@ static DWORD tlsIndex = TLS_OUT_OF_INDEXES;
 
 static inline void VertexShadeJob1(slist_item& job, _threadItem* const myPtr)
 {
+	SIMPLE_FUNC_SCOPE();
 	const IDirect3DDevice9Hook* const devHook = myPtr->devHook;
 	const drawCallVertexJobData& drawCallData = devHook->currentDrawCallData.vertexData;
 	if (drawCallData.userClipPlanesEnabled)
@@ -182,6 +183,7 @@ static inline void VertexShadeJob1(slist_item& job, _threadItem* const myPtr)
 #ifdef RUN_SHADERS_IN_WARPS
 static inline void VertexShadeJob4(slist_item& job, _threadItem* const myPtr)
 {
+	SIMPLE_FUNC_SCOPE();
 	const IDirect3DDevice9Hook* const devHook = myPtr->devHook;
 	const drawCallVertexJobData& drawCallData = devHook->currentDrawCallData.vertexData;
 	if (drawCallData.userClipPlanesEnabled)
@@ -1025,6 +1027,10 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::EvictManage
 
 COM_DECLSPEC_NOTHROW BOOL STDMETHODCALLTYPE IDirect3DDevice9Hook::ShowCursor(THIS_ BOOL bShow)
 {
+#ifdef OVERRIDE_HIDE_CURSOR
+	if (bShow == FALSE)
+		return TRUE;
+#endif
 	BOOL ret = d3d9dev->ShowCursor(bShow);
 	return ret;
 }
@@ -1053,6 +1059,10 @@ void IDirect3DDevice9Hook::PreReset(void)
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Reset(THIS_ D3DPRESENT_PARAMETERS* pPresentationParameters)
 {
+#ifdef _DEBUG
+	OutputDebugStringA("IDirect3DDevice9::Reset called!\n");
+#endif
+
 	D3DPRESENT_PARAMETERS modifiedParams = *pPresentationParameters;
 	ModifyPresentParameters(modifiedParams);
 

@@ -186,12 +186,17 @@ struct TextureStageState
 
 	inline void SetStageDefaults(void)
 	{
-		stageStateUnion.namedStates.colorOp = D3DTOP_DISABLE;
-		stageStateUnion.namedStates.colorArg1 = D3DCOLOR_ARGB(0, 0, 0, 0);
-		stageStateUnion.namedStates.colorArg2 = D3DCOLOR_ARGB(0, 0, 0, 0);
-		stageStateUnion.namedStates.alphaOp = D3DTOP_DISABLE;
-		stageStateUnion.namedStates.alphaArg1 = D3DCOLOR_ARGB(0, 0, 0, 0);
-		stageStateUnion.namedStates.alphaArg2 = D3DCOLOR_ARGB(0, 0, 0, 0);
+		// All of the invalid state indices have their values set to "0xBAADCAFE" in D3D9 under Windows 10
+		static const DWORD invalidTypeValue = 0xBAADCAFE;
+		for (unsigned x = 0; x < D3DTSS_CONSTANT + 1; ++x)
+			stageStateUnion.state[x] = invalidTypeValue;
+
+		stageStateUnion.namedStates.colorOp = D3DTOP_MODULATE;
+		stageStateUnion.namedStates.colorArg1 = D3DTOP_SELECTARG1;
+		stageStateUnion.namedStates.colorArg2 = D3DTOP_DISABLE;
+		stageStateUnion.namedStates.alphaOp = D3DTOP_SELECTARG1;
+		stageStateUnion.namedStates.alphaArg1 = D3DTOP_SELECTARG1;
+		stageStateUnion.namedStates.alphaArg2 = D3DTOP_DISABLE;
 		stageStateUnion.namedStates.bumpEnvMat00 = 0.0f;
 		stageStateUnion.namedStates.bumpEnvMat01 = 0.0f;
 		stageStateUnion.namedStates.bumpEnvMat10 = 0.0f;
@@ -200,16 +205,10 @@ struct TextureStageState
 		stageStateUnion.namedStates.bumpEnvLScale = 0.0f; // Shouldn't this default to 1.0f instead?
 		stageStateUnion.namedStates.bumpEnvLOffset = 0.0f;
 		stageStateUnion.namedStates.textureTransformFlags = D3DTTFF_DISABLE;
-		stageStateUnion.namedStates.colorArg0 = D3DCOLOR_ARGB(0, 0, 0, 0);
-		stageStateUnion.namedStates.alphaArg0 = D3DCOLOR_ARGB(0, 0, 0, 0);
-		stageStateUnion.namedStates.resultArg = D3DTA_CURRENT;
+		stageStateUnion.namedStates.colorArg0 = D3DTOP_DISABLE;
+		stageStateUnion.namedStates.alphaArg0 = D3DTOP_DISABLE;
+		stageStateUnion.namedStates.resultArg = D3DTOP_DISABLE;
 		stageStateUnion.namedStates.constant = D3DCOLOR_ARGB(0, 0, 0, 0);
-	}
-
-	inline void SetStage0Defaults(void)
-	{
-		stageStateUnion.namedStates.colorOp = D3DTOP_MODULATE;
-		stageStateUnion.namedStates.alphaOp = D3DTOP_SELECTARG1;
 	}
 
 	union _stageStateUnion
@@ -229,7 +228,7 @@ struct TextureStageState
 			float bumpEnvMat11; // 10
 			UINT texCoordIndex; // 11
 			DWORD emptyAddress; // 12 - Used to be "D3DTSS_ADDRESS" which was of type D3DTEXTUREADDRESS in D3D7. It was a combination of ADDRESSU and ADDRESSV before they were split out - see d3d7types.h
-			DWORD emptySamplerStates[8]; // 13 thru 21 (used to be where sampler state data was stored in D3D8 - see d3d8types.h)
+			DWORD emptySamplerStates[9]; // 13 thru 21 (used to be where sampler state data was stored in D3D8 - see d3d8types.h)
 			float bumpEnvLScale; // 22
 			float bumpEnvLOffset; // 23
 			D3DTEXTURETRANSFORMFLAGS textureTransformFlags; // 24
@@ -240,9 +239,9 @@ struct TextureStageState
 			DWORD emptyUnknown29[3]; // 29 thru 31 - Unknown what these used to be for
 			D3DCOLOR constant; // 32
 		} namedStates;
-		DWORD state[D3DTSS_CONSTANT];
+		DWORD state[D3DTSS_CONSTANT + 1];
 	} stageStateUnion;
-	static_assert(sizeof(_stageStateUnion) == sizeof(DWORD) * D3DTSS_CONSTANT, "Error: Unexpected union size!");
+	static_assert(sizeof(_stageStateUnion) == sizeof(DWORD) * (D3DTSS_CONSTANT + 1), "Error: Unexpected union size!");
 };
 
 struct TexturePaletteState
@@ -327,6 +326,47 @@ typedef enum _D3DTEXTUREBLEND
 
 // This is from d3dtypes.h
 typedef float D3DVALUE;
+
+union RGB565
+{
+	struct _bits565
+	{
+		unsigned short b : 5;
+		unsigned short g : 6;
+		unsigned short r : 5;
+	} bits565;
+
+	unsigned short word;
+};
+static_assert(sizeof(RGB565) == sizeof(unsigned short), "Error! Unexpected struct size!");
+
+union A4R4G4B4
+{
+	struct _bits4444
+	{
+		unsigned short b : 4;
+		unsigned short g : 4;
+		unsigned short r : 4;
+		unsigned short a : 4;
+	} bits4444;
+
+	unsigned short word;
+};
+static_assert(sizeof(A4R4G4B4) == sizeof(unsigned short), "Error! Unexpected struct size!");
+
+union X4R4G4B4
+{
+	struct _bits4440
+	{
+		unsigned short b : 4;
+		unsigned short g : 4;
+		unsigned short r : 4;
+		unsigned short x : 4;
+	} bits4440;
+
+	unsigned short word;
+};
+static_assert(sizeof(X4R4G4B4) == sizeof(unsigned short), "Error! Unexpected struct size!");
 
 // All of the render states available via SetRenderState() and GetRenderState()
 // Reference for the D3D9-supported ones: https://msdn.microsoft.com/en-us/library/windows/desktop/bb172599(v=vs.85).aspx
@@ -662,8 +702,6 @@ struct DeviceState
 		memset(&currentTextures, 0, sizeof(currentTextures) );
 		memset(&currentCubeTextures, 0, sizeof(currentTextures) );
 		memset(&currentVolumeTextures, 0, sizeof(currentTextures) );
-		currentStageStates[0].SetStage0Defaults();
-
 		memset(&currentMaterial, 0, sizeof(currentMaterial) );
 		memset(&enabledLightIndices, 0, sizeof(enabledLightIndices) );
 
@@ -1677,6 +1715,46 @@ inline void ColorDWORDToFloat4_4(const __m128i inColor4Vec, D3DXVECTOR4 (&outCol
 			outColor4[3].w = swizzledColorFloat4[3].m128_f32[3];
 		}
 	}
+}
+
+inline const D3DCOLOR Expand565To888(const RGB565 inColor)
+{
+	// TODO: Should alpha be 0.0f or 1.0f here?
+	return D3DCOLOR_ARGB(255, inColor.bits565.r << 3, inColor.bits565.g << 2, inColor.bits565.b << 3);
+}
+
+inline const D3DCOLOR Expand4444To8888(const A4R4G4B4 inColor)
+{
+	return D3DCOLOR_ARGB(inColor.bits4444.a << 4, inColor.bits4444.r << 4, 
+		inColor.bits4444.g << 4, inColor.bits4444.b << 4);
+}
+
+inline const D3DCOLOR Expand4440To8888(const X4R4G4B4 inColor)
+{
+	// TODO: Should alpha be 0.0f or 1.0f here?
+	return D3DCOLOR_ARGB(255, inColor.bits4440.r << 4, 
+		inColor.bits4440.g << 4, inColor.bits4440.b << 4);
+}
+
+template <const unsigned char writeMask = 0xF>
+inline void ColorA4R4G4B4ToFloat4(const A4R4G4B4 inColor, D3DXVECTOR4& outColor)
+{
+	const D3DCOLOR expandedColor8888 = Expand4444To8888(inColor);
+	ColorDWORDToFloat4(expandedColor8888, outColor);
+}
+
+template <const unsigned char writeMask = 0xF>
+inline void ColorX4R4G4B4ToFloat4(const X4R4G4B4 inColor, D3DXVECTOR4& outColor)
+{
+	const D3DCOLOR expandedColor8888 = Expand4440To8888(inColor);
+	ColorDWORDToFloat4(expandedColor8888, outColor);
+}
+
+template <const unsigned char writeMask = 0xF>
+inline void ColorRGB565ToFloat4(const RGB565 inColor, D3DXVECTOR4& outColor)
+{
+	const D3DCOLOR expandedColor888 = Expand565To888(inColor);
+	ColorDWORDToFloat4(expandedColor888, outColor);
 }
 
 template <const unsigned char writeMask = 0xF>

@@ -202,6 +202,9 @@ public:
 	void SetPixelVec4(const __m128i x4, const __m128i y4, const D3DXVECTOR4 (&color)[4]);
 
 	const D3DCOLOR GetPixel(const unsigned x, const unsigned y) const;
+	const A4R4G4B4 GetPixel4444(const unsigned x, const unsigned y) const;
+	const X4R4G4B4 GetPixel4440(const unsigned x, const unsigned y) const;
+	const RGB565 GetPixel565(const unsigned x, const unsigned y) const;
 
 	template <const unsigned char writeMask, const bool sRGBSurface>
 	void GetPixelVec(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;

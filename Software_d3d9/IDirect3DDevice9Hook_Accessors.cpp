@@ -1308,7 +1308,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetTextureS
 	if (Stage > MAX_NUM_TEXTURE_STAGE_STATES)
 		return D3DERR_INVALIDCALL;
 
-	if (!Type || Type > D3DTSS_CONSTANT)
+	if (Type < D3DTSS_COLOROP || Type > D3DTSS_CONSTANT)
 		return D3DERR_INVALIDCALL;
 	
 	if (pValue)
@@ -1329,7 +1329,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTextureS
 	if (Stage > MAX_NUM_TEXTURE_STAGE_STATES)
 		return D3DERR_INVALIDCALL;
 
-	if (!Type || Type > D3DTSS_CONSTANT)
+	if (Type < D3DTSS_COLOROP || Type > D3DTSS_CONSTANT)
 		return D3DERR_INVALIDCALL;
 
 	currentState.currentStageStates[Stage].stageStateUnion.state[Type] = Value;
@@ -1382,7 +1382,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetSamplerS
 	}
 
 	SamplerState& thisSampler = currentState.currentSamplerStates[Sampler];	
-	thisSampler.stateUnion.state[Type - 1] = Value;
+	thisSampler.stateUnion.state[Type] = Value;
 
 	if (Type == D3DSAMP_MAXMIPLEVEL)
 	{

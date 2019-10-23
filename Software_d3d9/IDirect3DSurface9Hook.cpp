@@ -2121,6 +2121,45 @@ const D3DCOLOR IDirect3DSurface9Hook::GetPixel(const unsigned x, const unsigned 
 #endif
 }
 
+const A4R4G4B4 IDirect3DSurface9Hook::GetPixel4444(const unsigned x, const unsigned y) const
+{
+#ifdef _DEBUG
+	if (InternalFormat != D3DFMT_A4R4G4B4)
+	{
+		__debugbreak();
+	}
+#endif
+
+	const A4R4G4B4* const pixels = (const A4R4G4B4* const)surfaceBytesRaw;
+	return pixels[y * InternalWidth + x];
+}
+
+const X4R4G4B4 IDirect3DSurface9Hook::GetPixel4440(const unsigned x, const unsigned y) const
+{
+#ifdef _DEBUG
+	if (InternalFormat != D3DFMT_X4R4G4B4)
+	{
+		__debugbreak();
+	}
+#endif
+
+	const X4R4G4B4* const pixels = (const X4R4G4B4* const)surfaceBytesRaw;
+	return pixels[y * InternalWidth + x];
+}
+
+const RGB565 IDirect3DSurface9Hook::GetPixel565(const unsigned x, const unsigned y) const
+{
+#ifdef _DEBUG
+	if (InternalFormat != D3DFMT_R5G6B5)
+	{
+		__debugbreak();
+	}
+#endif
+
+	const RGB565* const pixels = (const RGB565* const)surfaceBytesRaw;
+	return pixels[y * InternalWidth + x];
+}
+
 template void IDirect3DSurface9Hook::GetPixelVec<0, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 template void IDirect3DSurface9Hook::GetPixelVec<1, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
 template void IDirect3DSurface9Hook::GetPixelVec<2, false>(const unsigned x, const unsigned y, D3DXVECTOR4& outColor) const;
@@ -2325,6 +2364,30 @@ void IDirect3DSurface9Hook::GetPixelVec(const unsigned x, const unsigned y, D3DX
 	{
 		const D3DCOLOR ldrColor = GetPixel(x, y);
 		ColorDWORDToFloat4<writeMask>(ldrColor, outColor);
+		if (sRGBSurface)
+			GammaCorrectSample<writeMask & 0x7>(outColor);
+	}
+		break;
+	case D3DFMT_A4R4G4B4:
+	{
+		const A4R4G4B4 ldrColor = GetPixel4444(x, y);
+		ColorA4R4G4B4ToFloat4<writeMask>(ldrColor, outColor);
+		if (sRGBSurface)
+			GammaCorrectSample<writeMask & 0x7>(outColor);
+	}
+		break;
+	case D3DFMT_X4R4G4B4:
+	{
+		const X4R4G4B4 ldrColor = GetPixel4440(x, y);
+		ColorX4R4G4B4ToFloat4<writeMask>(ldrColor, outColor);
+		if (sRGBSurface)
+			GammaCorrectSample<writeMask & 0x7>(outColor);
+	}
+		break;
+	case D3DFMT_R5G6B5:
+	{
+		const RGB565 ldrColor = GetPixel565(x, y);
+		ColorRGB565ToFloat4<writeMask>(ldrColor, outColor);
 		if (sRGBSurface)
 			GammaCorrectSample<writeMask & 0x7>(outColor);
 	}
@@ -2594,6 +2657,153 @@ void IDirect3DSurface9Hook::GetPixelVec4(const __m128i x4, const __m128i y4, D3D
 		const D3DCOLOR* const pixels = (const D3DCOLOR* const)surfaceBytesRaw;
 		const __m128i ldrColor4 = _mm_i32gather_epi32( (const int* const)pixels, pixelIndex, 4);
 		ColorDWORDToFloat4_4<writeMask>(ldrColor4, outColor4);
+		if (sRGBSurface)
+			GammaCorrectSample4<writeMask & 0x7, pixelWriteMask>(outColor4);
+	}
+		break;
+	case D3DFMT_A4R4G4B4:
+	{
+		const A4R4G4B4* const pixels = (const A4R4G4B4* const)surfaceBytesRaw;
+
+		// Do our reads:
+		DWORD initialRow, nextRow;
+		if (pixelWriteMask & (0x1 | 0x2) )
+			initialRow = *(const DWORD* const)(pixels + pixelIndex.m128i_i32[0]);
+		if (pixelWriteMask & (0x4 | 0x8) )
+			nextRow = *(const DWORD* const)(pixels + pixelIndex.m128i_i32[2]);
+
+		__m128i ldrColor4;
+
+		// Convert as needed:
+		if (pixelWriteMask & 0x1)
+		{
+			A4R4G4B4 ldrColor;
+			ldrColor.word = (const unsigned short)(initialRow & 0xFFFF);
+			ldrColor4.m128i_u32[0] = Expand4444To8888(ldrColor);
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			A4R4G4B4 ldrColor;
+			ldrColor.word = (const unsigned short)( (initialRow >> 16) & 0xFFFF);
+			ldrColor4.m128i_u32[1] = Expand4444To8888(ldrColor);
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			A4R4G4B4 ldrColor;
+			ldrColor.word = (const unsigned short)(nextRow & 0xFFFF);
+			ldrColor4.m128i_u32[2] = Expand4444To8888(ldrColor);
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			A4R4G4B4 ldrColor;
+			ldrColor.word = (const unsigned short)( (nextRow >> 16) & 0xFFFF);
+			ldrColor4.m128i_u32[3] = Expand4444To8888(ldrColor);
+		}
+
+		ColorDWORDToFloat4_4<writeMask>(ldrColor4, outColor4);
+
+		if (sRGBSurface)
+			GammaCorrectSample4<writeMask & 0x7, pixelWriteMask>(outColor4);
+	}
+		break;
+	case D3DFMT_X4R4G4B4:
+	{
+		const X4R4G4B4* const pixels = (const X4R4G4B4* const)surfaceBytesRaw;
+
+		// Do our reads:
+		DWORD initialRow, nextRow;
+		if (pixelWriteMask & (0x1 | 0x2) )
+			initialRow = *(const DWORD* const)(pixels + pixelIndex.m128i_i32[0]);
+		if (pixelWriteMask & (0x4 | 0x8) )
+			nextRow = *(const DWORD* const)(pixels + pixelIndex.m128i_i32[2]);
+
+		__m128i ldrColor4;
+
+		// Convert as needed:
+		if (pixelWriteMask & 0x1)
+		{
+			X4R4G4B4 ldrColor;
+			ldrColor.word = (const unsigned short)(initialRow & 0xFFFF);
+			ldrColor4.m128i_u32[0] = Expand4440To8888(ldrColor);
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			X4R4G4B4 ldrColor;
+			ldrColor.word = (const unsigned short)( (initialRow >> 16) & 0xFFFF);
+			ldrColor4.m128i_u32[1] = Expand4440To8888(ldrColor);
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			X4R4G4B4 ldrColor;
+			ldrColor.word = (const unsigned short)(nextRow & 0xFFFF);
+			ldrColor4.m128i_u32[2] = Expand4440To8888(ldrColor);
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			X4R4G4B4 ldrColor;
+			ldrColor.word = (const unsigned short)( (nextRow >> 16) & 0xFFFF);
+			ldrColor4.m128i_u32[3] = Expand4440To8888(ldrColor);
+		}
+
+		ColorDWORDToFloat4_4<writeMask>(ldrColor4, outColor4);
+
+		// Set the W components to 1.0f:
+		if (pixelWriteMask & 0x1) *(__m128* const)&outColor4[0] = _mm_blend_ps(*(__m128* const)&outColor4[0], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x2) *(__m128* const)&outColor4[1] = _mm_blend_ps(*(__m128* const)&outColor4[1], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x4) *(__m128* const)&outColor4[2] = _mm_blend_ps(*(__m128* const)&outColor4[2], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x8) *(__m128* const)&outColor4[3] = _mm_blend_ps(*(__m128* const)&outColor4[3], oneVecF, 1 << 3);
+
+		if (sRGBSurface)
+			GammaCorrectSample4<writeMask & 0x7, pixelWriteMask>(outColor4);
+	}
+		break;
+	case D3DFMT_R5G6B5:
+	{
+		const RGB565* const pixels = (const RGB565* const)surfaceBytesRaw;
+
+		// Do our reads:
+		DWORD initialRow, nextRow;
+		if (pixelWriteMask & (0x1 | 0x2) )
+			initialRow = *(const DWORD* const)(pixels + pixelIndex.m128i_i32[0]);
+		if (pixelWriteMask & (0x4 | 0x8) )
+			nextRow = *(const DWORD* const)(pixels + pixelIndex.m128i_i32[2]);
+
+		__m128i ldrColor4;
+
+		// Convert as needed:
+		if (pixelWriteMask & 0x1)
+		{
+			RGB565 ldrColor;
+			ldrColor.word = (const unsigned short)(initialRow & 0xFFFF);
+			ldrColor4.m128i_u32[0] = Expand565To888(ldrColor);
+		}
+		if (pixelWriteMask & 0x2)
+		{
+			RGB565 ldrColor;
+			ldrColor.word = (const unsigned short)( (initialRow >> 16) & 0xFFFF);
+			ldrColor4.m128i_u32[1] = Expand565To888(ldrColor);
+		}
+		if (pixelWriteMask & 0x4)
+		{
+			RGB565 ldrColor;
+			ldrColor.word = (const unsigned short)(nextRow & 0xFFFF);
+			ldrColor4.m128i_u32[2] = Expand565To888(ldrColor);
+		}
+		if (pixelWriteMask & 0x8)
+		{
+			RGB565 ldrColor;
+			ldrColor.word = (const unsigned short)( (nextRow >> 16) & 0xFFFF);
+			ldrColor4.m128i_u32[3] = Expand565To888(ldrColor);
+		}
+
+		ColorDWORDToFloat4_4<(writeMask == 0xF) ? 0xF : (writeMask & 0x7)>(ldrColor4, outColor4);
+
+		// Set the W components to 1.0f:
+		if (pixelWriteMask & 0x1) *(__m128* const)&outColor4[0] = _mm_blend_ps(*(__m128* const)&outColor4[0], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x2) *(__m128* const)&outColor4[1] = _mm_blend_ps(*(__m128* const)&outColor4[1], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x4) *(__m128* const)&outColor4[2] = _mm_blend_ps(*(__m128* const)&outColor4[2], oneVecF, 1 << 3);
+		if (pixelWriteMask & 0x8) *(__m128* const)&outColor4[3] = _mm_blend_ps(*(__m128* const)&outColor4[3], oneVecF, 1 << 3);
+
 		if (sRGBSurface)
 			GammaCorrectSample4<writeMask & 0x7, pixelWriteMask>(outColor4);
 	}

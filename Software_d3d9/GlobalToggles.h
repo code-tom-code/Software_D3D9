@@ -38,6 +38,7 @@
 #ifdef _DEBUG
 	#define OVERRIDE_FORCE_NO_VSYNC 1
 #endif
+#define OVERRIDE_HIDE_CURSOR 1
 
 // If this is not defined, all shaders will run in solo threads rather than warps (usually of at least 2x2 pixels or vertices)
 #define RUN_SHADERS_IN_WARPS 1

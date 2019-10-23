@@ -280,6 +280,10 @@ struct SamplerState
 
 	inline void ClearSamplerStateToDefaults()
 	{
+		static const DWORD badSamplerStateValue = 0xBAADCAFE;
+		for (unsigned x = 0; x <= D3DSAMP_DMAPOFFSET; ++x)
+			stateUnion.state[x] = badSamplerStateValue;
+
 		stateUnion.namedStates.addressU = D3DTADDRESS_WRAP;
 		stateUnion.namedStates.addressV = D3DTADDRESS_WRAP;
 		stateUnion.namedStates.addressW = D3DTADDRESS_WRAP;
@@ -301,6 +305,7 @@ struct SamplerState
 	{
 		struct _namedStates
 		{
+			DWORD zeroState; // This is an invalid sampler state
 			D3DTEXTUREADDRESS addressU;
 			D3DTEXTUREADDRESS addressV;
 			D3DTEXTUREADDRESS addressW;
@@ -315,9 +320,9 @@ struct SamplerState
 			DWORD elementIndex;
 			DWORD dMapOffset; // "(DWORD) - Offset (in vertices) in a pre-sampled displacement map". Source: https://msdn.microsoft.com/en-us/library/windows/desktop/bb219748(v=vs.85).aspx
 		} namedStates;
-		DWORD state[D3DSAMP_DMAPOFFSET];
+		DWORD state[D3DSAMP_DMAPOFFSET + 1];
 	} stateUnion;
-	static_assert(sizeof(_stateUnion) == sizeof(DWORD) * D3DSAMP_DMAPOFFSET, "Error: Unexpected union size!");
+	static_assert(sizeof(_stateUnion) == sizeof(DWORD) * (D3DSAMP_DMAPOFFSET + 1), "Error: Unexpected union size!");
 
 	float cachedFloatMaxMipLevel;
 };
