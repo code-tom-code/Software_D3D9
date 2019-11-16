@@ -451,7 +451,7 @@ enum debuggableFVF_textureFormat : unsigned char
 enum debuggableFVF_positionTypeLow : unsigned char
 {
 	dbgD3DFVF_NoPosition = 0x000, // This is most commonly used when this FVF is all 0x00000000, like when initializing a non-FVF vertex buffer intended for use with a vertex declaration instead
-	dbgD3DFVF_RESERVED0 = D3DFVF_RESERVED0, // 0x001
+	dbgD3DFVF_RESERVED0 = D3DFVF_RESERVED0, // 0x001 // The RESERVED0 bit seems to be completely ignored by the FVF to Decl converter
 	dbgD3DFVF_XYZ = D3DFVF_XYZ, // 0x002
 	dbgD3DFVF_XYZRHW = D3DFVF_XYZRHW, // 0x004
 	dbgD3DFVF_XYZB1 = D3DFVF_XYZB1, // 0x006
@@ -532,15 +532,15 @@ union debuggableFVF
 	struct _namedFVF
 	{
 		debuggableFVF_positionTypeLow positionTypeLow : 4; // This is the XYZ + matrix palette blending
-		bool hasNormal : 1; // D3DFVF_NORMAL // This is the NORMAL0 semantic (float3)
-		bool hasPSize : 1; // D3DFVF_PSIZE // This is the PSIZE0 semantic (float)
-		bool hasDiffuse : 1; // D3DFVF_DIFFUSE // This is the COLOR0 semantic (D3DCOLOR)
-		bool hasSpecular : 1; // D3DFVF_SPECULAR // This is the COLOR1 semantic (D3DCOLOR)
+		bool hasNormal : 1; // D3DFVF_NORMAL // This is the NORMAL0 semantic (float3) // 0x010
+		bool hasPSize : 1; // D3DFVF_PSIZE // This is the PSIZE0 semantic (float) // 0x020
+		bool hasDiffuse : 1; // D3DFVF_DIFFUSE // This is the COLOR0 semantic (D3DCOLOR) // 0x040
+		bool hasSpecular : 1; // D3DFVF_SPECULAR // This is the COLOR1 semantic (D3DCOLOR) // 0x080
 		unsigned char numTexcoordElementsPresent : 4; // Valid values for this are from 0 (meaning no texcoords present) thru 8 (meaning 8 sets of texcoords present)
-		bool lastBeta_UBYTE4 : 1; // D3DFVF_LASTBETA_UBYTE4
-		unsigned char : 1; // RESERVED2 // 0x6000
+		bool lastBeta_UBYTE4 : 1; // D3DFVF_LASTBETA_UBYTE4 // 0x1000
+		bool hasFog : 1; // This is the underdocumented 0x2000 flag "D3DFVF_FOG". It is a float1 channel on stream 0 with usage 0 that implies D3DDECLUSAGE_FOG. It is placed between the lighting attributes and the texcoords in the vertex struct. // RESERVED2 is 0x6000, which is split between "has fog" and D3DFVF_XYZW // 0x2000
 		bool positionTypeContainsUntransformedW : 1; // D3DFVF_XYZW // 0x4002
-		bool lastBeta_D3DCOLOR : 1; // D3DFVF_LASTBETA_D3DCOLOR
+		bool lastBeta_D3DCOLOR : 1; // D3DFVF_LASTBETA_D3DCOLOR // 0x8000
 		debuggableFVF_textureFormat texCoord0type : 2; // TEX1 type
 		debuggableFVF_textureFormat texCoord1type : 2; // TEX2 type
 		debuggableFVF_textureFormat texCoord2type : 2; // TEX3 type

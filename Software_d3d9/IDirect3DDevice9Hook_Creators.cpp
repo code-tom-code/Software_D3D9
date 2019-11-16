@@ -238,13 +238,23 @@ static const unsigned texCoordSizeLookup[4] =
 	sizeof(float)
 };
 
+// Copied this from the Windows 10 DDK header file "d3dhal.h"
+// This is the rather underdocumented 0x2000 flag.
+// It is a float1 channel on stream 0 with usage 0 that implies D3DDECLUSAGE_FOG.
+// It is placed between the lighting attributes and the texcoords in the vertex struct.
+// There's a little bit more info about it here: https://docs.microsoft.com/en-us/windows-hardware/drivers/display/clamping-fog-intensity-per-pixel
+#ifndef D3DFVF_FOG
+	#define D3DFVF_FOG 0x00002000L /* There is a separate fog value in the FVF vertex */
+#endif
+
 // This is not an official D3D9 function, even though it looks like one. It is only used internally.
 // Most of these conversions came from this MSDN page: https://docs.microsoft.com/en-us/windows/win32/direct3d9/mapping-fvf-codes-to-a-directx-9-declaration
 // The remainder of the conversions came from testing and seeing what happens.
-// The test-set contained 1,674,960 unique FVF codes, which should encompass all or nearly all of the valid combinations of FVF codes. For all of those tested codes, the output of this function matches that of what the D3D9 runtime
+// The test-set contained all 2^32 unique FVF codes, which should encompass all combinations of FVF codes. For all of those tested codes, the output of this function matches that of what the D3D9 runtime
 // internally uses to convert FVF codes into vertex declarations.
 /*
 Undocumented/underdocumented D3D9 weird things:
+- D3DFVF_FOG is listed as part of D3DFVF_RESERVED2 in the d3d9 headers, but it is listed in the Windows DDK as a separate FVF flag.
 - If the FVF is 0x00000000 then the DrawPrimitive call gets dropped entirely for the fixed-function pipeline (although this could probably still work for the case of a vertex shader rendering a single point using shader constants for data).
 - If both D3DFVF_LASTBETA_UBYTE4 and D3DFVF_LASTBETA_D3DCOLOR are set (probably not a "valid FVF", but the runtime seems to accept it anyway) then D3DFVF_LASTBETA_UBYTE4 takes precedence and D3DFVF_LASTBETA_D3DCOLOR gets ignored.
 - D3DFVF_LASTBETA_UBYTE4 and D3DFVF_LASTBETA_D3DCOLOR are ignored for D3DFVF_XYZ, D3DFVF_XYZRHW, and D3DFVF_XYZW positions (they only work if one of the XYZBn positions are used).
@@ -264,13 +274,13 @@ IDirect3DVertexDeclaration9Hook* IDirect3DDevice9Hook::CreateVertexDeclFromFVFCo
 	}
 #endif // NO_CACHING_FVF_VERT_DECLS
 
-	// 16 is the worst-case number of decl elements (including the D3DDECL_END delimiter) because we could have this monsterous (but apparently valid) FVF code:
-	// (D3DFVF_XYZB5 | D3DFVF_LASTBETA_D3DCOLOR | D3DFVF_LASTBETA_UBYTE4 | D3DFVF_NORMAL | D3DFVF_PSIZE | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | TEX8 | 
+	// 24 is the worst-case number of decl elements (including the D3DDECL_END delimiter) because we could have this monsterous FVF code:
+	// (D3DFVF_XYZB5 | D3DFVF_LASTBETA_D3DCOLOR | D3DFVF_LASTBETA_UBYTE4 | D3DFVF_NORMAL | D3DFVF_PSIZE | D3DFVF_DIFFUSE | D3DFVF_SPECULAR | TEX15 | D3DFVF_FOG |
 	// D3DFVF_TEXCOORDSIZE4(0) | D3DFVF_TEXCOORDSIZE4(1) | D3DFVF_TEXCOORDSIZE4(2) | D3DFVF_TEXCOORDSIZE4(3) | 
 	// D3DFVF_TEXCOORDSIZE4(4) | D3DFVF_TEXCOORDSIZE4(5) | D3DFVF_TEXCOORDSIZE4(6) | D3DFVF_TEXCOORDSIZE4(7) )
-	// That's 3 tokens from the "position" section (D3DFVF_XYZB5), 4 from the "attributes" section (D3DFVF_NORMAL | D3DFVF_PSIZE | D3DFVF_DIFFUSE | D3DFVF_SPECULAR),
-	// 8 tokens from the "texcoords" section (TEX8 and all of the D3DFVF_TEXCOORDSIZE4 macros), and one for the D3DDECL_END token.
-	D3DVERTEXELEMENT9 elements[16] = {0};
+	// That's 3 tokens from the "position" section (D3DFVF_XYZB5), 4 from the "attributes" section (D3DFVF_NORMAL | D3DFVF_PSIZE | D3DFVF_DIFFUSE | D3DFVF_SPECULAR), one from fog,
+	// 15 tokens from the "texcoords" section (TEX8 and all of the D3DFVF_TEXCOORDSIZE4 macros), and one for the D3DDECL_END token.
+	D3DVERTEXELEMENT9 elements[24] = {0};
 
 	unsigned currentElementIndex = 0;
 	unsigned short totalVertexSizeBytes = 0;
@@ -433,23 +443,33 @@ IDirect3DVertexDeclaration9Hook* IDirect3DDevice9Hook::CreateVertexDeclFromFVFCo
 		totalVertexSizeBytes += sizeof(D3DCOLOR);
 	}
 
-	const unsigned numTexCoords = ( (FVF.rawFVF_DWORD & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT);
-#ifdef _DEBUG
-	if (numTexCoords > D3DDP_MAXTEXCOORD)
+	// The rather undocumented D3DFVF_FOG flag breaks the convention of all the other FVF flags of appearing "in order" as it actually comes *before* texcoords but *after* position and lighting attributes
+	if (FVF.rawFVF_DWORD & D3DFVF_FOG)
 	{
-		DbgBreakPrint("Error: Max number of texture coords for a FVF code is D3DDP_MAXTEXCOORD (8)");
+		elements[currentElementIndex++] = {0, totalVertexSizeBytes, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_FOG, 0};
+		totalVertexSizeBytes += sizeof(float);
 	}
-#endif
 
+	const unsigned numTexCoords = ( (FVF.rawFVF_DWORD & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT);
 	for (BYTE x = 0; x < numTexCoords; ++x)
 	{
-		const unsigned texCoordTypeShift = (16 + x * 2);
-		const unsigned texCoordTypeMask = 0x3 << texCoordTypeShift;
-		const unsigned texCoordType = (FVF.rawFVF_DWORD & texCoordTypeMask) >> texCoordTypeShift;
-		const D3DDECLTYPE texCoordTypeFormat = texCoordTypeLookup[texCoordType];
-		const unsigned texCoordTypeSize = texCoordSizeLookup[texCoordType];
-		elements[currentElementIndex++] = {0, totalVertexSizeBytes, (const BYTE)texCoordTypeFormat, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, x};
-		totalVertexSizeBytes += texCoordTypeSize;
+		if (x < 8)
+		{
+			const unsigned texCoordTypeShift = (16 + x * 2);
+			const unsigned texCoordTypeMask = 0x3 << texCoordTypeShift;
+			const unsigned texCoordType = (FVF.rawFVF_DWORD & texCoordTypeMask) >> texCoordTypeShift;
+			const D3DDECLTYPE texCoordTypeFormat = texCoordTypeLookup[texCoordType];
+			const unsigned texCoordTypeSize = texCoordSizeLookup[texCoordType];
+			elements[currentElementIndex++] = {0, totalVertexSizeBytes, (const BYTE)texCoordTypeFormat, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, x};
+			totalVertexSizeBytes += texCoordTypeSize;
+		}
+		else // Since there are no more bits to read, all texcoords after TEX8 are assumed to be of "float2" format
+		{
+			const D3DDECLTYPE texCoordTypeFormat = D3DDECLTYPE_FLOAT2;
+			const unsigned texCoordTypeSize = sizeof(D3DXVECTOR2);
+			elements[currentElementIndex++] = {0, totalVertexSizeBytes, (const BYTE)texCoordTypeFormat, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, x};
+			totalVertexSizeBytes += texCoordTypeSize;
+		}
 	}
 
 	elements[currentElementIndex] = D3DDECL_END();
