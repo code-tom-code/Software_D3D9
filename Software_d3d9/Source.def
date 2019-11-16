@@ -20,28 +20,28 @@ Direct3DShaderValidatorCreate9=HookDirect3DShaderValidatorCreate9 @24
 PSGPError=HookPSGPError @25
 PSGPSampleTexture=HookPSGPSampleTexture @26
 
-; Functions exported only by ordinal (hence the NONAME specifier) go here:
+; Functions exported only by ordinal go here:
 
 ; Ordinal 16 = Direct3D9ForceHybridEnumeration
-Direct3D9ForceHybridEnumeration=HookDirect3D9ForceHybridEnumeration @16 NONAME
+Direct3D9ForceHybridEnumeration=HookDirect3D9ForceHybridEnumeration @16
 
 ; Ordinal 17 = Direct3D9SetMaximizedWindowedModeShim
-Direct3D9SetMaximizedWindowedModeShim=HookDirect3D9SetMaximizedWindowedModeShim @17 NONAME
+Direct3D9SetMaximizedWindowedModeShim=HookDirect3D9SetMaximizedWindowedModeShim @17
 
 ; Ordinal 18 = Direct3D9SetSwapEffectUpgradeShim
-Direct3D9SetSwapEffectUpgradeShim=HookDirect3D9SetSwapEffectUpgradeShim @18 NONAME
+Direct3D9SetSwapEffectUpgradeShim=HookDirect3D9SetSwapEffectUpgradeShim @18
 
-; Ordinal 19 = Direct3D9Force9on12
-Direct3D9Force9on12=HookDirect3D9Force9on12 @19 NONAME
+; Ordinal 19 = Direct3D9Force9On12
+Direct3D9Force9On12=HookDirect3D9Force9On12 @19
 
-; Ordinal 20 = Direct3DCreate9on12
-Direct3DCreate9on12=HookDirect3DCreate9on12 @20 NONAME
+; Ordinal 20 = Direct3DCreate9On12
+Direct3DCreate9On12=HookDirect3DCreate9On12 @20
 
-; Ordinal 21 = Direct3DCreate9on12Ex
-Direct3DCreate9on12Ex=HookDirect3DCreate9on12Ex @21 NONAME
+; Ordinal 21 = Direct3DCreate9On12Ex
+Direct3DCreate9On12Ex=HookDirect3DCreate9On12Ex @21
 
 ; Ordinal 22 = Direct3D9SetMaximizedWindowHwndOverride
-Direct3D9SetMaximizedWindowHwndOverride=HookDirect3D9SetMaximizedWindowHwndOverride @22 NONAME
+Direct3D9SetMaximizedWindowHwndOverride=HookDirect3D9SetMaximizedWindowHwndOverride @22
 
-; Ordinal 23 = Direct3D9SetVendorIDLieFor9on12
-Direct3D9SetVendorIDLieFor9on12=HookDirect3D9SetVendorIDLieFor9on12 @23 NONAME
+; Ordinal 23 = Direct3D9SetVendorIDLieFor9On12
+Direct3D9SetVendorIDLieFor9On12=HookDirect3D9SetVendorIDLieFor9On12 @23

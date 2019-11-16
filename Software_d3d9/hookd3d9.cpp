@@ -18,17 +18,22 @@ HINSTANCE hLThisDLL = 0;
 HINSTANCE hL = 0;
 
 // Undocumented enum!
-enum Force9on12Mode : UINT
+enum Force9On12Mode : UINT
 {
-	Force9on12Mode_D3D9_Default = 0, // This will create a true D3D9 device (no 9on12 layer)
-	Force9on12Mode_D3D9on12 = 1, // This will create a D3D9on12 device
-	Force9on12Mode_D3D9_Unknown = 2 // I am not sure what this does, but it seems to act almost exactly like Force9on12Mode_D3D9_Default (value "0")
+	Force9On12Mode_D3D9_Default = 0, // This will create a true D3D9 device (no 9On12 layer)
+	Force9On12Mode_D3D9On12 = 1, // This will create a D3D9On12 device
+	Force9On12Mode_D3D9_Unknown = 2 // I am not sure what this does, but it seems to act almost exactly like Force9On12Mode_D3D9_Default (value "0")
 };
 
-// Undocumented struct
+#define MAX_D3D9ON12_QUEUES        2
+
 typedef struct _D3D9ON12_ARGS
 {
-	// Who knows what's in here!
+    BOOL Enable9On12;
+    IUnknown* pD3D12Device;
+    IUnknown* ppD3D12Queues[MAX_D3D9ON12_QUEUES];
+    UINT NumQueues;
+    UINT NodeMask;
 } D3D9ON12_ARGS;
 
 // Undocumented enum
@@ -70,11 +75,11 @@ typedef void (WINAPI *PSGPSampleTextureType)(class D3DFE_PROCESSVERTICES* vertic
 typedef void (WINAPI *Direct3D9ForceHybridEnumerationType)(_In_ BOOL ForceHybridEnumeration);
 typedef void (WINAPI *Direct3D9SetMaximizedWindowedModeShimType)(_In_ BOOL unknown0, _In_ BOOL unknown1);
 typedef INT (WINAPI *Direct3D9SetSwapEffectUpgradeShimType)(_In_ BOOL ShimEnable);
-typedef void (WINAPI *Direct3D9Force9on12Type)(_In_ Force9on12Mode Mode);
-typedef IDirect3D9* (WINAPI *Direct3DCreate9on12Type)(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* Args, _In_ UINT ArgsCount);
-typedef HRESULT (WINAPI *Direct3DCreate9on12ExType)(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* Args, _In_ UINT ArgsCount, _Inout_ IDirect3D9Ex** UnusedOutPtr);
+typedef void (WINAPI *Direct3D9Force9On12Type)(_In_ Force9On12Mode Mode);
+typedef IDirect3D9* (WINAPI *Direct3DCreate9On12Type)(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* pOverrideList, _In_ UINT NumOverrideEntries);
+typedef HRESULT (WINAPI *Direct3DCreate9On12ExType)(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* pOverrideList, UINT NumOverrideEntries, _Inout_ IDirect3D9Ex** ppOutputInterface);
 typedef void (WINAPI *Direct3D9SetMaximizedWindowHwndOverrideType)(_In_ BOOL Override);
-typedef void (WINAPI *Direct3D9SetVendorIDLieFor9on12Type)(_In_ BOOL VendorIDLie);
+typedef void (WINAPI *Direct3D9SetVendorIDLieFor9On12Type)(_In_ BOOL VendorIDLie);
 
 // All of these function pointer values will be pulled from the real d3d9.dll using GetProcAddress().
 // Not all of these functions may exist if we are running versions of Windows older than Windows 10, so in
@@ -97,11 +102,11 @@ static PSGPSampleTextureType Real_PSGPSampleTexture = NULL;
 static Direct3D9ForceHybridEnumerationType Real_Direct3D9ForceHybridEnumeration = NULL;
 static Direct3D9SetMaximizedWindowedModeShimType Real_Direct3D9SetMaximizedWindowedModeShim = NULL;
 static Direct3D9SetSwapEffectUpgradeShimType Real_Direct3D9SetSwapEffectUpgradeShim = NULL;
-static Direct3D9Force9on12Type Real_Direct3D9Force9on12 = NULL;
-static Direct3DCreate9on12Type Real_Direct3DCreate9on12 = NULL;
-static Direct3DCreate9on12ExType Real_Direct3DCreate9on12Ex = NULL;
+static Direct3D9Force9On12Type Real_Direct3D9Force9On12 = NULL;
+static Direct3DCreate9On12Type Real_Direct3DCreate9On12 = NULL;
+static Direct3DCreate9On12ExType Real_Direct3DCreate9On12Ex = NULL;
 static Direct3D9SetMaximizedWindowHwndOverrideType Real_Direct3D9SetMaximizedWindowHwndOverride = NULL;
-static Direct3D9SetVendorIDLieFor9on12Type Real_Direct3D9SetVendorIDLieFor9on12 = NULL;
+static Direct3D9SetVendorIDLieFor9On12Type Real_Direct3D9SetVendorIDLieFor9On12 = NULL;
 
 #ifdef _DEBUG
 
@@ -353,11 +358,11 @@ BOOL WINAPI DllMain(_In_ HINSTANCE hInst, _In_ DWORD reason, _In_ LPVOID /*lpvRe
 		Real_Direct3D9ForceHybridEnumeration = (const Direct3D9ForceHybridEnumerationType)GetProcAddress(hL, (LPCSTR)LOWORD(16u) ); // "void Direct3D9ForceHybridEnumeration(BOOL)"
 		Real_Direct3D9SetMaximizedWindowedModeShim = (const Direct3D9SetMaximizedWindowedModeShimType)GetProcAddress(hL, (LPCSTR)LOWORD(17u) ); // "void Direct3D9SetMaximizedWindowedModeShim()"
 		Real_Direct3D9SetSwapEffectUpgradeShim = (const Direct3D9SetSwapEffectUpgradeShimType)GetProcAddress(hL, (LPCSTR)LOWORD(18u) ); // "void Direct3D9SetSwapEffectUpgradeShim()"
-		Real_Direct3D9Force9on12 = (const Direct3D9Force9on12Type)GetProcAddress(hL, (LPCSTR)LOWORD(19u) ); // "void Direct3D9Force9on12()"
-		Real_Direct3DCreate9on12 = (const Direct3DCreate9on12Type)GetProcAddress(hL, (LPCSTR)LOWORD(20u) ); // "IDirect3D9* Direct3DCreate9on12()"
-		Real_Direct3DCreate9on12Ex = (const Direct3DCreate9on12ExType)GetProcAddress(hL, (LPCSTR)LOWORD(21u) ); // "HRESULT Direct3DCreate9on12Ex()"
+		Real_Direct3D9Force9On12 = (const Direct3D9Force9On12Type)GetProcAddress(hL, (LPCSTR)LOWORD(19u) ); // "void Direct3D9Force9On12()"
+		Real_Direct3DCreate9On12 = (const Direct3DCreate9On12Type)GetProcAddress(hL, (LPCSTR)LOWORD(20u) ); // "IDirect3D9* Direct3DCreate9On12()"
+		Real_Direct3DCreate9On12Ex = (const Direct3DCreate9On12ExType)GetProcAddress(hL, (LPCSTR)LOWORD(21u) ); // "HRESULT Direct3DCreate9On12Ex()"
 		Real_Direct3D9SetMaximizedWindowHwndOverride = (const Direct3D9SetMaximizedWindowHwndOverrideType)GetProcAddress(hL, (LPCSTR)LOWORD(22u) ); // "void Direct3D9SetMaximizedWindowHwndOverride()"
-		Real_Direct3D9SetVendorIDLieFor9on12 = (const Direct3D9SetVendorIDLieFor9on12Type)GetProcAddress(hL, (LPCSTR)LOWORD(23u) ); // "void Direct3D9SetVendorIDLieFor9on12(BOOL)"
+		Real_Direct3D9SetVendorIDLieFor9On12 = (const Direct3D9SetVendorIDLieFor9On12Type)GetProcAddress(hL, (LPCSTR)LOWORD(23u) ); // "void Direct3D9SetVendorIDLieFor9On12(BOOL)"
 	}
 
 	if (reason == DLL_PROCESS_DETACH)
@@ -501,28 +506,28 @@ extern "C" INT __stdcall HookDirect3D9SetSwapEffectUpgradeShim(BOOL ShimEnable)
 	return ret;
 }
 
-// Direct3D9Force9on12
+// Direct3D9Force9On12
 // Sets a global value in d3d9.dll that, when set to "1", causes future calls to Direct3DCreate9 and Direct3DCreate9Ex to be internally
-// turned into calls to Direct3DCreate9on12 and Direct3DCreate9on12Ex respectively, thus transparently creating D3D9on12 devices
+// turned into calls to Direct3DCreate9On12 and Direct3DCreate9On12Ex respectively, thus transparently creating D3D9On12 devices
 // for the callers without any user code modifications (except for the one initial call to Direct3D9Force9on12() ).
-// Note that this does not transform any existing D3D9 or D3D9Ex devices into D3D9on12/D3D9on12Ex devices, it only affects
+// Note that this does not transform any existing D3D9 or D3D9Ex devices into D3D9On12/D3D9On12Ex devices, it only affects
 // devices created after the force is enabled.
-extern "C" void __stdcall HookDirect3D9Force9on12(_In_ Force9on12Mode Mode)
+extern "C" void __stdcall HookDirect3D9Force9On12(_In_ Force9On12Mode Mode)
 {
-	(*Real_Direct3D9Force9on12)(Mode);
+	(*Real_Direct3D9Force9On12)(Mode);
 }
 
-// Direct3DCreate9on12
-extern "C" IDirect3D9* __stdcall HookDirect3DCreate9on12(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* Args, _In_ UINT ArgsCount)
+// Direct3DCreate9On12
+extern "C" IDirect3D9* __stdcall HookDirect3DCreate9On12(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* pOverrideList, _In_ UINT NumOverrideEntries)
 {
-	IDirect3D9* ret = (*Real_Direct3DCreate9on12)(SDKVersion, Args, ArgsCount);
+	IDirect3D9* ret = (*Real_Direct3DCreate9On12)(SDKVersion, pOverrideList, NumOverrideEntries);
 	return ret;
 }
 
-// Direct3DCreate9on12Ex
-extern "C" HRESULT __stdcall HookDirect3DCreate9on12Ex(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* Args, _In_ UINT ArgsCount, _Inout_ IDirect3D9Ex** OutExPtr)
+// Direct3DCreate9On12Ex
+extern "C" HRESULT __stdcall HookDirect3DCreate9On12Ex(_In_ UINT SDKVersion, _In_ D3D9ON12_ARGS* pOverrideList, UINT NumOverrideEntries, _Inout_ IDirect3D9Ex** ppOutputInterface)
 {
-	HRESULT ret = (*Real_Direct3DCreate9on12Ex)(SDKVersion, Args, ArgsCount, OutExPtr);
+	HRESULT ret = (*Real_Direct3DCreate9On12Ex)(SDKVersion, pOverrideList, NumOverrideEntries, ppOutputInterface);
 	return ret;
 }
 
@@ -532,8 +537,8 @@ extern "C" void __stdcall HookDirect3D9SetMaximizedWindowHwndOverride(_In_ BOOL 
 	(*Real_Direct3D9SetMaximizedWindowHwndOverride)(Override);
 }
 
-// Direct3D9SetVendorIDLieFor9on12
-extern "C" void __stdcall HookDirect3D9SetVendorIDLieFor9on12(_In_ BOOL VendorIDLie)
+// Direct3D9SetVendorIDLieFor9On12
+extern "C" void __stdcall HookDirect3D9SetVendorIDLieFor9On12(_In_ BOOL VendorIDLie)
 {
-	(*Real_Direct3D9SetVendorIDLieFor9on12)(VendorIDLie);
+	(*Real_Direct3D9SetVendorIDLieFor9On12)(VendorIDLie);
 }
