@@ -205,7 +205,9 @@ static inline void PixelShadeJob1(slist_item& job, _threadItem* const myPtr)
 	const slist_item::_jobData::_pixelJobData& pixelJobData = job.jobData.pixelJobData;
 	const primitivePixelJobData* const primitiveData = pixelJobData.primitiveData;
 
-	SIMPLE_FUNC_SCOPE_CONDITIONAL(primitiveData->primitiveID == 0 && abs( (const int)(320 - pixelJobData.x[0]) ) < 5 && abs( (const int)(240 - pixelJobData.y[0]) ) < 5);
+	SIMPLE_FUNC_SCOPE_CONDITIONAL(primitiveData->primitiveID == 0 && 
+		abs( (const int)(320 - pixelJobData.x[0]) ) < 5 && 
+		abs( (const int)(240 - pixelJobData.y[0]) ) < 5);
 
 	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
 	const __m128i barycentricCoordsVector = _mm_load_si128( (const __m128i* const)&pixelJobData.barycentricCoords[0]);
@@ -228,7 +230,9 @@ static inline void PixelShadeJob4(slist_item& job, _threadItem* const myPtr)
 	const slist_item::_jobData::_pixelJobData& pixelJobData = job.jobData.pixelJobData;
 	const primitivePixelJobData* const primitiveData = pixelJobData.primitiveData;
 
-	SIMPLE_FUNC_SCOPE_CONDITIONAL(primitiveData->primitiveID == 0 && abs( (const int)(320 - pixelJobData.x[0]) ) < 5 && abs( (const int)(240 - pixelJobData.y[0]) ) < 5);
+	SIMPLE_FUNC_SCOPE_CONDITIONAL(primitiveData->primitiveID == 0 && 
+		abs( (const int)(320 - pixelJobData.x[0]) ) < 5 && 
+		abs( (const int)(240 - pixelJobData.y[0]) ) < 5);
 
 	const __m128i x4 = *(const __m128i* const)(pixelJobData.x);
 	const __m128i y4 = *(const __m128i* const)(pixelJobData.y);
@@ -3773,39 +3777,47 @@ COM_DECLSPEC_NOTHROW void IDirect3DDevice9Hook::SetupCurrentDrawCallTriangleRast
 // Counts the number of 32-bit DWORD's for each of the D3DDECLTYPE's
 static unsigned char typeSize_DWORDs[MAXD3DDECLTYPE] =
 {
-	1,// D3DDECLTYPE_FLOAT1    =  0,  // 1D float expanded to (value, 0., 0., 1.)
-    2,// D3DDECLTYPE_FLOAT2    =  1,  // 2D float expanded to (value, value, 0., 1.)
-    3,// D3DDECLTYPE_FLOAT3    =  2,  // 3D float expanded to (value, value, value, 1.)
-    4,// D3DDECLTYPE_FLOAT4    =  3,  // 4D float
-    1,// D3DDECLTYPE_D3DCOLOR  =  4,  // 4D packed unsigned bytes mapped to 0. to 1. range
+	1 * sizeof(DWORD),// D3DDECLTYPE_FLOAT1    =  0,  // 1D float expanded to (value, 0., 0., 1.)
+    2 * sizeof(DWORD),// D3DDECLTYPE_FLOAT2    =  1,  // 2D float expanded to (value, value, 0., 1.)
+    3 * sizeof(DWORD),// D3DDECLTYPE_FLOAT3    =  2,  // 3D float expanded to (value, value, value, 1.)
+    4 * sizeof(DWORD),// D3DDECLTYPE_FLOAT4    =  3,  // 4D float
+    1 * sizeof(DWORD),// D3DDECLTYPE_D3DCOLOR  =  4,  // 4D packed unsigned bytes mapped to 0. to 1. range
 									// Input is in D3DCOLOR format (ARGB) expanded to (R, G, B, A)
-    1,// D3DDECLTYPE_UBYTE4    =  5,  // 4D unsigned byte
-    1,// D3DDECLTYPE_SHORT2    =  6,  // 2D signed short expanded to (value, value, 0., 1.)
-    2,// D3DDECLTYPE_SHORT4    =  7,  // 4D signed short
+    1 * sizeof(DWORD),// D3DDECLTYPE_UBYTE4    =  5,  // 4D unsigned byte
+    1 * sizeof(DWORD),// D3DDECLTYPE_SHORT2    =  6,  // 2D signed short expanded to (value, value, 0., 1.)
+    2 * sizeof(DWORD),// D3DDECLTYPE_SHORT4    =  7,  // 4D signed short
 
 	// The following types are valid only with vertex shaders >= 2.0
-    1,// D3DDECLTYPE_UBYTE4N   =  8,  // Each of 4 bytes is normalized by dividing to 255.0
-    1,// D3DDECLTYPE_SHORT2N   =  9,  // 2D signed short normalized (v[0]/32767.0,v[1]/32767.0,0,1)
-    2,// D3DDECLTYPE_SHORT4N   = 10,  // 4D signed short normalized (v[0]/32767.0,v[1]/32767.0,v[2]/32767.0,v[3]/32767.0)
-    1,// D3DDECLTYPE_USHORT2N  = 11,  // 2D unsigned short normalized (v[0]/65535.0,v[1]/65535.0,0,1)
-    2,// D3DDECLTYPE_USHORT4N  = 12,  // 4D unsigned short normalized (v[0]/65535.0,v[1]/65535.0,v[2]/65535.0,v[3]/65535.0)
-    1,// D3DDECLTYPE_UDEC3     = 13,  // 3D unsigned 10 10 10 format expanded to (value, value, value, 1)
-    1,// D3DDECLTYPE_DEC3N     = 14,  // 3D signed 10 10 10 format normalized and expanded to (v[0]/511.0, v[1]/511.0, v[2]/511.0, 1)
-    1,// D3DDECLTYPE_FLOAT16_2 = 15,  // Two 16-bit floating point values, expanded to (value, value, 0, 1)
-    2 // D3DDECLTYPE_FLOAT16_4 = 16,  // Four 16-bit floating point values
+    1 * sizeof(DWORD),// D3DDECLTYPE_UBYTE4N   =  8,  // Each of 4 bytes is normalized by dividing to 255.0
+    1 * sizeof(DWORD),// D3DDECLTYPE_SHORT2N   =  9,  // 2D signed short normalized (v[0]/32767.0,v[1]/32767.0,0,1)
+    2 * sizeof(DWORD),// D3DDECLTYPE_SHORT4N   = 10,  // 4D signed short normalized (v[0]/32767.0,v[1]/32767.0,v[2]/32767.0,v[3]/32767.0)
+    1 * sizeof(DWORD),// D3DDECLTYPE_USHORT2N  = 11,  // 2D unsigned short normalized (v[0]/65535.0,v[1]/65535.0,0,1)
+    2 * sizeof(DWORD),// D3DDECLTYPE_USHORT4N  = 12,  // 4D unsigned short normalized (v[0]/65535.0,v[1]/65535.0,v[2]/65535.0,v[3]/65535.0)
+    1 * sizeof(DWORD),// D3DDECLTYPE_UDEC3     = 13,  // 3D unsigned 10 10 10 format expanded to (value, value, value, 1)
+    1 * sizeof(DWORD),// D3DDECLTYPE_DEC3N     = 14,  // 3D signed 10 10 10 format normalized and expanded to (v[0]/511.0, v[1]/511.0, v[2]/511.0, 1)
+    1 * sizeof(DWORD),// D3DDECLTYPE_FLOAT16_2 = 15,  // Two 16-bit floating point values, expanded to (value, value, 0, 1)
+    2 * sizeof(DWORD) // D3DDECLTYPE_FLOAT16_4 = 16,  // Four 16-bit floating point values
 };
 
 static inline void ComputeCachedStreamEnd(StreamDataTypeEndPointers& thisStreamEnd, const BYTE* const streamBegin, const unsigned streamLenBytes)
 {
-	thisStreamEnd.streamEndAbsolute = streamBegin + streamLenBytes;
-
-	for (unsigned x = 0; x < ARRAYSIZE(thisStreamEnd.dataTypeStreamEnds); ++x)
+	if (streamBegin != NULL && streamLenBytes != 0)
 	{
-		const D3DDECLTYPE thisType = (const D3DDECLTYPE)x;
-		if (streamBegin)
-			thisStreamEnd.dataTypeStreamEnds[thisType] = thisStreamEnd.streamEndAbsolute - (typeSize_DWORDs[thisType] * sizeof(const DWORD) );
-		else
+		thisStreamEnd.streamEndAbsolute = streamBegin + streamLenBytes;
+		for (unsigned x = 0; x < ARRAYSIZE(thisStreamEnd.dataTypeStreamEnds); ++x)
+		{
+			const D3DDECLTYPE thisType = (const D3DDECLTYPE)x;
+			thisStreamEnd.dataTypeStreamEnds[thisType] = thisStreamEnd.streamEndAbsolute - typeSize_DWORDs[thisType];
+		}
+	}
+	else
+	{
+		thisStreamEnd.streamEndAbsolute = NULL;
+		for (unsigned x = 0; x < ARRAYSIZE(thisStreamEnd.dataTypeStreamEnds); ++x)
+		{
+			const D3DDECLTYPE thisType = (const D3DDECLTYPE)x;
 			thisStreamEnd.dataTypeStreamEnds[thisType] = NULL;
+		}
 	}
 }
 
@@ -3938,6 +3950,22 @@ const bool IDirect3DDevice9Hook::TotalDrawCallSkipTest(void) const
 			return false;
 		if (thisScissorRect.bottom <= thisScissorRect.top)
 			return false;
+	}
+
+	// Skip the entire draw call if we're doing dumb stuff (like rendering a fullscreen quad that is entirely alpha-transparent while alpha blending is enabled using the fixed function pipeline. Looking at you, Morrowind.exe):
+	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable && !currentState.currentPixelShader && !currentState.currentVertexShader)
+	{
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.lighting && currentState.currentRenderStates.renderStatesUnion.namedStates.diffuseMaterialSource == D3DMCS_MATERIAL &&
+			currentState.currentMaterial.Diffuse.a == 0.0f)
+		{
+			// FFPS selects vertex color for alpha channel
+			if (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaOp == D3DTOP_MODULATE && (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg1 == D3DTA_DIFFUSE || currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg2 == D3DTA_DIFFUSE) )
+				return false;
+			else if (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaOp == D3DTOP_SELECTARG1 && currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg1 == D3DTA_DIFFUSE)
+				return false;
+			else if (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaOp == D3DTOP_SELECTARG2 && currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg2 == D3DTA_DIFFUSE)
+				return false;
+		}
 	}
 
 	return true;
@@ -8675,7 +8703,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimiti
 	const unsigned numInputVerts = GetNumVertsUsed(PrimitiveType, PrimitiveCount);
 
 	const unsigned short shortVertexStreamZeroStride = (const unsigned short)VertexStreamZeroStride;
-	currentState.currentSoftUPStream.vertexBuffer->SoftUPSetInternalPointer( (const BYTE* const)pVertexStreamZeroData);
+	currentState.currentSoftUPStream.vertexBuffer->SoftUPSetInternalPointer( (const BYTE* const)pVertexStreamZeroData, numInputVerts * shortVertexStreamZeroStride);
 	currentState.currentSoftUPStream.streamOffset = 0;
 	currentState.currentSoftUPStream.streamStride = shortVertexStreamZeroStride;
 	currentState.currentSoftUPStream.streamDividerFrequency = D3DSTREAMSOURCE_INDEXEDDATA;
@@ -8746,12 +8774,12 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 
 	const unsigned short shortVertexStreamZeroStride = (const unsigned short)VertexStreamZeroStride;
 
-	currentState.currentSoftUPStream.vertexBuffer->SoftUPSetInternalPointer( (const BYTE* const)pVertexStreamZeroData);
+	currentState.currentSoftUPStream.vertexBuffer->SoftUPSetInternalPointer( (const BYTE* const)pVertexStreamZeroData, NumVertices * shortVertexStreamZeroStride);
 	currentState.currentSoftUPStream.streamOffset = 0;
 	currentState.currentSoftUPStream.streamStride = shortVertexStreamZeroStride;
 	currentState.currentSoftUPStream.streamDividerFrequency = D3DSTREAMSOURCE_INDEXEDDATA;
 
-	currentState.currentSoftUPIndexBuffer->SoftUPSetInternalPointer(pIndexData, IndexDataFormat);
+	currentState.currentSoftUPIndexBuffer->SoftUPSetInternalPointer(pIndexData, IndexDataFormat, PrimitiveType, PrimitiveCount);
 
 	SwapWithCopy(currentState.currentSoftUPStream, currentState.currentStreams[0]);
 	SwapWithCopy(currentState.currentSoftUPStreamEnd, currentState.currentStreamEnds[0]);
@@ -8838,6 +8866,7 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 #ifdef _DEBUG
 		__debugbreak(); // We should never be here...
 #endif
+		return;
 	}
 	const BYTE* const positionT0stream = currentState.currentStreams[positionT0->Stream].vertexBuffer->GetInternalDataBuffer() + currentState.currentStreams[positionT0->Stream].streamOffset + positionT0->Offset;
 	const unsigned short positionT0streamStride = currentState.currentStreams[positionT0->Stream].streamStride;

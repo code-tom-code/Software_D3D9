@@ -75,7 +75,7 @@ public:
 		isSoftVertexBufferUP = isSoftUPVertexBuffer;
 	}
 
-	inline void SoftUPSetInternalPointer(const BYTE* const stream0BytesUP)
+	inline void SoftUPSetInternalPointer(const BYTE* const stream0BytesUP, const UINT BufferLengthBytes)
 	{
 #ifdef _DEBUG
 		if (!isSoftVertexBufferUP)
@@ -92,6 +92,7 @@ public:
 		}
 #endif
 		data = (BYTE* const)stream0BytesUP;
+		InternalLength = BufferLengthBytes;
 	}
 
 	inline void SoftUPResetInternalPointer(void)
@@ -107,6 +108,7 @@ public:
 		}
 #endif
 		data = NULL;
+		InternalLength = 0;
 	}
 
 	inline const BYTE* const GetInternalDataBuffer(void) const

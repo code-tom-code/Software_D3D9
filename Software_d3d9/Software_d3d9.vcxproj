@@ -45,9 +45,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -96,7 +98,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FixedFunctionToPixelShader.cpp" />
     <ClCompile Include="FixedFunctionToShader.cpp" />
+    <ClCompile Include="FixedFunctionToVertexShader.cpp" />
     <ClCompile Include="hookd3d9.cpp" />
     <ClCompile Include="IDirect3D9Hook.cpp" />
     <ClCompile Include="IDirect3DBaseTexture9Hook.cpp" />
@@ -125,6 +129,9 @@
     <ClCompile Include="ShaderTextureFunctions4.cpp" />
     <ClCompile Include="VShaderEngine_InterpreterExec1.cpp" />
     <ClCompile Include="VShaderEngine_InterpreterExec4.cpp" />
+    <None Include="FixedFuncEmu\FFPS\Include\FFPS_ApplyColorStage.fxh" />
+    <None Include="FixedFuncEmu\FFPS\Include\FFPS_ArgumentSelector.fxh" />
+    <None Include="FixedFuncEmu\FFPS\Include\FFPS_TexLoad.fxh" />
     <None Include="ShaderJIT_PrefixFile.cpp" />
     <ClCompile Include="ShaderJIT_HLSL_to_CPP.cpp" />
     <ClCompile Include="VShaderEngine.cpp" />
@@ -169,16 +176,16 @@
     <ClInclude Include="VShaderEngine.h" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="FixedFunctionPixelShader.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">3.0</ShaderModel>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">3.0</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="FixedFunctionVertexShader.hlsl">
+    <None Include="FixedFuncEmu\FFPS\Source\FixedFunctionPixelShader.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="FixedFuncEmu\FFVS\Include\FFVS_CalculateSingleLight.fxh">
+      <FileType>Document</FileType>
+    </None>
+    <FxCompile Include="FixedFuncEmu\FFVS\Source\FixedFunctionVertexShader.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">3.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">3.0</ShaderModel>
     </FxCompile>
   </ItemGroup>

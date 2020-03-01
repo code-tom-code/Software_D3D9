@@ -225,16 +225,19 @@ void IDirect3DVertexShader9Hook::JitLoadShader()
 			if (!hm2)
 			{
 				DbgBreakPrint("Error: Failed to load recently JIT'd Vertex Shader");
+				return;
 			}
 			jitShaderMain = (VSEntry)GetProcAddress(hm2, shaderMainExportName);
 			jitShaderMain4 = (VSEntry)GetProcAddress(hm2, shaderMainExportName4);
 			if (!jitShaderMain)
 			{
 				DbgBreakPrint("Error: Cannot find VertexShaderMain in newly created JIT DLL");
+				return;
 			} 
 			else if (!jitShaderMain4)
 			{
 				DbgPrint("Warning: Cannot find VertexShaderMain4 in newly created JIT DLL");
+				return;
 			}
 		}
 	}

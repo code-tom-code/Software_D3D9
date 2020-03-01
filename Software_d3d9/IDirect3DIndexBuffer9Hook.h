@@ -101,7 +101,7 @@ public:
 		isSoftIndexBufferUP = isSoftUPIndexBuffer;
 	}
 
-	inline void SoftUPSetInternalPointer(const void* const stream0IndicesUP, const D3DFORMAT newFormat)
+	inline void SoftUPSetInternalPointer(const void* const stream0IndicesUP, const D3DFORMAT newFormat, const D3DPRIMITIVETYPE PrimitiveType, const UINT PrimitiveCount)
 	{
 #ifdef _DEBUG
 		if (!isSoftIndexBufferUP)
@@ -123,6 +123,34 @@ public:
 #endif
 		rawBytes.voidBytes = (BYTE* const)stream0IndicesUP;
 		InternalFormat = newFormat;
+
+		unsigned indexCount;
+		switch (PrimitiveType)
+		{
+		case D3DPT_POINTLIST:
+			indexCount = PrimitiveCount;
+			break;
+		case D3DPT_LINELIST:
+			indexCount = PrimitiveCount * 2;
+			break;
+		case D3DPT_LINESTRIP:
+			indexCount = PrimitiveCount - 1;
+			break;
+		default:
+#ifdef _DEBUG
+			__debugbreak(); // Should never be here
+#endif
+		case D3DPT_TRIANGLELIST:
+			indexCount = PrimitiveCount * 3;
+			break;
+		case D3DPT_TRIANGLESTRIP:
+		case D3DPT_TRIANGLEFAN:
+			indexCount = PrimitiveCount - 2;
+			break;
+		}
+
+		const unsigned char singleIndexSize = (newFormat == D3DFMT_INDEX16) ? 2 : 4;
+		InternalLength = indexCount * singleIndexSize;
 	}
 
 	inline void SoftUPResetInternalPointer(void)
@@ -139,6 +167,7 @@ public:
 #endif
 		rawBytes.voidBytes = NULL;
 		InternalFormat = D3DFMT_UNKNOWN;
+		InternalLength = 0;
 	}
 
 protected:

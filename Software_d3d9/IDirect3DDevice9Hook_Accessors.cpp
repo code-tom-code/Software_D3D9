@@ -1255,7 +1255,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTexture(
 	}
 #endif
 
-	if (Stage > ARRAYSIZE(currentState.currentTextures) )
+	if (Stage >= ARRAYSIZE(currentState.currentTextures) )
 	{
 #ifdef _DEBUG
 		DbgBreakPrint("Error: Texture index out of bounds");
@@ -1305,7 +1305,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetTextureS
 	}
 #endif
 
-	if (Stage > MAX_NUM_TEXTURE_STAGE_STATES)
+	if (Stage >= MAX_NUM_TEXTURE_STAGE_STATES)
 		return D3DERR_INVALIDCALL;
 
 	if (Type < D3DTSS_COLOROP || Type > D3DTSS_CONSTANT)
@@ -1326,7 +1326,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTextureS
 	if (FAILED(ret) )
 		return ret;
 
-	if (Stage > MAX_NUM_TEXTURE_STAGE_STATES)
+	if (Stage >= MAX_NUM_TEXTURE_STAGE_STATES)
 		return D3DERR_INVALIDCALL;
 
 	if (Type < D3DTSS_COLOROP || Type > D3DTSS_CONSTANT)
@@ -1561,7 +1561,10 @@ COM_DECLSPEC_NOTHROW BOOL STDMETHODCALLTYPE IDirect3DDevice9Hook::GetSoftwareVer
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetNPatchMode(THIS_ float nSegments)
 {
 	// Nope! Not gonna support tessellation in D3D9
-	DbgBreakPrint("Error: Tessellation is not yet supported");
+	if (nSegments != 0.0f)
+	{
+		DbgBreakPrint("Error: Tessellation is not yet supported");
+	}
 
 	HRESULT ret = d3d9dev->SetNPatchMode(nSegments);
 	return ret;

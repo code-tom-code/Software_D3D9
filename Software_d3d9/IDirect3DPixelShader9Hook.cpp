@@ -122,11 +122,13 @@ void IDirect3DPixelShader9Hook::JitLoadShader()
 			if (!hm2)
 			{
 				DbgBreakPrint("Error: Failed to load recently JIT'd Pixel Shader");
+				return;
 			}
 			jitShaderMain = (PSEntry)GetProcAddress(hm2, shaderMainExportName);
 			if (!jitShaderMain)
 			{
 				DbgBreakPrint("Error: Cannot find PixelShaderMain in newly created JIT DLL");
+				return;
 			}
 		}
 	}

@@ -175,39 +175,47 @@ struct TextureStageState
 	TextureStageState()
 	{
 		memset(this, 0, sizeof(*this) );
-		SetStageDefaults();
+		SetStageDefaults(0);
 	}
 
 	~TextureStageState()
 	{
 		memset(this, 0, sizeof(*this) );
-		SetStageDefaults();
+		SetStageDefaults(0);
 	}
 
-	inline void SetStageDefaults(void)
+	inline void SetStageDefaults(const unsigned stageNum)
 	{
 		// All of the invalid state indices have their values set to "0xBAADCAFE" in D3D9 under Windows 10
 		static const DWORD invalidTypeValue = 0xBAADCAFE;
 		for (unsigned x = 0; x < D3DTSS_CONSTANT + 1; ++x)
 			stageStateUnion.state[x] = invalidTypeValue;
 
-		stageStateUnion.namedStates.colorOp = D3DTOP_MODULATE;
-		stageStateUnion.namedStates.colorArg1 = D3DTOP_SELECTARG1;
-		stageStateUnion.namedStates.colorArg2 = D3DTOP_DISABLE;
-		stageStateUnion.namedStates.alphaOp = D3DTOP_SELECTARG1;
-		stageStateUnion.namedStates.alphaArg1 = D3DTOP_SELECTARG1;
-		stageStateUnion.namedStates.alphaArg2 = D3DTOP_DISABLE;
+		if (stageNum == 0)
+		{
+			stageStateUnion.namedStates.colorOp = D3DTOP_MODULATE;
+			stageStateUnion.namedStates.alphaOp = D3DTOP_SELECTARG1;
+		}
+		else
+		{
+			stageStateUnion.namedStates.colorOp = D3DTOP_DISABLE;
+			stageStateUnion.namedStates.alphaOp = D3DTOP_DISABLE;
+		}
+		stageStateUnion.namedStates.colorArg1 = D3DTA_TEXTURE;
+		stageStateUnion.namedStates.colorArg2 = D3DTA_CURRENT;
+		stageStateUnion.namedStates.alphaArg1 = D3DTA_TEXTURE;
+		stageStateUnion.namedStates.alphaArg2 = D3DTA_CURRENT;
 		stageStateUnion.namedStates.bumpEnvMat00 = 0.0f;
 		stageStateUnion.namedStates.bumpEnvMat01 = 0.0f;
 		stageStateUnion.namedStates.bumpEnvMat10 = 0.0f;
 		stageStateUnion.namedStates.bumpEnvMat11 = 0.0f;
-		stageStateUnion.namedStates.texCoordIndex = 0;
+		stageStateUnion.namedStates.texCoordIndex = D3DTSS_TCI_PASSTHRU | stageNum;
 		stageStateUnion.namedStates.bumpEnvLScale = 0.0f; // Shouldn't this default to 1.0f instead?
 		stageStateUnion.namedStates.bumpEnvLOffset = 0.0f;
 		stageStateUnion.namedStates.textureTransformFlags = D3DTTFF_DISABLE;
-		stageStateUnion.namedStates.colorArg0 = D3DTOP_DISABLE;
-		stageStateUnion.namedStates.alphaArg0 = D3DTOP_DISABLE;
-		stageStateUnion.namedStates.resultArg = D3DTOP_DISABLE;
+		stageStateUnion.namedStates.colorArg0 = D3DTA_CURRENT;
+		stageStateUnion.namedStates.alphaArg0 = D3DTA_CURRENT;
+		stageStateUnion.namedStates.resultArg = D3DTA_CURRENT;
 		stageStateUnion.namedStates.constant = D3DCOLOR_ARGB(0, 0, 0, 0);
 	}
 
@@ -577,6 +585,10 @@ __declspec(align(16) ) struct Transforms
 	inline void SetViewTransform(const D3DXMATRIXA16& newView)
 	{
 		wvpDirty = true;
+		wvDirty[0] = true;
+		wvDirty[1] = true;
+		wvDirty[2] = true;
+		wvDirty[3] = true;
 		ViewTransform = newView;
 	}
 
@@ -586,14 +598,25 @@ __declspec(align(16) ) struct Transforms
 		ProjectionTransform = newProj;
 	}
 
-	inline void SetWorldTransform(const D3DXMATRIXA16& newWorld, const unsigned worldIndex)
+	inline void SetWorldTransform(const D3DXMATRIXA16& newWorld, const unsigned char worldIndex)
 	{
-		wvpDirty = true;
+		if (worldIndex < 4)
+		{
+			if (worldIndex == 0)
+				wvpDirty = true;
+			wvDirty[worldIndex] = true;
+		}
 		WorldTransforms[worldIndex] = newWorld;
 	}
 
-	inline void SetTextureTransform(const D3DXMATRIXA16& newTexture, const unsigned textureIndex)
+	inline void SetTextureTransform(const D3DXMATRIXA16& newTexture, const unsigned char textureIndex)
 	{
+#ifdef _DEBUG
+		if (textureIndex >= 8)
+		{
+			__debugbreak();
+		}
+#endif
 		TextureTransforms[textureIndex] = newTexture;
 	}
 
@@ -602,18 +625,85 @@ __declspec(align(16) ) struct Transforms
 	D3DXMATRIXA16 TextureTransforms[D3DDP_MAXTEXCOORD];
 	D3DXMATRIXA16 WorldTransforms[MAX_WORLD_TRANSFORMS];
 
+	inline void ComputeWVMatrixForCache(const unsigned char wvMatrixIndex) const
+	{
+		D3DXMATRIXA16& cachedWV = CachedWVTransform[wvMatrixIndex];
+		cachedWV = WorldTransforms[wvMatrixIndex] * ViewTransform;
+		D3DXMatrixInverse(&(CachedInvTransposeWVTransform[wvMatrixIndex]), NULL, &cachedWV);
+		// D3DXMatrixTranspose(&(CachedInvTransposeWVTransform[wvMatrixIndex]), &inverseWV); // Skip the transpose
+	}
+
 	inline const D3DXMATRIXA16& GetWVPTransform() const
 	{
+		if (wvDirty[0])
+		{
+			wvDirty[0] = false;
+			ComputeWVMatrixForCache(0);
+		}
 		if (wvpDirty)
 		{
 			wvpDirty = false;
-			CachedWVPTransform = WorldTransforms[0] * ViewTransform * ProjectionTransform;
+			CachedWVPTransform = CachedWVTransform[0] * ProjectionTransform;
 		}
 		return CachedWVPTransform;
 	}
 
-	mutable D3DXMATRIXA16 CachedWVPTransform;
+	inline const D3DXMATRIXA16& GetWVTransformFromCache(const unsigned char worldTransformIndex) const
+	{
+#ifdef _DEBUG
+		if (worldTransformIndex >= 4)
+		{
+			__debugbreak();
+		}
+#endif
+		if (bool& isThisWVDirty = wvDirty[worldTransformIndex])
+		{
+			isThisWVDirty = false;
+			ComputeWVMatrixForCache(worldTransformIndex);
+		}
+		return CachedWVTransform[worldTransformIndex];
+	}
+
+	inline void GetWVTransform(const unsigned char worldTransformIndex, D3DXMATRIXA16& outWVMatrix) const
+	{
+		if (worldTransformIndex < 4)
+			outWVMatrix = GetWVTransformFromCache(worldTransformIndex);
+		else
+			outWVMatrix = WorldTransforms[worldTransformIndex] * ViewTransform;
+	}
+
+	inline const D3DXMATRIXA16& GetInvTransposeWVTransformFromCache(const unsigned char worldTransformIndex) const
+	{
+#ifdef _DEBUG
+		if (worldTransformIndex >= 4)
+		{
+			__debugbreak();
+		}
+#endif
+		if (bool& isThisWVDirty = wvDirty[worldTransformIndex])
+		{
+			isThisWVDirty = false;
+			ComputeWVMatrixForCache(worldTransformIndex);
+		}
+		return CachedInvTransposeWVTransform[worldTransformIndex];
+	}
+
+	inline void GetInvTransposeWVTransform(const unsigned char worldTransformIndex, D3DXMATRIXA16& outInvTransposeWVMatrix) const
+	{
+		if (worldTransformIndex < 4)
+			outInvTransposeWVMatrix = GetInvTransposeWVTransformFromCache(worldTransformIndex);
+		else
+		{
+			D3DXMatrixInverse(&outInvTransposeWVMatrix, NULL, &(CachedWVTransform[worldTransformIndex]) );
+			//D3DXMatrixTranspose(&outInvTransposeWVMatrix, &inverseWV); // Skip the transpose
+		}
+	}
+
+	mutable D3DXMATRIXA16 CachedWVPTransform; // This is a cached version of worldMatrix0 * viewMatrix * projMatrix
+	mutable D3DXMATRIXA16 CachedWVTransform[4];
+	mutable D3DXMATRIXA16 CachedInvTransposeWVTransform[4];
 	mutable bool wvpDirty;
+	mutable bool wvDirty[4];
 };
 
 struct LightInfo
@@ -702,13 +792,14 @@ struct DeviceState
 		memset(&currentTextures, 0, sizeof(currentTextures) );
 		memset(&currentCubeTextures, 0, sizeof(currentTextures) );
 		memset(&currentVolumeTextures, 0, sizeof(currentTextures) );
-		memset(&currentMaterial, 0, sizeof(currentMaterial) );
+		memset(&currentMaterial, 0, sizeof(currentMaterial) ); // Looks like our material gets initialized to all zeroes (as per GetMaterial() right after device creation)
 		memset(&enabledLightIndices, 0, sizeof(enabledLightIndices) );
 
+		for (unsigned x = 0; x < 8; ++x)
+			currentStageStates[x].SetStageDefaults(x);
+
 		for (unsigned x = 0; x < D3DMAXUSERCLIPPLANES; ++x)
-		{
 			currentClippingPlanes[x] = D3DXPLANE(0.0f, 0.0f, 0.0f, 0.0f);
-		}
 
 		lightInfoMap = new std::map<UINT, LightInfo*>();
 	}
@@ -1443,7 +1534,7 @@ inline void ColorDWORDToFloat4(const D3DCOLOR inColor, D3DXVECTOR4& outColor)
 	const __m128 colorfloat4 = _mm_cvtepi32_ps(coloruint4);
 	const __m128 normalizedColorFloat4 = _mm_mul_ps(colorfloat4, ColorDWORDToFloat4Divisor);
 
-	// Swizzle from RGBA -> ARGB
+	// Swizzle from ARGB -> RGBA
 	const __m128 swizzledColorFloat4 = _mm_shuffle_ps(normalizedColorFloat4, normalizedColorFloat4, _MM_SHUFFLE(3, 0, 1, 2) );
 
 	if (writeMask == 0xF)
