@@ -22,7 +22,7 @@ static const unsigned WORLDVIEW_TRANSFORM_REGISTERS = 112u;
 struct wvShaderMatrix
 {
 	D3DXMATRIXA16 worldView; // Forwards worldview matrix (used for transforming vertex positions from modelspace to view-space)
-	D3DXMATRIXA16 invTransposeWorldView; // Inverse-Transpose of the worldView matrix (used for transforming vertex normals from modelspace to view-space)
+	D3DXMATRIXA16 invWorldView; // Inverse of the worldView matrix (used for transforming vertex normals from modelspace to view-space)
 };
 
 struct shaderPackedLight
@@ -669,14 +669,13 @@ void SetFixedFunctionVertexShaderState(const DeviceState& state, IDirect3DDevice
 		{
 			wvShaderMatrix& thisShaderWVMatrices = indexedWorldViewBlendingMatrices[x];
 			thisShaderWVMatrices.worldView = transforms.GetWVTransformFromCache(x);
-			thisShaderWVMatrices.invTransposeWorldView = transforms.GetInvTransposeWVTransformFromCache(x);
+			thisShaderWVMatrices.invWorldView = transforms.GetInvWVTransformFromCache(x);
 		}
 		for (unsigned x = 4; x < MAX_WORLD_TRANSFORMS; ++x)
 		{
 			wvShaderMatrix& thisShaderWVMatrices = indexedWorldViewBlendingMatrices[x];
 			thisShaderWVMatrices.worldView = transforms.WorldTransforms[x] * transforms.ViewTransform;
-			D3DXMatrixInverse(&thisShaderWVMatrices.invTransposeWorldView, NULL, &(thisShaderWVMatrices.worldView) );
-			//D3DXMatrixTranspose(&thisShaderWVMatrices.invTransposeWorldView, &inverseWorldView); // Skip the transpose
+			D3DXMatrixInverse(&thisShaderWVMatrices.invWorldView, NULL, &(thisShaderWVMatrices.worldView) );
 		}
 		for (unsigned x = 0; x < MAX_WORLD_TRANSFORMS; ++x)
 		{
@@ -689,7 +688,7 @@ void SetFixedFunctionVertexShaderState(const DeviceState& state, IDirect3DDevice
 		{
 			wvShaderMatrix thisShaderWVMatrices;
 			thisShaderWVMatrices.worldView = transforms.GetWVTransformFromCache(x);
-			thisShaderWVMatrices.invTransposeWorldView = transforms.GetInvTransposeWVTransformFromCache(x);
+			thisShaderWVMatrices.invWorldView = transforms.GetInvWVTransformFromCache(x);
 			dev->SetVertexShaderConstantF(WORLDVIEW_TRANSFORM_REGISTERS + 7 * x, (const float* const)&thisShaderWVMatrices, 7);
 		}
 	}

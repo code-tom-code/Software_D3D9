@@ -629,8 +629,7 @@ __declspec(align(16) ) struct Transforms
 	{
 		D3DXMATRIXA16& cachedWV = CachedWVTransform[wvMatrixIndex];
 		cachedWV = WorldTransforms[wvMatrixIndex] * ViewTransform;
-		D3DXMatrixInverse(&(CachedInvTransposeWVTransform[wvMatrixIndex]), NULL, &cachedWV);
-		// D3DXMatrixTranspose(&(CachedInvTransposeWVTransform[wvMatrixIndex]), &inverseWV); // Skip the transpose
+		D3DXMatrixInverse(&(CachedInvWVTransform[wvMatrixIndex]), NULL, &cachedWV);
 	}
 
 	inline const D3DXMATRIXA16& GetWVPTransform() const
@@ -672,7 +671,7 @@ __declspec(align(16) ) struct Transforms
 			outWVMatrix = WorldTransforms[worldTransformIndex] * ViewTransform;
 	}
 
-	inline const D3DXMATRIXA16& GetInvTransposeWVTransformFromCache(const unsigned char worldTransformIndex) const
+	inline const D3DXMATRIXA16& GetInvWVTransformFromCache(const unsigned char worldTransformIndex) const
 	{
 #ifdef _DEBUG
 		if (worldTransformIndex >= 4)
@@ -685,23 +684,20 @@ __declspec(align(16) ) struct Transforms
 			isThisWVDirty = false;
 			ComputeWVMatrixForCache(worldTransformIndex);
 		}
-		return CachedInvTransposeWVTransform[worldTransformIndex];
+		return CachedInvWVTransform[worldTransformIndex];
 	}
 
-	inline void GetInvTransposeWVTransform(const unsigned char worldTransformIndex, D3DXMATRIXA16& outInvTransposeWVMatrix) const
+	inline void GetInvWVTransform(const unsigned char worldTransformIndex, D3DXMATRIXA16& outInvWVMatrix) const
 	{
 		if (worldTransformIndex < 4)
-			outInvTransposeWVMatrix = GetInvTransposeWVTransformFromCache(worldTransformIndex);
+			outInvWVMatrix = GetInvWVTransformFromCache(worldTransformIndex);
 		else
-		{
-			D3DXMatrixInverse(&outInvTransposeWVMatrix, NULL, &(CachedWVTransform[worldTransformIndex]) );
-			//D3DXMatrixTranspose(&outInvTransposeWVMatrix, &inverseWV); // Skip the transpose
-		}
+			D3DXMatrixInverse(&outInvWVMatrix, NULL, &(CachedWVTransform[worldTransformIndex]) );
 	}
 
 	mutable D3DXMATRIXA16 CachedWVPTransform; // This is a cached version of worldMatrix0 * viewMatrix * projMatrix
 	mutable D3DXMATRIXA16 CachedWVTransform[4];
-	mutable D3DXMATRIXA16 CachedInvTransposeWVTransform[4];
+	mutable D3DXMATRIXA16 CachedInvWVTransform[4];
 	mutable bool wvpDirty;
 	mutable bool wvDirty[4];
 };
