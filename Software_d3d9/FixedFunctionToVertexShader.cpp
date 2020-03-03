@@ -299,25 +299,25 @@ static inline void BuildVertexStateDefines(const DeviceState& state, std::vector
 	{
 		D3DXMACRO diffuse_mcs = {0};
 		diffuse_mcs.Name = "DIFFUSEMATERIALSOURCE";
-		diffuse_mcs.Definition = STAGE_MATERIALSOURCE[state.currentRenderStates.renderStatesUnion.namedStates.diffuseMaterialSource];
+		diffuse_mcs.Definition = STAGE_MATERIALSOURCE[state.currentRenderStates.renderStatesUnion.namedStates.colorVertex ? state.currentRenderStates.renderStatesUnion.namedStates.diffuseMaterialSource : D3DMCS_MATERIAL];
 		defines.push_back(diffuse_mcs);
 	}
 	{
 		D3DXMACRO specular_mcs = {0};
 		specular_mcs.Name = "SPECULARMATERIALSOURCE";
-		specular_mcs.Definition = STAGE_MATERIALSOURCE[state.currentRenderStates.renderStatesUnion.namedStates.specularMaterialSource];
+		specular_mcs.Definition = STAGE_MATERIALSOURCE[state.currentRenderStates.renderStatesUnion.namedStates.colorVertex ? state.currentRenderStates.renderStatesUnion.namedStates.specularMaterialSource : D3DMCS_MATERIAL];
 		defines.push_back(specular_mcs);
 	}
 	{
 		D3DXMACRO ambient_mcs = {0};
 		ambient_mcs.Name = "AMBIENTMATERIALSOURCE";
-		ambient_mcs.Definition = STAGE_MATERIALSOURCE[state.currentRenderStates.renderStatesUnion.namedStates.ambientMaterialSource];
+		ambient_mcs.Definition = STAGE_MATERIALSOURCE[state.currentRenderStates.renderStatesUnion.namedStates.ambientMaterialSource]; // D3DRS_AMBIENTMATERIALSOURCE does not appear to be affected by D3DRS_COLORVERTEX
 		defines.push_back(ambient_mcs);
 	}
 	{
 		D3DXMACRO emissive_mcs = {0};
 		emissive_mcs.Name = "EMISSIVEMATERIALSOURCE";
-		emissive_mcs.Definition = STAGE_MATERIALSOURCE[state.currentRenderStates.renderStatesUnion.namedStates.emissiveMaterialSource];
+		emissive_mcs.Definition = STAGE_MATERIALSOURCE[state.currentRenderStates.renderStatesUnion.namedStates.emissiveMaterialSource]; // D3DRS_EMISSIVEMATERIALSOURCE does not appear to be affected by D3DRS_COLORVERTEX
 		defines.push_back(emissive_mcs);
 	}
 
@@ -392,6 +392,7 @@ static inline void BuildVertexStateDefines(const DeviceState& state, std::vector
 			}
 		}
 
+		// Note that it *is* possible to have a situation where NUM_ENABLED_LIGHTS is 0 and LIGHTING is 1
 		D3DXMACRO lightCount = {0};
 		lightCount.Name = "NUM_ENABLED_LIGHTS";
 		lightCount.Definition = lightCountStr[numEnabledLights];

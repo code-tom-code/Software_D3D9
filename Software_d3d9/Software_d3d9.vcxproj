@@ -187,6 +187,10 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">3.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">3.0</ShaderModel>
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyCode</AssemblerOutput>
+      <AssemblerOutputFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(OutDir)%(Filename).asm</AssemblerOutputFile>
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AssemblyCode</AssemblerOutput>
+      <AssemblerOutputFile Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)%(Filename).asm</AssemblerOutputFile>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

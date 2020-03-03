@@ -122,7 +122,7 @@ struct D3DMATERIAL9
 	float4 Diffuse;
 	float4 Specular; // This contains Specular as RGB and Specular Power as A
 	float4 Ambient;
-	float4 Emissive;
+	float3 Emissive; // Emissive.a is not used
 };
 
 struct LightData
@@ -385,18 +385,18 @@ const float4 GetMaterialAmbient(in const inVert input)
 #endif
 }
 
-const float4 GetMaterialEmissive(in const inVert input)
+const float3 GetMaterialEmissive(in const inVert input)
 {
 #if (EMISSIVEMATERIALSOURCE < D3DMCS_MATERIAL) || (EMISSIVEMATERIALSOURCE > D3DMCS_COLOR2)
 	#error Error: Invalid EMISSIVEMATERIALSOURCE enum specified!
 #endif
 
 #if EMISSIVEMATERIALSOURCE == D3DMCS_COLOR1 && defined(INPUT_HAS_DIFFUSE)
-	return input.diffuse;
+	return input.diffuse.rgb;
 #elif EMISSIVEMATERIALSOURCE == D3DMCS_COLOR2 && defined(INPUT_HAS_SPECULAR)
-	return input.specular;
+	return input.specular.rgb;
 #else
-	return materialData.Emissive;
+	return materialData.Emissive.rgb;
 #endif
 }
 
@@ -782,7 +782,7 @@ const PerLightResults CalculateFixedFunctionLightingForAllLights(in const float3
 #if NUM_ENABLED_LIGHTS < 1 || NUM_ENABLED_LIGHTS > 8
 	allLightsResults.Ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
 	allLightsResults.Diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
-	allLightsResults.Specular = float4(0.0f, 0.0f, 0.0f, 1.0f);
+	allLightsResults.Specular = float4(0.0f, 0.0f, 0.0f, 0.0f);
 	return allLightsResults;
 #endif
 
@@ -859,18 +859,15 @@ const PerLightResults CalculateFixedFunctionLightingForAllLights(in const float3
 #endif // #if NUM_ENABLED_LIGHTS >= 2
 #endif // #if NUM_ENABLED_LIGHTS >= 1
 
-	// No matter what, the .w component of the Specular color is always 1.0f (unless vertex fog gets placed into specular alpha)
-	allLightsResults.Specular.w = 1.0f;
-
 	return allLightsResults;
 }
 
 const float4 CalculateFixedFunctionLighting(in const inVert input, const posNormal viewspacePN, out float4 outSpecular)
 {
-	const float4 emissive = GetMaterialEmissive(input);
-
-	const PerLightResults allLightsCombined = CalculateFixedFunctionLightingForAllLights(viewspacePN.worldViewPos, viewspacePN.oNormal);
 	const float4 materialAmbient = GetMaterialAmbient(input);
+	const float3 emissive = GetMaterialEmissive(input);
+#if NUM_ENABLED_LIGHTS >= 1
+	const PerLightResults allLightsCombined = CalculateFixedFunctionLightingForAllLights(viewspacePN.worldViewPos, viewspacePN.oNormal);
 	const float4 materialDiffuse = GetMaterialDiffuse(input);
 	const float4 materialSpecular = GetMaterialSpecular(input);
 
@@ -881,7 +878,13 @@ const float4 CalculateFixedFunctionLighting(in const inVert input, const posNorm
 
 	outSpecular = specular;
 
-	return ambient + diffuse + emissive;
+	return ambient + diffuse + float4(emissive, 0.0f);
+#else
+	// With no lights enabled, the Diffuse and Specular terms completely fall away, and we're left with just Ambient and Emissive terms
+	outSpecular = float4(0.0f, 0.0f, 0.0f, 1.0f);
+	const float4 ambient = materialAmbient * AMBIENT;
+	return ambient + float4(emissive, 0.0f);
+#endif
 }
 
 const float4 ResolveTex0(const float4 tex0source, const posNormal viewspacePN)

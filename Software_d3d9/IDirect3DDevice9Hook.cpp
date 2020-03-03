@@ -3955,15 +3955,18 @@ const bool IDirect3DDevice9Hook::TotalDrawCallSkipTest(void) const
 	// Skip the entire draw call if we're doing dumb stuff (like rendering a fullscreen quad that is entirely alpha-transparent while alpha blending is enabled using the fixed function pipeline. Looking at you, Morrowind.exe):
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable && !currentState.currentPixelShader && !currentState.currentVertexShader)
 	{
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.lighting && currentState.currentRenderStates.renderStatesUnion.namedStates.diffuseMaterialSource == D3DMCS_MATERIAL &&
-			currentState.currentMaterial.Diffuse.a == 0.0f)
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.lighting && 
+			currentState.currentRenderStates.renderStatesUnion.namedStates.ambientMaterialSource == D3DMCS_MATERIAL && currentState.currentMaterial.Ambient.a == 0.0f &&
+			currentState.currentRenderStates.renderStatesUnion.namedStates.diffuseMaterialSource == D3DMCS_MATERIAL && currentState.currentMaterial.Diffuse.a == 0.0f)
 		{
 			// FFPS selects vertex color for alpha channel
-			if (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaOp == D3DTOP_MODULATE && (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg1 == D3DTA_DIFFUSE || currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg2 == D3DTA_DIFFUSE) )
+			if (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaOp == D3DTOP_MODULATE && 
+				(currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg1 == D3DTA_DIFFUSE || currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg2 == D3DTA_DIFFUSE || 
+				currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg1 == D3DTA_CURRENT || currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg2 == D3DTA_CURRENT) )
 				return false;
-			else if (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaOp == D3DTOP_SELECTARG1 && currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg1 == D3DTA_DIFFUSE)
+			else if (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaOp == D3DTOP_SELECTARG1 && (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg1 == D3DTA_DIFFUSE || currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg1 == D3DTA_CURRENT) )
 				return false;
-			else if (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaOp == D3DTOP_SELECTARG2 && currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg2 == D3DTA_DIFFUSE)
+			else if (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaOp == D3DTOP_SELECTARG2 && (currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg2 == D3DTA_DIFFUSE || currentState.currentStageStates[0].stageStateUnion.namedStates.alphaArg2 == D3DTA_CURRENT) )
 				return false;
 		}
 	}
