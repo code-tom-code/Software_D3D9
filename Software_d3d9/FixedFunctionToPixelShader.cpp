@@ -3,9 +3,10 @@
 #include "IDirect3DTexture9Hook.h"
 #include "resource.h"
 
-static const unsigned TFACTOR_REGISTER = 0u; // c0
-static const unsigned TEXTURESTAGE_CONSTANTS_REGISTERS = 1u; // c1 thru c8
-static const unsigned STAGE_BUMPENVMAT_REGISTERS = 9u; // c9 thru c26
+static const unsigned char TFACTOR_REGISTER = 0u; // c0
+static const unsigned char FOGCOLOR_REGISTER = 1u; // c1
+static const unsigned char TEXTURESTAGE_CONSTANTS_REGISTERS = 2u; // c2 thru c9
+static const unsigned char STAGE_BUMPENVMAT_REGISTERS = 10u; // c10 thru c27
 
 const FixedFunctionStateHash HashPixelState(const DeviceState& state)
 {
@@ -38,7 +39,7 @@ const FixedFunctionStateHash HashPixelState(const DeviceState& state)
 	}
 
 	// Render states:
-	// - Fog (if pixel fog)
+	// - Fog
 	// - Texture factor (shared by all texture stages)
 	// - Shading mode (gourad vs. flat shading)
 
@@ -49,9 +50,8 @@ const FixedFunctionStateHash HashPixelState(const DeviceState& state)
 	}
 
 	HashContinue(retHash, state.currentRenderStates.renderStatesUnion.namedStates.fogEnable);
-	HashContinue(retHash, state.currentRenderStates.renderStatesUnion.namedStates.rangeFogEnable);
 	HashContinue(retHash, state.currentRenderStates.renderStatesUnion.namedStates.textureFactor);
-	HashContinue(retHash, state.currentRenderStates.renderStatesUnion.namedStates.shadeMode);
+	HashContinue<unsigned char>(retHash, state.currentRenderStates.renderStatesUnion.namedStates.shadeMode);
 
 	return retHash;
 }
@@ -431,6 +431,14 @@ static inline void BuildPixelStateDefines(const DeviceState& state, std::vector<
 		}
 	}
 
+	if (state.currentRenderStates.renderStatesUnion.namedStates.fogEnable)
+	{
+		D3DXMACRO fogEnableMacro = {0};
+		fogEnableMacro.Name = "FOG_ENABLE";
+		fogEnableMacro.Definition = "1";
+		defines.push_back(fogEnableMacro);
+	}
+
 	if (state.currentRenderStates.renderStatesUnion.namedStates.colorVertex)
 	{
 		D3DXMACRO colorVertexMacro = {0};
@@ -658,7 +666,15 @@ void SetFixedFunctionPixelShaderState(const DeviceState& state, IDirect3DDevice9
 		( (tfactorColor >> 24) & 0xFF) / 255.0f); // A
 	dev->SetPixelShaderConstantF(TFACTOR_REGISTER, &tfactor.x, 1);
 
-	// D3DTSS_CONSTANT (c1 thru c9)
+	// FOGCOLOR (c1)
+	const D3DCOLOR fogColor = state.currentRenderStates.renderStatesUnion.namedStates.fogColor;
+	const D3DXVECTOR4 fogColorVec( ( (fogColor >> 16) & 0xFF) / 255.0f,  // R
+		( (fogColor >> 8) & 0xFF) / 255.0f,  // G
+		(fogColor & 0xFF) / 255.0f, 		 // B
+		( (fogColor >> 24) & 0xFF) / 255.0f); // A
+	dev->SetPixelShaderConstantF(FOGCOLOR_REGISTER, &fogColorVec.x, 1);
+
+	// D3DTSS_CONSTANT (c2 thru c10)
 	for (unsigned x = 0; x < MAX_NUM_TEXTURE_STAGE_STATES; ++x)
 	{
 		const D3DCOLOR stageConstantColor = state.currentStageStates[x].stageStateUnion.namedStates.constant;
@@ -669,7 +685,7 @@ void SetFixedFunctionPixelShaderState(const DeviceState& state, IDirect3DDevice9
 		dev->SetPixelShaderConstantF(TEXTURESTAGE_CONSTANTS_REGISTERS + x, &stageConstant.x, 1);
 	}
 
-	// BUMPENVMAT matrices (c9 thru c26)
+	// BUMPENVMAT matrices (c10 thru c27)
 	for (unsigned x = 0; x < MAX_NUM_TEXTURE_STAGE_STATES; ++x)
 	{
 		D3DXVECTOR4 stageBumpEnvMat[2];

@@ -12,6 +12,11 @@
 #define D3DLIGHT_SPOT 2
 #define D3DLIGHT_DIRECTIONAL 3
 
+#define D3DFOG_NONE		0
+#define D3DFOG_EXP		1
+#define D3DFOG_EXP2		2
+#define D3DFOG_LINEAR	3
+
 #define D3DVBF_DISABLE 0 // Disable vertex blending
 #define D3DVBF_0WEIGHTS 256 // one matrix is used with weight 1.0
 #define D3DVBF_1WEIGHTS 1 // 2 matrix blending
@@ -700,19 +705,23 @@ const float CalculatePointSizeOut(const float pointSize, const float3 viewspaceV
 }
 #endif // #ifdef OUTPUT_POINTSIZE
 
-const float CalculateFogOut(const float viewspaceVertexZ)
+const float CalculateFogOut(const float3 viewspaceVertexPos)
 {
 #if D3DRS_FOGVERTEXMODE != D3DFOG_NONE
-	const float absZDepth = abs(viewspaceVertexZ);
+#ifdef D3DRS_RANGEFOGENABLE
+	const float fogDistance = length(viewspaceVertexPos);
+#else
+	const float fogDistance = abs(viewspaceVertexPos.z);
+#endif
 #endif // #if D3DRS_FOGVERTEXMODE != D3DFOG_NONE
 
 #if D3DRS_FOGVERTEXMODE == D3DFOG_NONE
 	return 1.0f;
 #elif D3DRS_FOGVERTEXMODE == D3DFOG_EXP
-	const float dTimesDensity = absZDepth * D3DRS_FOGDENSITY;
+	const float dTimesDensity = fogDistance * D3DRS_FOGDENSITY;
 	return exp(-dTimesDensity);
 #elif D3DRS_FOGVERTEXMODE == D3DFOG_EXP2
-	const float dTimesDensity = absZDepth * D3DRS_FOGDENSITY;
+	const float dTimesDensity = fogDistance * D3DRS_FOGDENSITY;
 	const float dTimesDensitySquared = dTimesDensity * dTimesDensity;
 	return exp(-dTimesDensitySquared);
 #elif D3DRS_FOGVERTEXMODE == D3DFOG_LINEAR
@@ -720,7 +729,7 @@ const float CalculateFogOut(const float viewspaceVertexZ)
 	const float fogRange = D3DRS_FOGEND - D3DRS_FOGSTART;
 	const float FFVSx = -1.0f / fogRange;
 	const float FFVSy = D3DRS_FOGEND / fogRange;
-	return mad(absZDepth, FFVSx, FFVSy);
+	return mad(fogDistance, FFVSx, FFVSy);
 #else
 	#error Unknown D3DRS_FOGVERTEXMODE specified!
 	return 1.0f;
@@ -1054,7 +1063,7 @@ outVert main(in const inVert input)
 #endif // #ifdef OUTPUT_POINTSIZE
 
 #ifdef OUTPUT_FOG
-	ret.oFog = CalculateFogOut(pn.worldViewPos.z);
+	ret.oFog = CalculateFogOut(pn.worldViewPos);
 #endif // #ifdef OUTPUT_FOG
 
 	// For texture coordinates, the order in which they pass through the fixed-function pipeline when auto-generated texture coordinates are enabled for a texcoord channel is:

@@ -5,17 +5,17 @@
 
 #define M_PI       3.14159265358979323846f   // pi
 
-static const unsigned WVP_REGISTERS = 3u;
-static const unsigned TWEENFACTOR_REGISTER = 7u;
-static const unsigned POINTSCALEPARAMS_REGISTER = 8u;
-static const unsigned POINTSCALEDATA_REGISTER = 9u;
-static const unsigned FOGDATA_REGISTER = 14u;
-static const unsigned MATERIALDATA_REGISTERS = 15u;
-static const unsigned AMBIENT_REGISTER = 19u;
-static const unsigned TEXCOORD_TRANSFORM_REGISTERS = 20u;
-static const unsigned LIGHTDATA_REGISTERS = 52u;
-static const unsigned PROJMATRIX_REGISTERS = 108u;
-static const unsigned WORLDVIEW_TRANSFORM_REGISTERS = 112u;
+static const unsigned char WVP_REGISTERS = 3u;
+static const unsigned char TWEENFACTOR_REGISTER = 7u;
+static const unsigned char POINTSCALEPARAMS_REGISTER = 8u;
+static const unsigned char POINTSCALEDATA_REGISTER = 9u;
+static const unsigned char FOGDATA_REGISTER = 14u;
+static const unsigned char MATERIALDATA_REGISTERS = 15u;
+static const unsigned char AMBIENT_REGISTER = 19u;
+static const unsigned char TEXCOORD_TRANSFORM_REGISTERS = 20u;
+static const unsigned char LIGHTDATA_REGISTERS = 52u;
+static const unsigned char PROJMATRIX_REGISTERS = 108u;
+static const unsigned char WORLDVIEW_TRANSFORM_REGISTERS = 112u;
 
 #pragma pack(push)
 #pragma pack(1)
@@ -66,7 +66,12 @@ const FixedFunctionStateHash HashVertexState(const DeviceState& state)
 	HashContinue(retHash, currentNamedStates.indexedVertexBlendEnable);
 	HashContinue(retHash, currentNamedStates.normalizeNormals);
 	HashContinue(retHash, currentNamedStates.fogEnable);
-	HashContinue<unsigned char>(retHash, currentNamedStates.fogVertexMode);
+	if (currentNamedStates.fogEnable)
+	{
+		HashContinue<unsigned char>(retHash, currentNamedStates.fogVertexMode);
+		HashContinue<unsigned char>(retHash, currentNamedStates.fogTableMode);
+		HashContinue<unsigned char>(retHash, currentNamedStates.rangeFogEnable);
+	}
 	HashContinue(retHash, currentNamedStates.lighting);
 	HashContinue(retHash, currentNamedStates.specularEnable);
 	HashContinue(retHash, currentNamedStates.localViewer);
@@ -374,11 +379,33 @@ static inline void BuildVertexStateDefines(const DeviceState& state, std::vector
 		defines.push_back(normalizeNormalsEnable);
 	}
 
+	if (state.currentRenderStates.renderStatesUnion.namedStates.fogEnable)
 	{
+		D3DXMACRO fogEnable = {0};
+		fogEnable.Name = "OUTPUT_FOG";
+		fogEnable.Definition = "1";
+		defines.push_back(fogEnable);
+
+		D3DFOGMODE fogMode = D3DFOG_NONE;
+
+		// TODO: Confirm that table-fog overrides vertex-fog and not the other way around:
+		if (state.currentRenderStates.renderStatesUnion.namedStates.fogVertexMode > D3DFOG_NONE)
+			fogMode = state.currentRenderStates.renderStatesUnion.namedStates.fogVertexMode;
+		if (state.currentRenderStates.renderStatesUnion.namedStates.fogTableMode > D3DFOG_NONE)
+			fogMode = state.currentRenderStates.renderStatesUnion.namedStates.fogTableMode;
+
 		D3DXMACRO vertexFogmode = {0};
 		vertexFogmode.Name = "D3DRS_FOGVERTEXMODE";
-		vertexFogmode.Definition = VERTEX_FOGMODE[state.currentRenderStates.renderStatesUnion.namedStates.fogVertexMode];
+		vertexFogmode.Definition = VERTEX_FOGMODE[fogMode];
 		defines.push_back(vertexFogmode);
+
+		if (state.currentRenderStates.renderStatesUnion.namedStates.rangeFogEnable)
+		{
+			D3DXMACRO rangeFogEnable = {0};
+			rangeFogEnable.Name = "D3DRS_RANGEFOGENABLE";
+			rangeFogEnable.Definition = "1";
+			defines.push_back(rangeFogEnable);
+		}
 	}
 
 	if (state.currentRenderStates.renderStatesUnion.namedStates.lighting)

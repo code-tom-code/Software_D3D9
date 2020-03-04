@@ -180,8 +180,9 @@
 // End sample macro values for testing
 
 const float4 TFACTOR : register(c0); // This is the value set by SetRenderState(D3DTA_TFACTOR). It is shared across all texture stages.
-const float4 TEXTURESTAGE_CONSTANT[8] : register(c1); // This encompasses c1 thru c8. These are the values set by SetTextureStageState(x, D3DTSS_CONSTANT).
-const row_major float2x4 BUMPENVMAT[8] : register(c9); // This encompasses c9 thru c26. These are the values set by SetTextureStageState(x, D3DTSS_BUMPENVMAT00 through D3DTSS_BUMPENVMAT11). The BUMPENVLUMASCALE and BUMPENVLUMAOFFSET values are stored in the .w components of each of the rows (scale in row 0's w, offset in row 1's w).
+const float4 FOGCOLOR : register(c1); // This is the value set by SetRenderState(D3DRS_FOGCOLOR). It is shared across all texture stages, and only applied if fog is enabled.
+const float4 TEXTURESTAGE_CONSTANT[8] : register(c2); // This encompasses c2 thru c9. These are the values set by SetTextureStageState(x, D3DTSS_CONSTANT).
+const row_major float2x4 BUMPENVMAT[8] : register(c10); // This encompasses c10 thru c27. These are the values set by SetTextureStageState(x, D3DTSS_BUMPENVMAT00 through D3DTSS_BUMPENVMAT11). The BUMPENVLUMASCALE and BUMPENVLUMAOFFSET values are stored in the .w components of each of the rows (scale in row 0's w, offset in row 1's w).
 SAMPLERTYPE0 texture0 : register(s0);
 SAMPLERTYPE1 texture1 : register(s1);
 SAMPLERTYPE2 texture2 : register(s2);
@@ -201,6 +202,10 @@ struct inProcessedVert
 {
 	LIGHTING_INTERPOLATION float4 diffuse : COLOR0;
 	LIGHTING_INTERPOLATION float4 specular : COLOR1;
+
+#ifdef FOG_ENABLE
+	float fog : FOG;
+#endif
 
 #ifdef HAS_TEXCOORD0
 	float4 texCoords0 : TEXCOORD0;
@@ -699,5 +704,10 @@ float4 main(const in inProcessedVert input) : COLOR0
 #ifdef HAS_SPECULAR
 	currentRegister.rgb += input.specular.rgb; // Specular .a is not used (it actually may be the vertex shader's oFog scalar register, so the pixel shader should ignore it)
 #endif // HAS_SPECULAR
+
+#ifdef FOG_ENABLE
+	currentRegister.rgb = lerp(FOGCOLOR.rgb, currentRegister.rgb, input.fog);
+#endif
+
 	return saturate(currentRegister);
 }
