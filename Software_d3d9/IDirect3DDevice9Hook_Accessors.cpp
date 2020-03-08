@@ -1122,6 +1122,11 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetRenderSt
 	{
 		DbgBreakPrint("Error: Internal render state different than render state");
 	}
+
+	if (IsRenderStateD3D9Deprecated() )
+	{
+		DbgBreakPrint("Warning: Render-state deprecation is supposed to cause GetRenderState() to return D3DERR_INVALIDARG, so we shouldn't make it this far");
+	}
 #endif
 
 	if (!pValue)
@@ -1516,6 +1521,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetScissorR
 	return ret;
 }
 
+// One interesting note about SetSoftwareVertexProcessing is that the documentation explicitly calls out that because this used to be a render-state back in the D3D8 days, in
+// D3D9 this API is *not* captured by state-blocks on purpose.
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetSoftwareVertexProcessing(THIS_ BOOL bSoftware)
 {
 	HRESULT ret = d3d9dev->SetSoftwareVertexProcessing(bSoftware);

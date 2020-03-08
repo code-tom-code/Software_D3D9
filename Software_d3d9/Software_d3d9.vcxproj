@@ -142,6 +142,7 @@
   <ItemGroup>
     <ClInclude Include="d3d9include.h" />
     <ClInclude Include="DebuggableEnums.h" />
+    <ClInclude Include="DeviceState.h" />
     <ClInclude Include="DitherTables.h" />
     <ClInclude Include="FixedFunctionToShader.h" />
     <ClInclude Include="GlobalToggles.h" />
