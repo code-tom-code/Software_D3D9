@@ -13,6 +13,7 @@
 #include "IDirect3DVertexDeclaration9Hook.h"
 #include "IDirect3DVertexShader9Hook.h"
 #include "IDirect3DPixelShader9Hook.h"
+#include "IDirect3DStateBlock9Hook.h"
 
 COM_DECLSPEC_NOTHROW UINT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetAvailableTextureMem(THIS)
 {
@@ -403,15 +404,24 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTransfor
 
 	if (pMatrix)
 	{
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			currentlyRecordingStateBlock->MarkSetTransformCaptured(State);
+		}
+		else
+			targetDeviceState = &currentState;
+
 		if (State < D3DTS_WORLD)
 		{
 			switch (State)
 			{
 			case D3DTS_VIEW:
-				currentState.currentTransforms.SetViewTransform(*pMatrix);
+				targetDeviceState->currentTransforms.SetViewTransform(*pMatrix);
 				break;
 			case D3DTS_PROJECTION:
-				currentState.currentTransforms.SetProjectionTransform(*pMatrix);
+				targetDeviceState->currentTransforms.SetProjectionTransform(*pMatrix);
 				break;
 			case D3DTS_TEXTURE0:
 			case D3DTS_TEXTURE1:
@@ -421,7 +431,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTransfor
 			case D3DTS_TEXTURE5:
 			case D3DTS_TEXTURE6:
 			case D3DTS_TEXTURE7:
-				currentState.currentTransforms.SetTextureTransform(*pMatrix, State - D3DTS_TEXTURE0);
+				targetDeviceState->currentTransforms.SetTextureTransform(*pMatrix, State - D3DTS_TEXTURE0);
 				break;
 			default:
 #ifdef _DEBUG
@@ -433,7 +443,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTransfor
 		}
 		else if (State < D3DTS_WORLDMATRIX(MAX_WORLD_TRANSFORMS) ) // World transforms
 		{
-			currentState.currentTransforms.SetWorldTransform(*pMatrix, State - D3DTS_WORLD);
+			targetDeviceState->currentTransforms.SetWorldTransform(*pMatrix, State - D3DTS_WORLD);
 		}
 #ifdef _DEBUG
 		else
@@ -611,10 +621,20 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetViewport
 	if (FAILED(ret) )
 		return ret;
 
+	// Real D3D9 crashes if you pass in a NULL pointer, so we can do basically whatever we want here
 	if (pViewport)
 	{
-		currentState.cachedViewport.viewport = *pViewport;
-		currentState.cachedViewport.RecomputeCache();
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetViewport>();
+		}
+		else
+			targetDeviceState = &currentState;
+
+		targetDeviceState->cachedViewport.viewport = *pViewport;
+		targetDeviceState->cachedViewport.RecomputeCache();
 	}
 #ifdef _DEBUG
 	else
@@ -659,9 +679,19 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetMaterial
 	if (FAILED(ret) )
 		return ret;
 
+	// D3D9 just crashes if you pass a NULL pointer pMaterial, so we can do whatever in that case
 	if (pMaterial)
 	{
-		currentState.currentMaterial = *pMaterial;
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetMaterial>();
+		}
+		else
+			targetDeviceState = &currentState;
+
+		targetDeviceState->currentMaterial = *pMaterial;
 	}
 
 	return ret;
@@ -698,16 +728,32 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetLight(TH
 
 	if (pLight)
 	{
-		std::map<UINT, LightInfo*>::iterator it = currentState.lightInfoMap->find(Index);
-		if (it == currentState.lightInfoMap->end() )
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			currentlyRecordingStateBlock->MarkSetLightCaptured(Index);
+		}
+		else
+			targetDeviceState = &currentState;
+
+		std::map<UINT, LightInfo*>::iterator it = targetDeviceState->lightInfoMap->find(Index);
+		if (it == targetDeviceState->lightInfoMap->end() )
 		{
 			LightInfo* newLightInfo = new LightInfo;
 			newLightInfo->light = *pLight;
-			currentState.lightInfoMap->insert(std::make_pair(Index, newLightInfo) );
+			targetDeviceState->lightInfoMap->insert(std::make_pair(Index, newLightInfo) );
 		}
 		else
 		{
-			it->second->light = *pLight;
+			if (it->second != &LightInfo::defaultLight)
+				it->second->light = *pLight;
+			else
+			{
+				LightInfo* newLightInfo = new LightInfo;
+				newLightInfo->light = *pLight;
+				it->second = newLightInfo;
+			}
 		}
 	}
 
@@ -750,14 +796,24 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::LightEnable
 	if (FAILED(ret) )
 		return ret;
 
-	const std::map<UINT, LightInfo*>::const_iterator it = currentState.lightInfoMap->find(Index);
-	if (it == currentState.lightInfoMap->end() )
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
 	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkLightEnableCaptured(Index, Enable);
+	}
+	else
+		targetDeviceState = &currentState;
+
+	const std::map<UINT, LightInfo*>::const_iterator it = targetDeviceState->lightInfoMap->find(Index);
+	if (it == targetDeviceState->lightInfoMap->end() )
+	{
+		targetDeviceState->lightInfoMap->insert(std::make_pair(Index, &LightInfo::defaultLight) );
 		for (unsigned x = 0; x < MAX_ENABLED_LIGHTS; ++x)
 		{
-			if (!currentState.enabledLightIndices[x])
+			if (!targetDeviceState->enabledLightIndices[x])
 			{
-				currentState.enabledLightIndices[x] = &defaultLight;
+				targetDeviceState->enabledLightIndices[x] = &LightInfo::defaultLight;
 				return ret;
 			}
 		}
@@ -783,7 +839,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::LightEnable
 			}
 			else
 			{
-				currentState.enabledLightIndices[it->second->activeLightIndex] = NULL;
+				targetDeviceState->enabledLightIndices[it->second->activeLightIndex] = NULL;
 				it->second->activeLightIndex = -1;
 				return ret;
 			}
@@ -794,9 +850,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::LightEnable
 			{
 				for (unsigned x = 0; x < MAX_ENABLED_LIGHTS; ++x)
 				{
-					if (!currentState.enabledLightIndices[x])
+					if (targetDeviceState->enabledLightIndices[x] == NULL)
 					{
-						currentState.enabledLightIndices[x] = it->second;
+						targetDeviceState->enabledLightIndices[x] = it->second;
 						it->second->activeLightIndex = x;
 						return ret;
 					}
@@ -861,9 +917,20 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetClipPlan
 	if (FAILED(ret) )
 		return ret;
 
-	if (pPlane)
+	// The real D3D9 seems to handle clip planes greater than D3DMAXUSERCLIPPLANES by allocating dynamic memory in a tree structure, however
+	// most GPU's don't read clip planes beyond the first six anyway, so we don't actually need to keep track of those high-numbered clip planes for rendering.
+	if (pPlane && Index < D3DMAXUSERCLIPPLANES)
 	{
-		memcpy(&currentState.currentClippingPlanes[Index], pPlane, sizeof(D3DXPLANE) );
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetMaterial>();
+		}
+		else
+			targetDeviceState = &currentState;
+
+		memcpy(&(targetDeviceState->currentClippingPlanes[Index]), pPlane, sizeof(D3DXPLANE) );
 	}
 
 	return ret;
@@ -876,16 +943,26 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetClipPlan
 	if (FAILED(ret) )
 		return ret;
 
-#ifdef _DEBUG
-	if (memcmp(&realPlane, &currentState.currentClippingPlanes[Index], sizeof(D3DXPLANE) ) != 0)
+	if (Index < D3DMAXUSERCLIPPLANES)
 	{
-		DbgBreakPrint("Error: Internal clipping plane different than clipping plane");
-	}
+#ifdef _DEBUG
+		if (memcmp(&realPlane, &currentState.currentClippingPlanes[Index], sizeof(D3DXPLANE) ) != 0)
+		{
+			DbgBreakPrint("Error: Internal clipping plane different than clipping plane");
+		}
 #endif
 
-	if (pPlane)
+		if (pPlane)
+		{
+			memcpy(pPlane, &currentState.currentClippingPlanes[Index], sizeof(D3DXPLANE) );
+		}
+	}
+	else
 	{
-		memcpy(pPlane, &currentState.currentClippingPlanes[Index], sizeof(D3DXPLANE) );
+		if (pPlane)
+		{
+			memset(pPlane, 0, sizeof(D3DXPLANE) );
+		}
 	}
 
 	return ret;
@@ -1027,82 +1104,98 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetRenderSt
 	if (FAILED(ret) )
 		return ret;
 
-	if (State >= 0 && State < MAX_NUM_RENDERSTATES)
+	if (State < 0 || State >= MAX_NUM_RENDERSTATES)
+		return D3DERR_INVALIDCALL;
+
+	// Active state block recording redirects state writes into the state block rather than to the real device
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
 	{
-#ifdef _DEBUG
-		if (!IsRenderStateValidForD3D9(State) )
-		{
-			DbgBreakPrint("Warning: Render state enum is in bounds, but not a recognized render state. This may be due to driver-specific render-states, or via people using D3D7 or D3D8 render states by accident.");
-		}
-#endif
-		currentState.currentRenderStates.renderStatesUnion.states[State] = Value;
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkRenderStateAsCaptured(State);
 	}
 	else
-		return D3DERR_INVALIDCALL;
+		targetDeviceState = &currentState;
+	RenderStates& targetRenderStates = targetDeviceState->currentRenderStates;
+	RenderStates::_renderStatesUnion& targetRenderStatesUnion = targetRenderStates.renderStatesUnion;
+
+#ifdef _DEBUG
+	if (!IsRenderStateValidForD3D9(State) )
+	{
+		char buffer[256] = {0};
+#pragma warning(push)
+#pragma warning(disable:4996)
+		sprintf(buffer, "Warning: Render state enum is in bounds, but not a recognized render state and will not have any effect. This may be due to driver-specific render-states, or via people using D3D7 or D3D8 render states by accident. Render State Index: %u, Value: %u\n", State, Value);
+#pragma warning(pop)
+		OutputDebugStringA(buffer);
+	}
+#endif
+
+	targetRenderStatesUnion.states[State] = Value;
 
 	switch (State)
 	{
 	case D3DRS_ALPHAREF:
-		currentState.currentRenderStates.cachedAlphaRefFloat = currentState.currentRenderStates.renderStatesUnion.namedStates.alphaRef / 255.0f;
-		currentState.currentRenderStates.alphaRefSplatted = _mm_set1_ps(currentState.currentRenderStates.cachedAlphaRefFloat);
+		targetRenderStates.cachedAlphaRefFloat = targetRenderStatesUnion.namedStates.alphaRef / 255.0f;
+		targetRenderStates.alphaRefSplatted = _mm_set1_ps(targetRenderStates.cachedAlphaRefFloat);
 		break;
 	case D3DRS_AMBIENT:
-		ColorDWORDToFloat4<0xF>(currentState.currentRenderStates.renderStatesUnion.namedStates.ambient, currentState.currentRenderStates.cachedAmbient);
+		ColorDWORDToFloat4<0xF>(targetRenderStatesUnion.namedStates.ambient, targetRenderStates.cachedAmbient);
 		break;
 	case D3DRS_BLENDFACTOR:
-		ColorDWORDToFloat4(currentState.currentRenderStates.renderStatesUnion.states[D3DRS_BLENDFACTOR], currentState.currentRenderStates.cachedBlendFactor);
-		currentState.currentRenderStates.cachedInvBlendFactor = D3DXVECTOR4(1.0f, 1.0f, 1.0f, 1.0f) - currentState.currentRenderStates.cachedBlendFactor;
+		ColorDWORDToFloat4(targetRenderStatesUnion.states[D3DRS_BLENDFACTOR], targetRenderStates.cachedBlendFactor);
+		targetRenderStates.cachedInvBlendFactor = D3DXVECTOR4(1.0f, 1.0f, 1.0f, 1.0f) - targetRenderStates.cachedBlendFactor;
 		break;
 	case D3DRS_DEPTHBIAS:
-		currentState.currentRenderStates.depthBiasSplatted = _mm_set1_ps(currentState.currentRenderStates.renderStatesUnion.namedStates.depthBias);
+		targetRenderStates.depthBiasSplatted = _mm_set1_ps(targetRenderStatesUnion.namedStates.depthBias);
 		break;
 
-		// Alpha blend type caching:
+	// Alpha blend type caching:
 	case D3DRS_ALPHABLENDENABLE:
 	case D3DRS_SEPARATEALPHABLENDENABLE:
 	case D3DRS_SRCBLEND:
 	case D3DRS_DESTBLEND:
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaBlendEnable)
+		if (targetRenderStatesUnion.namedStates.alphaBlendEnable)
 		{
 			// Separate alpha blending
-			if (currentState.currentRenderStates.renderStatesUnion.namedStates.separateAlphaBlendEnable)
+			if (targetRenderStatesUnion.namedStates.separateAlphaBlendEnable)
 			{
-				currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::otherAlphaBlending;
-				currentState.currentRenderStates.alphaBlendNeedsDestRead = true; // TODO: Figure this out for reals rather than defaulting to this conservative "true" value
+				targetRenderStates.simplifiedAlphaBlendMode = RenderStates::otherAlphaBlending;
+				targetRenderStates.alphaBlendNeedsDestRead = true; // TODO: Figure this out for reals rather than defaulting to this conservative "true" value
 			}
 			// Unified alpha blending
 			else
 			{
-				if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
-					currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+				if (targetRenderStatesUnion.namedStates.srcBlend == D3DBLEND_SRCALPHA && 
+					targetRenderStatesUnion.namedStates.destBlend == D3DBLEND_INVSRCALPHA) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
 				{
-					currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::alphaBlending;
+					targetRenderStates.simplifiedAlphaBlendMode = RenderStates::alphaBlending;
 				}
-				else if (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
-						currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+				else if (targetRenderStatesUnion.namedStates.srcBlend == D3DBLEND_ONE &&
+						targetRenderStatesUnion.namedStates.destBlend == D3DBLEND_ONE) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
 				{
-					currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::additiveBlending;
+					targetRenderStates.simplifiedAlphaBlendMode = RenderStates::additiveBlending;
 				}
-				else if ( (currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_DESTCOLOR &&
-						currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_ZERO) || 
-						(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend == D3DBLEND_ZERO &&
-						currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend == D3DBLEND_SRCCOLOR) ) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
+				else if ( (targetRenderStatesUnion.namedStates.srcBlend == D3DBLEND_DESTCOLOR &&
+						targetRenderStatesUnion.namedStates.destBlend == D3DBLEND_ZERO) || 
+						(targetRenderStatesUnion.namedStates.srcBlend == D3DBLEND_ZERO &&
+						targetRenderStatesUnion.namedStates.destBlend == D3DBLEND_SRCCOLOR) ) // TODO: Check the for the less common Min/Max/Reversesubtract blend ops
 				{
-					currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::multiplicativeBlending;
+					targetRenderStates.simplifiedAlphaBlendMode = RenderStates::multiplicativeBlending;
 				}
 				else
 				{
-					currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::otherAlphaBlending;
+					targetRenderStates.simplifiedAlphaBlendMode = RenderStates::otherAlphaBlending;
 				}
 			}
 
-			currentState.currentRenderStates.alphaBlendNeedsDestRead = (currentState.currentRenderStates.renderStatesUnion.namedStates.destBlend > D3DBLEND_ZERO)
-				|| DoesSrcBlendRequireDestData(currentState.currentRenderStates.renderStatesUnion.namedStates.srcBlend);
+			targetRenderStates.alphaBlendNeedsDestRead = (targetRenderStatesUnion.namedStates.destBlend > D3DBLEND_ZERO)
+				|| DoesSrcBlendRequireDestData(targetRenderStatesUnion.namedStates.srcBlend);
 		}
 		else
 		{
-			currentState.currentRenderStates.simplifiedAlphaBlendMode = RenderStates::noAlphaBlending;
-			currentState.currentRenderStates.alphaBlendNeedsDestRead = false;
+			targetRenderStates.simplifiedAlphaBlendMode = RenderStates::noAlphaBlending;
+			targetRenderStates.alphaBlendNeedsDestRead = false;
 		}
 		break;
 	}
@@ -1123,30 +1216,31 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetRenderSt
 		DbgBreakPrint("Error: Internal render state different than render state");
 	}
 
-	if (IsRenderStateD3D9Deprecated() )
+	if (IsRenderStateD3D9Deprecated(State) )
 	{
 		DbgBreakPrint("Warning: Render-state deprecation is supposed to cause GetRenderState() to return D3DERR_INVALIDARG, so we shouldn't make it this far");
 	}
 #endif
 
+	if (State < 0 || State >= MAX_NUM_RENDERSTATES)
+		return D3DERR_INVALIDCALL;
+
 	if (!pValue)
 		return D3DERR_INVALIDCALL;
-	else
-	{
-		if (State >= 0 && State < MAX_NUM_RENDERSTATES)
-		{
+
 #ifdef _DEBUG
-			if (!IsRenderStateValidForD3D9(State) )
-			{
-				DbgBreakPrint("Warning: Render state enum is in bounds, but not a recognized render state. This may be due to driver-specific render-states, or via people using D3D7 or D3D8 render states by accident.");
-			}
-#endif
-			*pValue = currentState.currentRenderStates.renderStatesUnion.states[State];
-			return ret;
-		}
-		else
-			return D3DERR_INVALIDCALL;
+	if (!IsRenderStateValidForD3D9(State) )
+	{
+		char buffer[256] = {0};
+#pragma warning(push)
+#pragma warning(disable:4996)
+		sprintf(buffer, "Warning: Render state enum is in bounds, but not a recognized render state and will not have any effect. This may be due to driver-specific render-states, or via people using D3D7 or D3D8 render states by accident. Render State Index: %u, Value: %u\n", State, *pValue);
+#pragma warning(pop)
+		OutputDebugStringA(buffer);
 	}
+#endif
+	*pValue = currentState.currentRenderStates.renderStatesUnion.states[State];
+	return ret;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetClipStatus(THIS_ CONST D3DCLIPSTATUS9* pClipStatus)
@@ -1268,29 +1362,38 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTexture(
 		return D3DERR_INVALIDCALL;
 	}
 
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
+	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetTextureCaptured(Stage);
+	}
+	else
+		targetDeviceState = &currentState;
+
 	if (textureHookPtr)
 	{
-		currentState.currentTextures[Stage] = textureHookPtr;
-		currentState.currentCubeTextures[Stage] = NULL;
-		currentState.currentVolumeTextures[Stage] = NULL;
+		targetDeviceState->currentTextures[Stage] = textureHookPtr;
+		targetDeviceState->currentCubeTextures[Stage] = NULL;
+		targetDeviceState->currentVolumeTextures[Stage] = NULL;
 	}
 	else if (cubeHookPtr)
 	{
-		currentState.currentTextures[Stage] = NULL;
-		currentState.currentCubeTextures[Stage] = cubeHookPtr;
-		currentState.currentVolumeTextures[Stage] = NULL;
+		targetDeviceState->currentTextures[Stage] = NULL;
+		targetDeviceState->currentCubeTextures[Stage] = cubeHookPtr;
+		targetDeviceState->currentVolumeTextures[Stage] = NULL;
 	}
 	else if (volumeHookPtr)
 	{
-		currentState.currentTextures[Stage] = NULL;
-		currentState.currentCubeTextures[Stage] = NULL;
-		currentState.currentVolumeTextures[Stage] = volumeHookPtr;
+		targetDeviceState->currentTextures[Stage] = NULL;
+		targetDeviceState->currentCubeTextures[Stage] = NULL;
+		targetDeviceState->currentVolumeTextures[Stage] = volumeHookPtr;
 	}
 	else
 	{
-		currentState.currentTextures[Stage] = NULL;
-		currentState.currentCubeTextures[Stage] = NULL;
-		currentState.currentVolumeTextures[Stage] = NULL;
+		targetDeviceState->currentTextures[Stage] = NULL;
+		targetDeviceState->currentCubeTextures[Stage] = NULL;
+		targetDeviceState->currentVolumeTextures[Stage] = NULL;
 	}
 
 	return ret;
@@ -1337,7 +1440,16 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTextureS
 	if (Type < D3DTSS_COLOROP || Type > D3DTSS_CONSTANT)
 		return D3DERR_INVALIDCALL;
 
-	currentState.currentStageStates[Stage].stageStateUnion.state[Type] = Value;
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
+	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetTextureStageStateCaptured(Stage, Type);
+	}
+	else
+		targetDeviceState = &currentState;
+
+	targetDeviceState->currentStageStates[Stage].stageStateUnion.state[Type] = Value;
 
 	return ret;
 }
@@ -1348,6 +1460,14 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetSamplerS
 	HRESULT ret = d3d9dev->GetSamplerState(Sampler, Type, &outVal);
 	if (FAILED(ret) )
 		return ret;
+
+	if (Type < D3DSAMP_ADDRESSU || Type > D3DSAMP_DMAPOFFSET)
+	{
+#ifdef _DEBUG
+		DbgBreakPrint("Error: Type is out of bounds");
+#endif
+		return D3DERR_INVALIDCALL;
+	}
 
 #ifdef _DEBUG
 	if (currentState.currentSamplerStates[Sampler].stateUnion.state[Type] != outVal)
@@ -1371,7 +1491,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetSamplerS
 	if (FAILED(ret) )
 		return ret;
 
-	if (Type == 0)
+	if (Type < D3DSAMP_ADDRESSU)
 	{
 #ifdef _DEBUG
 		DbgBreakPrint("Error: Sampler state type out of bounds (0 is not a valid sampler state enum)");
@@ -1386,7 +1506,16 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetSamplerS
 		return D3DERR_INVALIDCALL;
 	}
 
-	SamplerState& thisSampler = currentState.currentSamplerStates[Sampler];	
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
+	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetSamplerStateCaptured(Sampler, Type);
+	}
+	else
+		targetDeviceState = &currentState;
+
+	SamplerState& thisSampler = targetDeviceState->currentSamplerStates[Sampler];
 	thisSampler.stateUnion.state[Type] = Value;
 
 	if (Type == D3DSAMP_MAXMIPLEVEL)
@@ -1462,7 +1591,24 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetCurrentT
 	if (FAILED(ret) )
 		return ret;
 
-	currentState.currentPaletteState.currentPaletteIndex = (const unsigned short)PaletteNumber;
+	if (PaletteNumber > 0xFFFF)
+	{
+#ifdef _DEBUG
+		__debugbreak(); // Error: Palette index out of bounds!
+#endif
+		return D3DERR_INVALIDCALL;
+	}
+
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
+	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetCurrentTexturePalette>();
+	}
+	else
+		targetDeviceState = &currentState;
+
+	targetDeviceState->currentPaletteState.currentPaletteIndex = (const unsigned short)PaletteNumber;
 
 	return ret;
 }
@@ -1492,11 +1638,20 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetScissorR
 	if (FAILED(ret) )
 		return ret;
 
+	// Real D3D9 crashes if you try to call SetScissorRect() with a NULL pointer, so we can do pretty much whatever we want in this case
 	if (pRect != NULL)
 	{
-		currentState.currentScissorRect.scissorRect = *pRect;
-		currentState.currentScissorRect.RecomputeScissorRect();
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetScissorRect>();
+		}
+		else
+			targetDeviceState = &currentState;
 
+		targetDeviceState->currentScissorRect.scissorRect = *pRect;
+		targetDeviceState->currentScissorRect.RecomputeScissorRect();
 	}
 
 	return ret;
@@ -1546,44 +1701,55 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetSoftware
 	}
 #endif
 
-	currentState.currentSwvpEnabled = bSoftware;
+	currentSwvpEnabled = bSoftware;
 
 	return ret;
 }
 
 COM_DECLSPEC_NOTHROW BOOL STDMETHODCALLTYPE IDirect3DDevice9Hook::GetSoftwareVertexProcessing(THIS)
 {
-	BOOL ret = d3d9dev->GetSoftwareVertexProcessing();
-
 #ifdef _DEBUG
-	if (ret != currentState.currentSwvpEnabled)
+	BOOL realRet = d3d9dev->GetSoftwareVertexProcessing();
+	if (realRet != currentSwvpEnabled)
 	{
 		DbgBreakPrint("Error: Internal SWVP doesn't match SWVP");
 	}
 #endif
 
-	return ret;
+	return currentSwvpEnabled;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetNPatchMode(THIS_ float nSegments)
 {
-	// Nope! Not gonna support tessellation in D3D9
-	if (nSegments != 0.0f)
-	{
-		DbgBreakPrint("Error: Tessellation is not yet supported");
-	}
-
 	HRESULT ret = d3d9dev->SetNPatchMode(nSegments);
+	if (FAILED(ret) )
+		return ret;
+
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
+	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetNPatchMode>();
+	}
+	else
+		targetDeviceState = &currentState;
+
+	targetDeviceState->currentNPatchMode = nSegments;
+
 	return ret;
 }
 
 COM_DECLSPEC_NOTHROW float STDMETHODCALLTYPE IDirect3DDevice9Hook::GetNPatchMode(THIS)
 {
-	// Nope! Not gonna support tessellation in D3D9
-	DbgBreakPrint("Error: Tessellation is not yet supported");
-
-	float ret = d3d9dev->GetNPatchMode();
-	return ret;
+#ifdef _DEBUG
+	const float realNPatchMode = d3d9dev->GetNPatchMode();
+	if (realNPatchMode != currentState.currentNPatchMode)
+	{
+		// Real device divergence detected!
+		__debugbreak();
+	}
+#endif
+	return currentState.currentNPatchMode;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexDeclaration(THIS_ IDirect3DVertexDeclaration9* pDecl)
@@ -1602,12 +1768,21 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexDe
 	if (FAILED(ret) )
 		return ret;
 
-	if (currentState.currentVertexDecl != NULL)
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
 	{
-		// currentState.currentVertexDecl->Release();
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetVertexDeclaration>();
+	}
+	else
+		targetDeviceState = &currentState;
+
+	if (targetDeviceState->currentVertexDecl != NULL)
+	{
+		// targetDeviceState->currentVertexDecl->Release();
 	}
 
-	const IDirect3DVertexDeclaration9Hook* const oldVertDecl = currentState.currentVertexDecl;
+	const IDirect3DVertexDeclaration9Hook* const oldVertDecl = targetDeviceState->currentVertexDecl;
 	if (oldVertDecl != hook)
 	{
 		// Set dirty flags on stream-ends for used streams for this new decl:
@@ -1618,16 +1793,16 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexDe
 			for (unsigned x = 0; x < numElements; ++x)
 			{
 				const DebuggableD3DVERTEXELEMENT9& thisElement = elements[x];
-				currentState.currentStreamEnds[thisElement.Stream].SetDirty();
+				targetDeviceState->currentStreamEnds[thisElement.Stream].SetDirty();
 			}
 		}
 	}
 
-	currentState.currentVertexDecl = hook;
+	targetDeviceState->currentVertexDecl = hook;
 
 	if (pDecl)
 	{
-		currentState.declTarget = DeviceState::targetVertexDecl;
+		targetDeviceState->declTarget = DeviceState::targetVertexDecl;
 	}
 
 	return ret;
@@ -1675,16 +1850,25 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetFVF(THIS
 	if (FAILED(ret) )
 		return ret;
 
-	const DWORD oldFVF_DWORD = currentState.currentFVF.rawFVF_DWORD;
-	currentState.currentFVF.rawFVF_DWORD = dbgFVF.rawFVF_DWORD;
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
+	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetFVF>();
+	}
+	else
+		targetDeviceState = &currentState;
+
+	const DWORD oldFVF_DWORD = targetDeviceState->currentFVF.rawFVF_DWORD;
+	targetDeviceState->currentFVF.rawFVF_DWORD = dbgFVF.rawFVF_DWORD;
 
 	if (dbgFVF.rawFVF_DWORD != 0x00000000)
 	{
 		// Skip setting the same FVF/decl twice
-		if (currentState.declTarget == DeviceState::targetFVF && oldFVF_DWORD == dbgFVF.rawFVF_DWORD)
+		if (targetDeviceState->declTarget == DeviceState::targetFVF && oldFVF_DWORD == dbgFVF.rawFVF_DWORD)
 			return ret;
 
-		currentState.declTarget = DeviceState::targetFVF;
+		targetDeviceState->declTarget = DeviceState::targetFVF;
 
 		// D3D9 does some weird stuff under the hood if you call SetFVF with a valid FVF-code. It needs to:
 		// 1) Release any existing set vertex declarations
@@ -1716,8 +1900,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetFVF(THIS
 		DbgBreakPrint("Error: Internal FVF doesn't match FVF");
 	}
 	return ret;
-#endif
+#else // #ifdef _DEBUG
 	return S_OK;
+#endif // #ifdef _DEBUG
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexShader(THIS_ IDirect3DVertexShader9* pShader)
@@ -1731,12 +1916,22 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexSh
 		DbgBreakPrint("Error: Vertex shader is not hooked");
 	}
 #endif
-	if (currentState.currentVertexShader != NULL)
+
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
 	{
-		// currentState.currentVertexShader->Release();
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetVertexShader>();
+	}
+	else
+		targetDeviceState = &currentState;
+
+	if (targetDeviceState->currentVertexShader != NULL)
+	{
+		// targetDeviceState->currentVertexShader->Release();
 	}
 
-	currentState.currentVertexShader = hookPtr;
+	targetDeviceState->currentVertexShader = hookPtr;
 
 	if (hookPtr)
 	{
@@ -1799,7 +1994,18 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexSh
 
 	if (pConstantData != NULL)
 	{
-		memcpy(currentState.vertexShaderRegisters.floats + StartRegister, pConstantData, Vector4fCount * sizeof(float4) );
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			const unsigned finalSetRegister = StartRegister + Vector4fCount;
+			for (unsigned constantIndex = StartRegister; constantIndex < finalSetRegister; ++constantIndex)
+				currentlyRecordingStateBlock->MarkSetVertexShaderConstantF(constantIndex);
+		}
+		else
+			targetDeviceState = &currentState;
+
+		memcpy(targetDeviceState->vertexShaderRegisters.floats + StartRegister, pConstantData, Vector4fCount * sizeof(float4) );
 	}
 
 	return ret;
@@ -1855,7 +2061,18 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexSh
 
 	if (pConstantData != NULL)
 	{
-		memcpy(currentState.vertexShaderRegisters.ints + StartRegister, pConstantData, Vector4iCount * sizeof(int4) );
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			const unsigned finalSetRegister = StartRegister + Vector4iCount;
+			for (unsigned constantIndex = StartRegister; constantIndex < finalSetRegister; ++constantIndex)
+				currentlyRecordingStateBlock->MarkSetVertexShaderConstantI(constantIndex);
+		}
+		else
+			targetDeviceState = &currentState;
+
+		memcpy(targetDeviceState->vertexShaderRegisters.ints + StartRegister, pConstantData, Vector4iCount * sizeof(int4) );
 	}
 
 	return ret;
@@ -1911,7 +2128,18 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetVertexSh
 
 	if (pConstantData != NULL)
 	{
-		memcpy(currentState.vertexShaderRegisters.bools + StartRegister, pConstantData, BoolCount * sizeof(BOOL) );
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			const unsigned finalSetRegister = StartRegister + BoolCount;
+			for (unsigned constantIndex = StartRegister; constantIndex < finalSetRegister; ++constantIndex)
+				currentlyRecordingStateBlock->MarkSetVertexShaderConstantB(constantIndex);
+		}
+		else
+			targetDeviceState = &currentState;
+
+		memcpy(targetDeviceState->vertexShaderRegisters.bools + StartRegister, pConstantData, BoolCount * sizeof(BOOL) );
 	}
 
 	return ret;
@@ -1970,7 +2198,16 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetStreamSo
 	if (FAILED(ret) )
 		return ret;
 
-	StreamSource& thisStreamSource = currentState.currentStreams[StreamNumber];
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
+	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetStreamSourceCaptured(StreamNumber);
+	}
+	else
+		targetDeviceState = &currentState;
+
+	StreamSource& thisStreamSource = targetDeviceState->currentStreams[StreamNumber];
 
 	if (thisStreamSource.vertexBuffer != NULL)
 	{
@@ -1985,7 +2222,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetStreamSo
 
 	if (oldVertexBuffer != hookPtr)
 	{
-		currentState.currentStreamEnds[StreamNumber].SetDirty();
+		targetDeviceState->currentStreamEnds[StreamNumber].SetDirty();
 	}
 
 	return ret;
@@ -2039,11 +2276,23 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetStreamSo
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetStreamSourceFreq(THIS_ UINT StreamNumber, UINT Setting)
 {
+	if (StreamNumber >= MAX_D3D9_STREAMS)
+		return D3DERR_INVALIDCALL;
+
 	HRESULT ret = d3d9dev->SetStreamSourceFreq(StreamNumber, Setting);
 	if (FAILED(ret) )
 		return ret;
 
-	currentState.currentStreams[StreamNumber].streamDividerFrequency = Setting;
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
+	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetStreamSourceFreqCaptured(StreamNumber);
+	}
+	else
+		targetDeviceState = &currentState;
+
+	targetDeviceState->currentStreams[StreamNumber].streamDividerFrequency = Setting;
 
 	return ret;
 }
@@ -2076,9 +2325,6 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetIndices(
 	}
 #endif
 
-	/*HRESULT ret = d3d9dev->SetIndices(pIndexData);
-	if (FAILED(ret) )
-		return ret;*/
 	if (pIndexData == NULL)
 	{
 		return D3DERR_INVALIDCALL;
@@ -2089,7 +2335,17 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetIndices(
 		// currentState.currentIndexBuffer->Release();
 	}
 
-	currentState.currentIndexBuffer = hook;
+	// Active state block recording redirects state writes into the state block rather than to the real device
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
+	{
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetIndices>();
+	}
+	else
+		targetDeviceState = &currentState;
+
+	targetDeviceState->currentIndexBuffer = hook;
 
 	return S_OK;
 }
@@ -2133,12 +2389,21 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetPixelSha
 	}
 #endif
 
-	if (currentState.currentPixelShader != NULL)
+	DeviceState* targetDeviceState;
+	if (IsCurrentlyRecordingStateBlock() )
 	{
-		// currentState.currentPixelShader->Release();
+		targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+		currentlyRecordingStateBlock->MarkSetCallAsCaptured<SBT_SetPixelShader>();
+	}
+	else
+		targetDeviceState = &currentState;
+
+	if (targetDeviceState->currentPixelShader != NULL)
+	{
+		// targetDeviceState->currentPixelShader->Release();
 	}
 
-	currentState.currentPixelShader = hookPtr;
+	targetDeviceState->currentPixelShader = hookPtr;
 
 	if (hookPtr)
 	{
@@ -2201,7 +2466,18 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetPixelSha
 
 	if (pConstantData != NULL)
 	{
-		memcpy(currentState.pixelShaderRegisters.floats + StartRegister, pConstantData, Vector4fCount * sizeof(float4) );
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			const unsigned finalSetRegister = StartRegister + Vector4fCount;
+			for (unsigned constantIndex = StartRegister; constantIndex < finalSetRegister; ++constantIndex)
+				currentlyRecordingStateBlock->MarkSetPixelShaderConstantF(constantIndex);
+		}
+		else
+			targetDeviceState = &currentState;
+
+		memcpy(targetDeviceState->pixelShaderRegisters.floats + StartRegister, pConstantData, Vector4fCount * sizeof(float4) );
 	}
 
 	return ret;
@@ -2257,7 +2533,18 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetPixelSha
 
 	if (pConstantData != NULL)
 	{
-		memcpy(currentState.pixelShaderRegisters.ints + StartRegister, pConstantData, Vector4iCount * sizeof(int4) );
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			const unsigned finalSetRegister = StartRegister + Vector4iCount;
+			for (unsigned constantIndex = StartRegister; constantIndex < finalSetRegister; ++constantIndex)
+				currentlyRecordingStateBlock->MarkSetPixelShaderConstantI(constantIndex);
+		}
+		else
+			targetDeviceState = &currentState;
+
+		memcpy(targetDeviceState->pixelShaderRegisters.ints + StartRegister, pConstantData, Vector4iCount * sizeof(int4) );
 	}
 
 	return ret;
@@ -2313,7 +2600,18 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetPixelSha
 
 	if (pConstantData != NULL)
 	{
-		memcpy(currentState.pixelShaderRegisters.bools + StartRegister, pConstantData, BoolCount * sizeof(BOOL) );
+		DeviceState* targetDeviceState;
+		if (IsCurrentlyRecordingStateBlock() )
+		{
+			targetDeviceState = currentlyRecordingStateBlock->GetDeviceStateForWrite();
+			const unsigned finalSetRegister = StartRegister + BoolCount;
+			for (unsigned constantIndex = StartRegister; constantIndex < finalSetRegister; ++constantIndex)
+				currentlyRecordingStateBlock->MarkSetPixelShaderConstantB(constantIndex);
+		}
+		else
+			targetDeviceState = &currentState;
+
+		memcpy(targetDeviceState->pixelShaderRegisters.bools + StartRegister, pConstantData, BoolCount * sizeof(BOOL) );
 	}
 
 	return ret;

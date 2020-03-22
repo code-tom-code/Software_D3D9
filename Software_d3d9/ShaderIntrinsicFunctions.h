@@ -211,6 +211,8 @@ static INTRINSIC_INLINE void dst(D3DXVECTOR4& dest, const D3DXVECTOR4& src0, con
 // ddx/dsx: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/dsx---ps
 static INTRINSIC_INLINE void dsx(D3DXVECTOR4& dst, const D3DXVECTOR4& src0)
 {
+	UNREFERENCED_PARAMETER(src0);
+
 	// We can't compute derivatives for just 1-pixel warps, so return zero for everything (need at least a 2x2 quad warp to compute this)
 	dst.x = dst.y = dst.z = dst.w = 0.0f;
 }
@@ -218,6 +220,8 @@ static INTRINSIC_INLINE void dsx(D3DXVECTOR4& dst, const D3DXVECTOR4& src0)
 // ddy/dsy: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/dsy---ps
 static INTRINSIC_INLINE void dsy(D3DXVECTOR4& dst, const D3DXVECTOR4& src0)
 {
+	UNREFERENCED_PARAMETER(src0);
+
 	// We can't compute derivatives for just 1-pixel warps, so return zero for everything (need at least a 2x2 quad warp to compute this)
 	dst.x = dst.y = dst.z = dst.w = 0.0f;
 }
@@ -669,15 +673,6 @@ static INTRINSIC_INLINE void rsq(float& dst, const float src)
 	dst = f;
 }
 
-// Saturate:
-static INTRINSIC_INLINE void sat(D3DXVECTOR4& dst, const D3DXVECTOR4& src0)
-{
-	src0.x < 0.0f ? 0.0f : (src0.x > 1.0f ? 1.0f : src0.x);
-	src0.y < 0.0f ? 0.0f : (src0.y > 1.0f ? 1.0f : src0.y);
-	src0.z < 0.0f ? 0.0f : (src0.z > 1.0f ? 1.0f : src0.z);
-	src0.w < 0.0f ? 0.0f : (src0.w > 1.0f ? 1.0f : src0.w);
-}
-
 // Sine/cosine: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/sincos---vs
 static INTRINSIC_INLINE void sincos_c(D3DXVECTOR4& dst, const float src)
 {
@@ -715,6 +710,9 @@ static INTRINSIC_INLINE void sge(float& dst, const float src0, const float src1)
 // Sign determination function: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/sgn---vs
 static INTRINSIC_INLINE void sgn(D3DXVECTOR4& dst, const D3DXVECTOR4& src0, const D3DXVECTOR4& src1_unused, const D3DXVECTOR4& src2_unused)
 {
+	UNREFERENCED_PARAMETER(src1_unused);
+	UNREFERENCED_PARAMETER(src2_unused);
+
 	dst.x = src0.x < 0 ? -1.0f : src0.x == 0.0f ? 0.0f : 1.0f;
 	dst.y = src0.y < 0 ? -1.0f : src0.y == 0.0f ? 0.0f : 1.0f;
 	dst.z = src0.z < 0 ? -1.0f : src0.z == 0.0f ? 0.0f : 1.0f;

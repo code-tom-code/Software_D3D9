@@ -1033,15 +1033,6 @@ static INTRINSIC_INLINE void rsq4(D3DXVECTOR4 (&dst)[4], const float (&src)[4])
 	dst[3].x = dst[3].y = dst[3].z = dst[3].w = f4[3];
 }
 
-// Saturate:
-static INTRINSIC_INLINE void sat4(D3DXVECTOR4& dst, const D3DXVECTOR4& src0)
-{
-	src0.x < 0.0f ? 0.0f : (src0.x > 1.0f ? 1.0f : src0.x);
-	src0.y < 0.0f ? 0.0f : (src0.y > 1.0f ? 1.0f : src0.y);
-	src0.z < 0.0f ? 0.0f : (src0.z > 1.0f ? 1.0f : src0.z);
-	src0.w < 0.0f ? 0.0f : (src0.w > 1.0f ? 1.0f : src0.w);
-}
-
 // Sine/cosine: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/sincos---vs
 static INTRINSIC_INLINE void sincos_c4(D3DXVECTOR4 (&dst)[4], const float (&src)[4])
 {
@@ -1101,6 +1092,9 @@ static INTRINSIC_INLINE void sge4(D3DXVECTOR4 (&dst)[4], const D3DXVECTOR4 (&src
 // Sign determination function: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/sgn---vs
 static INTRINSIC_INLINE void sgn4(D3DXVECTOR4 (&dst)[4], const D3DXVECTOR4 (&src0)[4], const D3DXVECTOR4 (&src1_unused)[4], const D3DXVECTOR4 (&src2_unused)[4])
 {
+	UNREFERENCED_PARAMETER(src1_unused);
+	UNREFERENCED_PARAMETER(src2_unused);
+
 	dst[0].x = src0[0].x < 0 ? -1.0f : src0[0].x == 0.0f ? 0.0f : 1.0f;
 	dst[1].x = src0[1].x < 0 ? -1.0f : src0[1].x == 0.0f ? 0.0f : 1.0f;
 	dst[2].x = src0[2].x < 0 ? -1.0f : src0[2].x == 0.0f ? 0.0f : 1.0f;

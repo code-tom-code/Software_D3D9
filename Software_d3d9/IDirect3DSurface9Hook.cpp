@@ -59,13 +59,17 @@ static_assert(sizeof(DXT5Chunk) == 16, "Error: Unexpected DXT5 chunk size!");
 
 static inline const D3DCOLOR DXT565To888(const unsigned short color565)
 {
-	const unsigned short b5 = (color565 & ( (0x20 - 1) << 11) ) >> 11;
+	const unsigned short r5 = (color565 & ( (0x20 - 1) << 11) ) >> 11;
 	const unsigned short g6 = (color565 & ( (0x40 - 1) << 5) ) >> 5;
-	const unsigned short r5 = (color565 & (0x20 - 1) );
+	const unsigned short b5 = (color565 & (0x20 - 1) );
 
-	const unsigned short b8 = r5 << 3;
-	const unsigned short g8 = g6 << 2;
-	const unsigned short r8 = b5 << 3;
+	const float scaledR = r5 / 31.0f;
+	const float scaledG = g6 / 63.0f;
+	const float scaledB = b5 / 31.0f;
+
+	const unsigned char r8 = (const unsigned char)(scaledR * 255.0f);
+	const unsigned char g8 = (const unsigned char)(scaledG * 255.0f);
+	const unsigned char b8 = (const unsigned char)(scaledB * 255.0f);
 
 	return D3DCOLOR_XRGB(r8, g8, b8);
 }
@@ -624,7 +628,7 @@ static inline const DWORD DecompressDXT3Alpha(const DXT3Chunk& chunk, const unsi
 	}
 #endif
 
-	const unsigned alpha = alpha4Bit << 4;
+	const unsigned alpha = alpha4Bit * 17;
 	return alpha;
 }
 
@@ -1370,6 +1374,8 @@ void IDirect3DSurface9Hook::CreateOffscreenPlainSurface(UINT _Width, UINT _Heigh
 	InternalPool = _Pool;
 	LockableRT = TRUE;
 	DiscardRT = FALSE;
+	InternalMultiSampleType = D3DMULTISAMPLE_NONE;
+	InternalMultiSampleQuality = 0;
 	UpdateCachedValuesOnCreate();
 
 	AllocSurfaceBytes(GetSurfaceSizeBytes(InternalWidth, InternalHeight, InternalFormat)
@@ -1410,6 +1416,8 @@ void IDirect3DSurface9Hook::CreateDepthStencilSurface(UINT _Width, UINT _Height,
 	DiscardRT = _Discard;
 	LockableRT = FALSE;
 	InternalPool = D3DPOOL_DEFAULT;
+	InternalMultiSampleType = _MultiSample;
+	InternalMultiSampleQuality = _MultisampleQuality;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_DEPTHSTENCIL); // Important not to mark this with the D3DUSAGE_RENDERTARGET Usage because that will get a Usage-mismatch with real D3D9!
 	UpdateCachedValuesOnCreate();
 
@@ -1451,6 +1459,8 @@ void IDirect3DSurface9Hook::CreateRenderTarget(UINT _Width, UINT _Height, D3DFOR
 	LockableRT = _Lockable;
 	DiscardRT = FALSE;
 	InternalPool = D3DPOOL_DEFAULT;
+	InternalMultiSampleType = _MultiSample;
+	InternalMultiSampleQuality = _MultisampleQuality;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_RENDERTARGET);
 	UpdateCachedValuesOnCreate();
 
@@ -1491,6 +1501,8 @@ void IDirect3DSurface9Hook::CreateTextureImplicitSurface(UINT _Width, UINT _Heig
 	InternalFormat = _Format;
 	InternalPool = _Pool;
 	InternalUsage = _Usage;
+	InternalMultiSampleType = D3DMULTISAMPLE_NONE;
+	InternalMultiSampleQuality = 0;
 	TextureSurfaceLevel = _Level;
 	HookParentTexturePtr = _HookParentTexturePtr;
 	LockableRT = TRUE;
@@ -1537,6 +1549,8 @@ void IDirect3DSurface9Hook::CreateDeviceImplicitSurface(const D3DPRESENT_PARAMET
 	InternalHeight = d3dpp.BackBufferHeight;
 	InternalFormat = d3dpp.BackBufferFormat;
 	InternalPool = D3DPOOL_DEFAULT;
+	InternalMultiSampleType = d3dpp.MultiSampleType;
+	InternalMultiSampleQuality = d3dpp.MultiSampleQuality;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_RENDERTARGET); // The implicit backbuffer is a rendertarget
 	UpdateCachedValuesOnCreate();
 
@@ -1583,6 +1597,8 @@ void IDirect3DSurface9Hook::CreateDeviceImplicitDepthStencil(const D3DPRESENT_PA
 	InternalHeight = d3dpp.BackBufferHeight;
 	InternalFormat = d3dpp.AutoDepthStencilFormat;
 	InternalPool = D3DPOOL_DEFAULT;
+	InternalMultiSampleType = d3dpp.MultiSampleType;
+	InternalMultiSampleQuality = d3dpp.MultiSampleQuality;
 	InternalUsage = (const DebuggableUsage)(D3DUSAGE_DEPTHSTENCIL); // Important not to mark this with the D3DUSAGE_RENDERTARGET Usage because that will get a Usage-mismatch with real D3D9!
 	LockableRT = FALSE;
 	UpdateCachedValuesOnCreate();

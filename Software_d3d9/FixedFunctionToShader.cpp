@@ -20,6 +20,9 @@ static std::map<FixedFunctionStateHash, IDirect3DPixelShader9Hook*> pixelShaders
 
 DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE D3DXIncludeHandler::Open(THIS_ D3DXINCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes)
 {
+	UNREFERENCED_PARAMETER(pParentData);
+	UNREFERENCED_PARAMETER(IncludeType);
+
 	unsigned resourceSize = 0;
 	const void* includeFileBytes = GetShaderResourceFile(pFileName, resourceSize);
 	if (includeFileBytes != NULL)
@@ -34,6 +37,8 @@ DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE D3DXIncludeHandler::Open(THIS_ D3DXIN
 
 DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE D3DXIncludeHandler::Close(THIS_ LPCVOID pData)
 {
+	UNREFERENCED_PARAMETER(pData);
+
 	// We don't have to do anything on close, so this is okay!
 	return S_OK;
 }

@@ -558,6 +558,7 @@ void BuildVertexShader(const DeviceState& state, IDirect3DDevice9Hook* const dev
 
 #ifdef _DEBUG
 	const char* const debugErrorMessage = errorMessages ? ( (const char* const)errorMessages->GetBufferPointer() ) : NULL;
+	UNREFERENCED_PARAMETER(debugErrorMessage);
 #endif
 
 	IDirect3DVertexShader9* newVertexShader = NULL;
@@ -693,26 +694,26 @@ void SetFixedFunctionVertexShaderState(const DeviceState& state, IDirect3DDevice
 	{
 		// This takes up quite a lot of stack-space!
 		wvShaderMatrix indexedWorldViewBlendingMatrices[MAX_WORLD_TRANSFORMS];
-		for (unsigned x = 0; x < 4; ++x)
+		for (unsigned char x = 0; x < 4; ++x)
 		{
 			wvShaderMatrix& thisShaderWVMatrices = indexedWorldViewBlendingMatrices[x];
 			thisShaderWVMatrices.worldView = transforms.GetWVTransformFromCache(x);
 			thisShaderWVMatrices.invWorldView = transforms.GetInvWVTransformFromCache(x);
 		}
-		for (unsigned x = 4; x < MAX_WORLD_TRANSFORMS; ++x)
+		for (unsigned short x = 4; x < MAX_WORLD_TRANSFORMS; ++x)
 		{
 			wvShaderMatrix& thisShaderWVMatrices = indexedWorldViewBlendingMatrices[x];
 			thisShaderWVMatrices.worldView = transforms.WorldTransforms[x] * transforms.ViewTransform;
 			D3DXMatrixInverse(&thisShaderWVMatrices.invWorldView, NULL, &(thisShaderWVMatrices.worldView) );
 		}
-		for (unsigned x = 0; x < MAX_WORLD_TRANSFORMS; ++x)
+		for (unsigned short x = 0; x < MAX_WORLD_TRANSFORMS; ++x)
 		{
 			dev->SetVertexShaderConstantF(WORLDVIEW_TRANSFORM_REGISTERS + 7 * x, (const float* const)&(indexedWorldViewBlendingMatrices[x]), 7);
 		}
 	}
 	else
 	{
-		for (unsigned x = 0; x < 4; ++x)
+		for (unsigned char x = 0; x < 4; ++x)
 		{
 			wvShaderMatrix thisShaderWVMatrices;
 			thisShaderWVMatrices.worldView = transforms.GetWVTransformFromCache(x);

@@ -156,7 +156,7 @@ struct parameterToken
 						debuggableSwizzleChannel ySwizzle : 2; // [19:18] Channel Y swizzle
 						debuggableSwizzleChannel zSwizzle : 2; // [21:20] Channel Z swizzle
 						debuggableSwizzleChannel wSwizzle : 2; // [23:22] Channel W swizzle
-					};
+					} channelSwizzles;
 
 					debuggableFullSwizzle fullSwizzle; // [23:16] XYZW swizzle
 				};

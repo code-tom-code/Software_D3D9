@@ -26,6 +26,7 @@ class IDirect3DBaseTexture9Hook;
 class IDirect3DTexture9Hook;
 class IDirect3DCubeTexture9Hook;
 class IDirect3DVolumeTexture9Hook;
+class IDirect3DStateBlock9Hook;
 
 struct DeclarationSemanticMapping;
 struct VStoPSMapping;
@@ -68,7 +69,7 @@ struct DebuggableD3DVERTEXELEMENT9
 static_assert(sizeof(D3DVERTEXELEMENT9) == sizeof(DebuggableD3DVERTEXELEMENT9), "Error!");
 
 // A debuggable usage type for resource usages
-enum DebuggableUsage : long
+enum DebuggableUsage : DWORD
 {
 	UsageNone = 0x00000000, // This is a valid usage, it is also the default usage
 	UsageRENDERTARGET = D3DUSAGE_RENDERTARGET,
@@ -100,6 +101,9 @@ struct StreamSource
 	StreamSource() : vertexBuffer(NULL), streamOffset(0), streamDividerFrequency(D3DSTREAMSOURCE_INDEXEDDATA), streamStride(0)
 	{
 	}
+
+	// This function is used during state block captures to clone this struct (and make sure that pointer-fixups and AddRef() calls properly occur)
+	void CopyForCapture(const StreamSource& rhs);
 
 	~StreamSource()
 	{
@@ -166,9 +170,44 @@ struct DeviceState_ShaderRegisters
 		memset(this, 0, sizeof(*this) );
 	}
 
-	float4 floats[256]; // 256 is the maximum number of shader constants in both PS_3_0 and VS_3_0
+	float4 floats[4096]; // 4096 is the maximum number of shader constants per constant buffer in D3D11 and D3D12, which acts as a nice superset of D3D9 functionality. Also we'll need at least 2048 + 64 slots available for supporting D3DRS_INDEXEDVERTEXBLENDENABLE.
 	BOOL bools[16];
 	int4 ints[16];
+};
+
+enum textureStageArgument : DWORD
+{
+	TA_DIFFUSE = D3DTA_DIFFUSE,
+	TA_CURRENT = D3DTA_CURRENT,
+	TA_TEXTURE = D3DTA_TEXTURE,
+	TA_TFACTOR = D3DTA_TFACTOR,
+	TA_SPECULAR = D3DTA_SPECULAR,
+	TA_TEMP = D3DTA_TEMP,
+	TA_CONSTANT = D3DTA_CONSTANT,
+
+	TA_COMPLEMENT_DIFFUSE = D3DTA_DIFFUSE | D3DTA_COMPLEMENT,
+	TA_COMPLEMENT_CURRENT = D3DTA_CURRENT | D3DTA_COMPLEMENT,
+	TA_COMPLEMENT_TEXTURE = D3DTA_TEXTURE | D3DTA_COMPLEMENT,
+	TA_COMPLEMENT_TFACTOR = D3DTA_TFACTOR | D3DTA_COMPLEMENT,
+	TA_COMPLEMENT_SPECULAR = D3DTA_SPECULAR | D3DTA_COMPLEMENT,
+	TA_COMPLEMENT_TEMP = D3DTA_TEMP | D3DTA_COMPLEMENT,
+	TA_COMPLEMENT_CONSTANT = D3DTA_CONSTANT | D3DTA_COMPLEMENT,
+
+	TA_DIFFUSE_ALPHAREPLICATE = D3DTA_DIFFUSE | D3DTA_ALPHAREPLICATE,
+	TA_CURRENT_ALPHAREPLICATE = D3DTA_CURRENT | D3DTA_ALPHAREPLICATE,
+	TA_TEXTURE_ALPHAREPLICATE = D3DTA_TEXTURE | D3DTA_ALPHAREPLICATE,
+	TA_TFACTOR_ALPHAREPLICATE = D3DTA_TFACTOR | D3DTA_ALPHAREPLICATE,
+	TA_SPECULAR_ALPHAREPLICATE = D3DTA_SPECULAR | D3DTA_ALPHAREPLICATE,
+	TA_TEMP_ALPHAREPLICATE = D3DTA_TEMP | D3DTA_ALPHAREPLICATE,
+	TA_CONSTANT_ALPHAREPLICATE = D3DTA_CONSTANT | D3DTA_ALPHAREPLICATE,
+
+	TA_COMPLEMENT_DIFFUSE_ALPHAREPLICATE = D3DTA_DIFFUSE | D3DTA_COMPLEMENT | D3DTA_ALPHAREPLICATE,
+	TA_COMPLEMENT_CURRENT_ALPHAREPLICATE = D3DTA_CURRENT | D3DTA_COMPLEMENT | D3DTA_ALPHAREPLICATE,
+	TA_COMPLEMENT_TEXTURE_ALPHAREPLICATE = D3DTA_TEXTURE | D3DTA_COMPLEMENT | D3DTA_ALPHAREPLICATE,
+	TA_COMPLEMENT_TFACTOR_ALPHAREPLICATE = D3DTA_TFACTOR | D3DTA_COMPLEMENT | D3DTA_ALPHAREPLICATE,
+	TA_COMPLEMENT_SPECULAR_ALPHAREPLICATE = D3DTA_SPECULAR | D3DTA_COMPLEMENT | D3DTA_ALPHAREPLICATE,
+	TA_COMPLEMENT_TEMP_ALPHAREPLICATE = D3DTA_TEMP | D3DTA_COMPLEMENT | D3DTA_ALPHAREPLICATE,
+	TA_COMPLEMENT_CONSTANT_ALPHAREPLICATE = D3DTA_CONSTANT | D3DTA_COMPLEMENT | D3DTA_ALPHAREPLICATE
 };
 
 struct TextureStageState
@@ -202,10 +241,10 @@ struct TextureStageState
 			stageStateUnion.namedStates.colorOp = D3DTOP_DISABLE;
 			stageStateUnion.namedStates.alphaOp = D3DTOP_DISABLE;
 		}
-		stageStateUnion.namedStates.colorArg1 = D3DTA_TEXTURE;
-		stageStateUnion.namedStates.colorArg2 = D3DTA_CURRENT;
-		stageStateUnion.namedStates.alphaArg1 = D3DTA_TEXTURE;
-		stageStateUnion.namedStates.alphaArg2 = D3DTA_CURRENT;
+		stageStateUnion.namedStates.colorArg1 = TA_TEXTURE;
+		stageStateUnion.namedStates.colorArg2 = TA_CURRENT;
+		stageStateUnion.namedStates.alphaArg1 = TA_TEXTURE;
+		stageStateUnion.namedStates.alphaArg2 = TA_CURRENT;
 		stageStateUnion.namedStates.bumpEnvMat00 = 0.0f;
 		stageStateUnion.namedStates.bumpEnvMat01 = 0.0f;
 		stageStateUnion.namedStates.bumpEnvMat10 = 0.0f;
@@ -214,9 +253,9 @@ struct TextureStageState
 		stageStateUnion.namedStates.bumpEnvLScale = 0.0f; // Shouldn't this default to 1.0f instead?
 		stageStateUnion.namedStates.bumpEnvLOffset = 0.0f;
 		stageStateUnion.namedStates.textureTransformFlags = D3DTTFF_DISABLE;
-		stageStateUnion.namedStates.colorArg0 = D3DTA_CURRENT;
-		stageStateUnion.namedStates.alphaArg0 = D3DTA_CURRENT;
-		stageStateUnion.namedStates.resultArg = D3DTA_CURRENT;
+		stageStateUnion.namedStates.colorArg0 = TA_CURRENT;
+		stageStateUnion.namedStates.alphaArg0 = TA_CURRENT;
+		stageStateUnion.namedStates.resultArg = TA_CURRENT;
 		stageStateUnion.namedStates.constant = D3DCOLOR_ARGB(0, 0, 0, 0);
 	}
 
@@ -226,11 +265,11 @@ struct TextureStageState
 		{
 			DWORD padding0; // 0
 			D3DTEXTUREOP colorOp; // 1
-			D3DCOLOR colorArg1; // 2
-			D3DCOLOR colorArg2; // 3
+			textureStageArgument colorArg1; // 2
+			textureStageArgument colorArg2; // 3
 			D3DTEXTUREOP alphaOp; // 4
-			D3DCOLOR alphaArg1; // 5
-			D3DCOLOR alphaArg2; // 6
+			textureStageArgument alphaArg1; // 5
+			textureStageArgument alphaArg2; // 6
 			float bumpEnvMat00; // 7
 			float bumpEnvMat01; // 8
 			float bumpEnvMat10; // 9
@@ -242,9 +281,9 @@ struct TextureStageState
 			float bumpEnvLOffset; // 23
 			D3DTEXTURETRANSFORMFLAGS textureTransformFlags; // 24
 			DWORD emptyAddressW; // 25 - Used to be "D3DTSS_ADDRESSW" in D3D8 - see d3d8types.h
-			D3DCOLOR colorArg0; // 26
-			D3DCOLOR alphaArg0; // 27
-			DWORD resultArg; // 28
+			textureStageArgument colorArg0; // 26
+			textureStageArgument alphaArg0; // 27
+			textureStageArgument resultArg; // 28
 			DWORD emptyUnknown29[3]; // 29 thru 31 - Unknown what these used to be for
 			D3DCOLOR constant; // 32
 		} namedStates;
@@ -257,6 +296,18 @@ struct TexturePaletteState
 {
 	TexturePaletteState() : currentPaletteIndex(0), paletteEntries(NULL)
 	{
+	}
+
+	void CaptureCopyTexturePaletteState(const TexturePaletteState& rhs)
+	{
+		currentPaletteIndex = rhs.currentPaletteIndex;
+		if (rhs.paletteEntries)
+		{
+			paletteEntries = new std::vector<TexturePaletteEntry>();
+			*paletteEntries = *(rhs.paletteEntries);
+		}
+		else
+			paletteEntries = NULL;
 	}
 
 	~TexturePaletteState()
@@ -468,6 +519,9 @@ struct LightInfo
 
 	D3DLIGHT9 light;
 	INT activeLightIndex;
+
+	// This isn't marked const, but it is global, so please do not modify its data
+	static LightInfo defaultLight;
 };
 
 struct CachedViewport
@@ -534,7 +588,7 @@ struct scissorRectStruct
 
 struct DeviceState
 {
-	DeviceState() : currentIndexBuffer(NULL), currentVertexShader(NULL), currentPixelShader(NULL), currentVertexDecl(NULL), declTarget(targetFVF), currentSwvpEnabled(FALSE), currentDepthStencil(NULL)
+	DeviceState() : currentIndexBuffer(NULL), currentVertexShader(NULL), currentPixelShader(NULL), currentVertexDecl(NULL), declTarget(targetFVF), currentDepthStencil(NULL), currentNPatchMode(0.0f)
 	{
 		currentFVF.rawFVF_DWORD = 0x00000000;
 
@@ -554,6 +608,9 @@ struct DeviceState
 		lightInfoMap = new std::map<UINT, LightInfo*>();
 	}
 
+	// Used during state block captures to copy the device state over
+	void CaptureCopyState(const DeviceState& rhs);
+
 #define MAX_NUM_SAMPLERS D3DVERTEXTEXTURESAMPLER3
 #define MAX_NUM_TEXTURE_STAGE_STATES 8
 
@@ -562,7 +619,6 @@ struct DeviceState
 		currentIndexBuffer = NULL;
 		currentVertexShader = NULL;
 		currentPixelShader = NULL;
-		currentSwvpEnabled = FALSE;
 		for (unsigned x = 0; x < MAX_NUM_SAMPLERS; ++x)
 		{
 			currentTextures[x] = NULL;
@@ -576,6 +632,8 @@ struct DeviceState
 		for (unsigned x = 0; x < ARRAYSIZE(currentRenderTargets); ++x)
 			currentRenderTargets[x] = NULL;
 		currentDepthStencil = NULL;
+
+		currentNPatchMode = 0.0f;
 
 		if (lightInfoMap)
 		{
@@ -606,7 +664,6 @@ struct DeviceState
 	IDirect3DPixelShader9Hook* currentPixelShader;
 	DeviceState_ShaderRegisters pixelShaderRegisters;
 	TexturePaletteState currentPaletteState;
-	BOOL currentSwvpEnabled; // Note that this parameter is not recorded by State Blocks (TODO: Move this out of the device state)
 
 	// TODO: Refactor the hooks inheritance tree to make this work with baseTextures so we don't need these duplicates:
 	IDirect3DTexture9Hook* currentTextures[MAX_NUM_SAMPLERS];
@@ -618,6 +675,7 @@ struct DeviceState
 	D3DXPLANE currentClippingPlanes[D3DMAXUSERCLIPPLANES];
 
 	D3DMATERIAL9 currentMaterial;
+	float currentNPatchMode;
 
 	__declspec(align(16) ) RenderStates currentRenderStates;
 
@@ -1212,6 +1270,11 @@ public:
 
 	currentDrawCallJobData currentDrawCallData;
 
+	inline const bool IsCurrentlyRecordingStateBlock() const
+	{
+		return currentlyRecordingStateBlock != NULL;
+	}
+
 	inline void LockDeviceCS(void)
 	{
 		EnterCriticalSection(&deviceCS);
@@ -1246,12 +1309,14 @@ protected:
 	std::map<DWORD, IDirect3DVertexDeclaration9Hook*>* FVFToVertDeclCache;
 #endif // NO_CACHING_FVF_VERT_DECLS
 
-	DeviceState currentState;
+	__declspec(align(16) ) DeviceState currentState;
+
+	IDirect3DStateBlock9Hook* currentlyRecordingStateBlock;
+
+	BOOL currentSwvpEnabled; // Note that this parameter is not supposed to be recorded by State Blocks (which is why it's not inside the DeviceState struct)
 
 	// This is the implicit swap chain:
 	IDirect3DSwapChain9Hook* implicitSwapChain;
-
-	LightInfo defaultLight;
 
 	// For debug-printing efficiently
 	HANDLE hConsoleHandle;
@@ -1561,20 +1626,26 @@ inline void ColorDWORDToFloat4_4(const __m128i inColor4Vec, D3DXVECTOR4 (&outCol
 inline const D3DCOLOR Expand565To888(const RGB565 inColor)
 {
 	// TODO: Should alpha be 0.0f or 1.0f here?
-	return D3DCOLOR_ARGB(255, inColor.bits565.r << 3, inColor.bits565.g << 2, inColor.bits565.b << 3);
+	const float scaledR = inColor.bits565.r / 31.0f;
+	const float scaledG = inColor.bits565.g / 63.0f;
+	const float scaledB = inColor.bits565.b / 31.0f;
+	const unsigned char r8 = (const unsigned char)(scaledR * 255.0f);
+	const unsigned char g8 = (const unsigned char)(scaledG * 255.0f);
+	const unsigned char b8 = (const unsigned char)(scaledB * 255.0f);
+	return D3DCOLOR_ARGB(255, r8, g8, b8);
 }
 
 inline const D3DCOLOR Expand4444To8888(const A4R4G4B4 inColor)
 {
-	return D3DCOLOR_ARGB(inColor.bits4444.a << 4, inColor.bits4444.r << 4, 
-		inColor.bits4444.g << 4, inColor.bits4444.b << 4);
+	return D3DCOLOR_ARGB(inColor.bits4444.a * 17, inColor.bits4444.r * 17, 
+		inColor.bits4444.g * 17, inColor.bits4444.b * 17);
 }
 
 inline const D3DCOLOR Expand4440To8888(const X4R4G4B4 inColor)
 {
 	// TODO: Should alpha be 0.0f or 1.0f here?
-	return D3DCOLOR_ARGB(255, inColor.bits4440.r << 4, 
-		inColor.bits4440.g << 4, inColor.bits4440.b << 4);
+	return D3DCOLOR_ARGB(255, inColor.bits4440.r * 17, 
+		inColor.bits4440.g * 17, inColor.bits4440.b * 17);
 }
 
 template <const unsigned char writeMask = 0xF>

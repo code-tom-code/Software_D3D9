@@ -102,9 +102,9 @@ COM_DECLSPEC_NOTHROW void IDirect3DTexture9Hook::PreLoad(THIS)
 
 COM_DECLSPEC_NOTHROW D3DRESOURCETYPE IDirect3DTexture9Hook::GetType(THIS)
 {
-	D3DRESOURCETYPE ret = realObject->GetType();
 #ifdef _DEBUG
-	if (ret != D3DRTYPE_TEXTURE)
+	D3DRESOURCETYPE realRet = realObject->GetType();
+	if (realRet != D3DRTYPE_TEXTURE)
 	{
 		__debugbreak();
 	}
@@ -143,9 +143,9 @@ COM_DECLSPEC_NOTHROW HRESULT IDirect3DTexture9Hook::SetAutoGenFilterType(THIS_ D
 
 COM_DECLSPEC_NOTHROW D3DTEXTUREFILTERTYPE IDirect3DTexture9Hook::GetAutoGenFilterType(THIS)
 {
-	D3DTEXTUREFILTERTYPE ret = realObject->GetAutoGenFilterType();
 #ifdef _DEBUG
-	if (ret != AutoGenFilter)
+	D3DTEXTUREFILTERTYPE realRet = realObject->GetAutoGenFilterType();
+	if (realRet != AutoGenFilter)
 	{
 		__debugbreak();
 	}

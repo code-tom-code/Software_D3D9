@@ -24,6 +24,8 @@
 #define D3DVBF_3WEIGHTS 3 // 4 matrix blending
 #define D3DVBF_TWEENING 255 // blending using D3DRS_TWEENFACTOR
 
+#define MAX_WORLD_TRANSFORMS 256
+
 #ifndef TEX0TYPE
 	#define TEX0TYPE float4
 #endif // #ifndef TEX0TYPE
@@ -194,7 +196,7 @@ const float4 AMBIENT : register(c19); // Global ambient color, set by SetRenderS
 const row_major float4x4 texMatrices[8] : register(c20); // It looks like texcoord matrix transforms get applied *after* autogeneration of texcoords (i.e. D3DTSS_TCI_CAMERA_*). c20 thru c51
 const LightData enabledLightsData[8] : register(c52); // c52 thru c107
 const row_major float4x4 proj : register(c108); // c108 thru c111
-const wvMatrix wvBlendingMatrices[256] : register(c112); // This should always be last
+const wvMatrix wvBlendingMatrices[MAX_WORLD_TRANSFORMS] : register(c112); // This should always be last
 
 #define D3DRS_POINTSIZE_MAX pointScaleData.x
 #define D3DRS_POINTSIZE_MIN pointScaleData.y

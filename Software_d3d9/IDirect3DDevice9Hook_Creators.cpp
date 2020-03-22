@@ -178,14 +178,20 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::CreateState
 	OutputDebugStringA(buffer);
 #endif
 
-	LPDIRECT3DSTATEBLOCK9 realStateBlock = NULL;
-	HRESULT ret = d3d9dev->CreateStateBlock(Type, &realStateBlock);
-	if (FAILED(ret) )
-		return ret;
-
 	if (ppSB)
 	{
-		IDirect3DStateBlock9Hook* newStateBlock = new IDirect3DStateBlock9Hook(realStateBlock, this);
+		LPDIRECT3DSTATEBLOCK9 realStateBlock = NULL;
+		HRESULT ret = d3d9dev->CreateStateBlock(Type, &realStateBlock);
+		if (FAILED(ret) )
+			return ret;
+
+		void* const newStateBlockMemory = _aligned_malloc(sizeof(IDirect3DStateBlock9Hook), 16);
+		if (!newStateBlockMemory)
+			return D3DERR_OUTOFVIDEOMEMORY;
+
+		const bool isCompleteStateBlock = true;
+		IDirect3DStateBlock9Hook* newStateBlock = new (newStateBlockMemory) IDirect3DStateBlock9Hook(realStateBlock, this, isCompleteStateBlock);
+		newStateBlock->InitializeListAndCapture(Type);
 		*ppSB = newStateBlock;
 		return ret;
 	}

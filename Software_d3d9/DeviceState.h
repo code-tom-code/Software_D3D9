@@ -61,6 +61,7 @@ typedef enum _D3DANTIALIASMODE
     D3DANTIALIAS_FORCE_DWORD   = 0x7fffffff, /* force 32-bit size enum */
 } D3DANTIALIASMODE;
 
+#ifdef _DEBUG
 // These are bit-fields for each of the deprecated render states (up to 255) as of D3D9.
 // Note that the presence of a "1" bit indicates "deprecated" whereas a "0" bit can mean either "unused" or "not deprecated"
 static const unsigned long deprecatedD3D9RenderStatesBits[8] =
@@ -81,9 +82,10 @@ static const bool IsRenderStateD3D9Deprecated(const D3DRENDERSTATETYPE renderSta
 		return false;
 
 	const unsigned bitmaskDWORDIndex = renderState / 32;
-	const unsigned bitmask = renderState % 32;
+	const unsigned bitmask = 1 << (renderState % 32);
 	return (deprecatedD3D9RenderStatesBits[bitmaskDWORDIndex] & bitmask) != 0;
 }
+#endif // #ifdef _DEBUG
 
 // All of the render states available via SetRenderState() and GetRenderState()
 // Reference for the D3D9-supported ones: https://msdn.microsoft.com/en-us/library/windows/desktop/bb172599(v=vs.85).aspx

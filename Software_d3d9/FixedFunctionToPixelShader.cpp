@@ -625,6 +625,7 @@ void BuildPixelShader(const DeviceState& state, IDirect3DDevice9Hook* const dev,
 
 #ifdef _DEBUG
 	const char* const debugErrorMessage = errorMessages ? ( (const char* const)errorMessages->GetBufferPointer() ) : NULL;
+	UNREFERENCED_PARAMETER(debugErrorMessage);
 #endif
 
 	IDirect3DPixelShader9* newPixelShader = NULL;

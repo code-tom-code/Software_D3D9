@@ -58,14 +58,15 @@ void IDirect3DVertexDeclaration9Hook::CreateVertexDeclaration(const DebuggableD3
 
 	UINT currentOffset = 0;
 
-	DebuggableD3DVERTEXELEMENT9 newElement = elements[0];
-	newElement.Usage = D3DDECLUSAGE_POSITIONT;
-	newElement.Type = D3DDECLTYPE_FLOAT4;
-	newElement.Offset = 0;
-	newElement.Stream = 0;
-	vertShaderOutputElements.push_back(newElement);
-
-	currentOffset += GetElementSizeFromType(newElement.Type);
+	{
+		DebuggableD3DVERTEXELEMENT9 newElement = elements[0];
+		newElement.Usage = D3DDECLUSAGE_POSITIONT;
+		newElement.Type = D3DDECLTYPE_FLOAT4;
+		newElement.Offset = 0;
+		newElement.Stream = 0;
+		vertShaderOutputElements.push_back(newElement);
+		currentOffset += GetElementSizeFromType(newElement.Type);
+	}
 
 	for (unsigned x = 0; x < numElements; ++x)
 	{

@@ -7,7 +7,7 @@ struct DeviceState;
 struct DeviceState_ShaderRegisters;
 struct ShaderInfo;
 
-#define MAX_NUM_VS_CONSTANTS 256
+#define MAX_NUM_VS_CONSTANTS 4096
 
 struct VS_2_0_ConstantsBuffer
 {

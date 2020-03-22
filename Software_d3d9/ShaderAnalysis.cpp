@@ -238,16 +238,16 @@ static inline void ResolveDstParameter(const DWORD*& bytecode, ShaderInfo& shade
 		}
 		if (print) dprintf(shaderInfo, "%u", relativeDstParameter.GetRegisterIndex() );
 
-		const unsigned registerWriteMask = relativeDstParameter.GetWriteMask();
-		if (registerWriteMask != 0xF) // Omit displaying ".xyzw" after every register because it gets annoying!
+		const unsigned relativeRegisterWriteMask = relativeDstParameter.GetWriteMask();
+		if (relativeRegisterWriteMask != 0xF) // Omit displaying ".xyzw" after every register because it gets annoying!
 		{
 			bool writeMaskDotApplied = false;
-			if (registerWriteMask & 0x1) // x
+			if (relativeRegisterWriteMask & 0x1) // x
 			{
 				if (print) dprintf(shaderInfo, ".x");
 				writeMaskDotApplied = true;
 			}
-			if (registerWriteMask & 0x2) // y
+			if (relativeRegisterWriteMask & 0x2) // y
 			{
 				if (!writeMaskDotApplied)
 				{
@@ -259,7 +259,7 @@ static inline void ResolveDstParameter(const DWORD*& bytecode, ShaderInfo& shade
 				}
 				writeMaskDotApplied = true;
 			}
-			if (registerWriteMask & 0x4) // z
+			if (relativeRegisterWriteMask & 0x4) // z
 			{
 				if (!writeMaskDotApplied)
 				{
@@ -271,7 +271,7 @@ static inline void ResolveDstParameter(const DWORD*& bytecode, ShaderInfo& shade
 				}
 				writeMaskDotApplied = true;
 			}
-			if (registerWriteMask & 0x8) // w
+			if (relativeRegisterWriteMask & 0x8) // w
 			{
 				if (!writeMaskDotApplied)
 				{

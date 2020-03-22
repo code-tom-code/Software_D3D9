@@ -8,7 +8,7 @@ struct DeviceState;
 struct DeviceState_ShaderRegisters;
 struct ShaderInfo;
 
-#define MAX_NUM_PS_CONSTANTS 32
+#define MAX_NUM_PS_CONSTANTS 4096
 #define MAX_NUM_PS_INPUTS 10
 
 __declspec(align(16) ) struct PS_2_0_ConstantsBuffer

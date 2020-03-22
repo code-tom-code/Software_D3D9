@@ -943,8 +943,8 @@ static inline const bool ParseCustomOpcode(const D3DSHADER_INSTRUCTION_OPCODE_TY
 			src1.internalRawToken = 0x00000000;
 			src1.srcParameter.instructionParameterBit = parameterTokenMarker;
 			src1.srcParameter.registerIndex = destParameter.GetRegisterIndex();
-			src1.srcParameter.registerType_lowBits = D3DSPR_SAMPLER;
-			src1.srcParameter.registerType_highBits = D3DSPR_SAMPLER >> 3;
+			src1.srcParameter.registerType_lowBits = (D3DSPR_SAMPLER & 0x7);
+			src1.srcParameter.registerType_highBits = ( (D3DSPR_SAMPLER >> 3) & 0x3);
 			src1.srcParameter.sourceSwizzle.fullSwizzle = _NoSwizzleXYZW;
 		}
 		else

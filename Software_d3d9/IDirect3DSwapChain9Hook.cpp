@@ -294,6 +294,8 @@ void IDirect3DSwapChain9Hook::InitializeSwapChain(const D3DPRESENT_PARAMETERS& _
 
 void IDirect3DSwapChain9Hook::SetGammaRamp(DWORD Flags, CONST D3DGAMMARAMP* pRamp)
 {
+	UNREFERENCED_PARAMETER(Flags);
+
 	if (pRamp)
 	{
 		gammaRamp = *pRamp;

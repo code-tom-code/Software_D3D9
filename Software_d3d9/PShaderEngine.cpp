@@ -533,9 +533,9 @@ void PShaderEngine::Reset(const unsigned x, const unsigned y)
 
 #ifdef _DEBUG
 	// These values match the default GPR values in PIX
-	for (unsigned x = 0; x < ARRAYSIZE(runtimeRegisters[0].r); ++x)
+	for (unsigned registerIndex = 0; registerIndex < ARRAYSIZE(runtimeRegisters[0].r); ++registerIndex)
 	{
-		D3DXVECTOR4& vec = runtimeRegisters[0].r[x];
+		D3DXVECTOR4& vec = runtimeRegisters[0].r[registerIndex];
 		vec.x = 1.0f;
 		vec.y = 1.0f;
 		vec.z = 1.0f;
@@ -568,11 +568,11 @@ void PShaderEngine::Reset4(const __m128i x4, const __m128i y4)
 
 #ifdef _DEBUG
 	// These values match the default GPR values in PIX
-	for (unsigned z = 0; z < 4; ++z)
+	for (unsigned pixelIndex = 0; pixelIndex < 4; ++pixelIndex)
 	{
-		for (unsigned x = 0; x < ARRAYSIZE(runtimeRegisters[z].r); ++x)
+		for (unsigned registerIndex = 0; registerIndex < ARRAYSIZE(runtimeRegisters[pixelIndex].r); ++registerIndex)
 		{
-			D3DXVECTOR4& vec = runtimeRegisters[z].r[x];
+			D3DXVECTOR4& vec = runtimeRegisters[pixelIndex].r[registerIndex];
 			vec.x = 1.0f;
 			vec.y = 1.0f;
 			vec.z = 1.0f;
@@ -1219,8 +1219,8 @@ const shaderStatus PShaderEngine::InterpreterExecStep(void)
 		const D3DXVECTOR4 texCoord = ResolveSrcRegister(srcDst.internalRawToken);
 
 		srcParameterToken samplerSrc = srcDst;
-		samplerSrc.srcParameter.registerType_lowBits = D3DSPR_SAMPLER;
-		samplerSrc.srcParameter.registerType_highBits = (D3DSPR_SAMPLER >> 3);
+		samplerSrc.srcParameter.registerType_lowBits = (D3DSPR_SAMPLER & 0x7);
+		samplerSrc.srcParameter.registerType_highBits = ( (D3DSPR_SAMPLER >> 3) & 0x3);
 		const D3DXVECTOR4& samplerTemp = ResolveSrcParameter(samplerSrc.internalRawToken);
 		const sampler* const samplerPtr = (const sampler* const)&samplerTemp;
 

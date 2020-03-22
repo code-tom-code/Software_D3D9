@@ -10,6 +10,8 @@
 #include "IDirect3DSurface9Hook.h"
 #include "IDirect3DSwapChain9Hook.h"
 #include "IDirect3DTexture9Hook.h"
+#include "IDirect3DCubeTexture9Hook.h"
+#include "IDirect3DVolumeTexture9Hook.h"
 #include "IDirect3DStateBlock9Hook.h"
 #include "FixedFunctionToShader.h"
 #include "SemanticMappings.h"
@@ -74,6 +76,8 @@ static_assert(sizeof(oneMaskVecBytes) == sizeof(oneMaskVec), "Error! Unexpected 
 #endif // #ifdef PROFILE_AVERAGE_PIXEL_SHADE_TIMES
 
 extern HINSTANCE hLThisDLL;
+
+/*static*/ LightInfo LightInfo::defaultLight;
 
 #ifdef MULTITHREAD_SHADING
 #define NUM_THREADS 16
@@ -515,6 +519,9 @@ static inline void SynchronizeThreads()
 
 static VOID NTAPI CleanupGroupCancelCallback(_Inout_opt_ PVOID ObjectContext, _Inout_opt_ PVOID CleanupContext)
 {
+	UNREFERENCED_PARAMETER(ObjectContext);
+	UNREFERENCED_PARAMETER(CleanupContext);
+
 	// Do nothing.
 	// We'll probably never call this callback anyway
 }
@@ -1739,21 +1746,56 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Clear(THIS_
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::BeginStateBlock(THIS)
 {
+	if (currentlyRecordingStateBlock != NULL)
+	{
+		// It is not legal to call BeginStateBlock() while you are in the middle of recording another state block. Call EndStateBlock() first to stop recording before you can call BeginStateBlock() again.
+		// If you do this, then the call gets dropped and nothing happens.
+		return D3DERR_INVALIDCALL;
+	}
+	
 	HRESULT ret = d3d9dev->BeginStateBlock();
-	return ret;
+	if (FAILED(ret) )
+		return ret;
+
+#ifdef _DEBUG
+	char buffer[256];
+#pragma warning(push)
+#pragma warning(disable:4996)
+	sprintf(buffer, "BeginStateBlock()\n");
+#pragma warning(pop)
+	OutputDebugStringA(buffer);
+#endif
+
+	LPDIRECT3DSTATEBLOCK9 realStateBlock = NULL;
+	void* const newStateBlockMemory = _aligned_malloc(sizeof(IDirect3DStateBlock9Hook), 16);
+	if (newStateBlockMemory)
+	{
+		const bool isCompleteStateBlock = false;
+		currentlyRecordingStateBlock = new (newStateBlockMemory) IDirect3DStateBlock9Hook(realStateBlock, this, isCompleteStateBlock);
+		return ret;
+	}
+	else
+		return D3DERR_OUTOFVIDEOMEMORY;
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::EndStateBlock(THIS_ IDirect3DStateBlock9** ppSB)
 {
-	LPDIRECT3DSTATEBLOCK9 realStateBlock = NULL;
-	HRESULT ret = d3d9dev->EndStateBlock(&realStateBlock);
-	if (FAILED(ret) )
-		return ret;
+	// It is not legal to call EndStateBlock() if you have not previously called BeginStateBlock() to begin recording a state block.
+	if (currentlyRecordingStateBlock == NULL)
+	{
+		return D3DERR_INVALIDCALL;
+	}
 
 	if (ppSB)
 	{
-		IDirect3DStateBlock9Hook* newStateBlock = new IDirect3DStateBlock9Hook(realStateBlock, this);
-		*ppSB = newStateBlock;
+		LPDIRECT3DSTATEBLOCK9 realStateBlock = NULL;
+		HRESULT ret = d3d9dev->EndStateBlock(&realStateBlock);
+		if (FAILED(ret) )
+			return ret;
+
+		currentlyRecordingStateBlock->SetRealObject(realStateBlock);
+		*ppSB = currentlyRecordingStateBlock;
+		currentlyRecordingStateBlock = NULL;
 		return ret;
 	}
 	else
@@ -1764,6 +1806,52 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::ValidateDev
 {
 	HRESULT ret = d3d9dev->ValidateDevice(pNumPasses);
 	return ret;
+}
+
+void StreamSource::CopyForCapture(const StreamSource& rhs)
+{
+	memcpy(this, &rhs, sizeof(*this) );
+	if (vertexBuffer)
+		vertexBuffer->AddRef();
+}
+
+void DeviceState::CaptureCopyState(const DeviceState& rhs)
+{
+	memcpy(this, &rhs, sizeof(*this) );
+	if (lightInfoMap)
+	{
+		lightInfoMap = new std::map<UINT, LightInfo*>;
+		*lightInfoMap = *(rhs.lightInfoMap);
+	}
+	for (unsigned x = 0; x < MAX_ENABLED_LIGHTS; ++x)
+	{
+		// TODO: Fix up the active enabled lights array so that it points into the new std::map rather than the old one
+	}
+	currentPaletteState.CaptureCopyTexturePaletteState(rhs.currentPaletteState);
+	for (unsigned x = 0; x < MAX_D3D9_STREAMS; ++x)
+	{
+		currentStreams[x].CopyForCapture(rhs.currentStreams[x]);
+		currentStreamEnds[x].ResetEndPointers();
+	}
+	currentSoftUPStream.CopyForCapture(rhs.currentSoftUPStream);
+	currentSoftUPStreamEnd.ResetEndPointers();
+
+	if (currentIndexBuffer) currentIndexBuffer->AddRef();
+	if (currentSoftUPIndexBuffer) currentSoftUPIndexBuffer->AddRef();
+	if (currentVertexShader) currentVertexShader->AddRef();
+	if (currentPixelShader) currentPixelShader->AddRef();
+	for (unsigned x = 0; x < MAX_NUM_SAMPLERS; ++x)
+	{
+		if (currentTextures[x]) currentTextures[x]->AddRef();
+		if (currentCubeTextures[x]) currentCubeTextures[x]->AddRef();
+		if (currentVolumeTextures[x]) currentVolumeTextures[x]->AddRef();
+	}
+	for (unsigned x = 0; x < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++x)
+	{
+		if (currentRenderTargets[x]) currentRenderTargets[x]->AddRef();
+	}
+	if (currentDepthStencil) currentDepthStencil->AddRef();
+	if (currentVertexDecl) currentVertexDecl->AddRef();
 }
 
 struct int2
@@ -1966,20 +2054,6 @@ static inline void LoadElementToRegister(D3DXVECTOR4& outRegister, const D3DDECL
 	}
 		break;
 	}
-}
-
-static inline void LoadElementToRegisterValidated(D3DXVECTOR4& outRegister, const D3DDECLTYPE elemType, const void* const data, const void* const streamEndPtr)
-{
-	if (data > streamEndPtr)
-	{
-		outRegister.x = 0.0f;
-		outRegister.y = 0.0f;
-		outRegister.z = 0.0f;
-		outRegister.w = 1.0f;
-		return;
-	}
-
-	LoadElementToRegister(outRegister, elemType, data);
 }
 
 #ifdef RUN_SHADERS_IN_WARPS
@@ -2541,9 +2615,18 @@ void IDirect3DDevice9Hook::LoadVertexInputElement(const DebuggableD3DVERTEXELEME
 	}
 #endif
 
-	// Do the actual store:
 	const void* const streamEndPtr = currentState.currentStreamEnds[element.Stream].dataTypeStreamEnds[element.Type];
-	LoadElementToRegisterValidated(*elementPtr, element.Type, dataPtr, streamEndPtr);
+	if (dataPtr > streamEndPtr)
+	{
+		elementPtr->x = 0.0f;
+		elementPtr->y = 0.0f;
+		elementPtr->z = 0.0f;
+		elementPtr->w = 1.0f;
+		return;
+	}
+
+	// Do the actual store:
+	LoadElementToRegister(*elementPtr, element.Type, dataPtr);
 }
 
 #ifdef RUN_SHADERS_IN_WARPS
@@ -3873,19 +3956,18 @@ const bool IDirect3DDevice9Hook::TotalDrawCallSkipTest(void) const
 		return false;
 #endif // #ifdef ENABLE_END_TO_SKIP_DRAWS
 
-	bool DepthWriteEnabled = false;
-	if (currentState.currentDepthStencil != NULL)
-		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable)
-			DepthWriteEnabled = true;
-
+	const bool DepthWriteEnabled = (currentState.currentDepthStencil != NULL) && currentState.currentRenderStates.renderStatesUnion.namedStates.zWriteEnable;
 	if (DepthWriteEnabled)
 	{
 		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zFunc == D3DCMP_NEVER)
 			return false; // TODO: Check for stencil enable and stencil zFail here
 	}
-
-	if (currentState.currentRenderStates.renderStatesUnion.namedStates.colorWriteEnable == 0x00)
-		return false;
+	else
+	{
+		// If we're only writing color (no depth), then early-out if we have no writemask
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.colorWriteEnable == 0x00)
+			return false;
+	}
 
 	if (!DepthWriteEnabled)
 	{
@@ -7429,11 +7511,17 @@ void IDirect3DDevice9Hook::ShadePixel_FailDepth(const unsigned x, const unsigned
 
 void IDirect3DDevice9Hook::PostShadePixel_FailAlphaTest(const unsigned x, const unsigned y) const
 {
+	UNREFERENCED_PARAMETER(x);
+	UNREFERENCED_PARAMETER(y);
+
 	++frameStats.numAlphaTestFailPixels;
 }
 
 void IDirect3DDevice9Hook::PostShadePixel_Discard(const unsigned x, const unsigned y) const
 {
+	UNREFERENCED_PARAMETER(x);
+	UNREFERENCED_PARAMETER(y);
+
 	++frameStats.numPixelsTexkilled;
 }
 
@@ -8197,6 +8285,9 @@ void IDirect3DDevice9Hook::RasterizeLineFromStream(const DeclarationSemanticMapp
 #endif
 
 	// Do nothing, line rasterization is not yet implemented
+	UNREFERENCED_PARAMETER(v0);
+	UNREFERENCED_PARAMETER(v1);
+	UNREFERENCED_PARAMETER(vertexDeclMapping);
 }
 
 // Assumes pre-transformed vertex from a vertex declaration + raw vertex stream
@@ -8211,6 +8302,8 @@ void IDirect3DDevice9Hook::RasterizePointFromStream(const DeclarationSemanticMap
 #endif
 
 	// Do nothing, point rasterization is not yet implemented
+	UNREFERENCED_PARAMETER(v0);
+	UNREFERENCED_PARAMETER(vertexDeclMapping);
 }
 
 // Assumes pre-transformed vertices from a processed vertex shader
@@ -8225,6 +8318,9 @@ void IDirect3DDevice9Hook::RasterizeLineFromShader(const VStoPSMapping& vs_psMap
 #endif
 
 	// Do nothing, line rasterization is not yet implemented
+	UNREFERENCED_PARAMETER(v0);
+	UNREFERENCED_PARAMETER(v1);
+	UNREFERENCED_PARAMETER(vs_psMapping);
 }
 
 // Assumes pre-transformed vertex from a processed vertex shader
@@ -8239,6 +8335,8 @@ void IDirect3DDevice9Hook::RasterizePointFromShader(const VStoPSMapping& vs_psMa
 #endif
 
 	// Do nothing, point rasterization is not yet implemented
+	UNREFERENCED_PARAMETER(v0);
+	UNREFERENCED_PARAMETER(vs_psMapping);
 }
 
 template <const unsigned char integerBits, const unsigned char fractionBits, typename baseType = unsigned>
@@ -8307,7 +8405,7 @@ static const float ConvertFixedToFloat(TFixed<integerBits, fractionBits, baseTyp
 	else
 	{
 		// Positive number
-		return (fixed.splitFormat.intPart) + conv;
+		return intConv + conv;
 	}
 }
 
@@ -9431,9 +9529,9 @@ void IDirect3DDevice9Hook::InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, c
 
 	// Mixed-mode vertex processing starts in hardware mode by default
 	if (initialCreateFlags & (D3DCREATE_MIXED_VERTEXPROCESSING | D3DCREATE_HARDWARE_VERTEXPROCESSING) )
-		currentState.currentSwvpEnabled = FALSE;
+		currentSwvpEnabled = FALSE;
 	else
-		currentState.currentSwvpEnabled = TRUE;
+		currentSwvpEnabled = TRUE;
 
 	// Reset the implicit swap chain for this device:
 	delete implicitSwapChain;
@@ -9579,7 +9677,7 @@ void IDirect3DDevice9Hook::InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, c
 
 IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D9Hook* _parentHook) : d3d9dev(_d3d9dev), parentHook(_parentHook), refCount(1), initialDevType(D3DDEVTYPE_HAL), initialCreateFlags(D3DCREATE_HARDWARE_VERTEXPROCESSING),
 	enableDialogs(FALSE), sceneBegun(FALSE), implicitSwapChain(NULL), hConsoleHandle(INVALID_HANDLE_VALUE), overlayFontTexture(NULL), numPixelsPassedZTest(0), initialCreateFocusWindow(NULL), initialCreateDeviceWindow(NULL),
-	processedVertexBuffer(NULL), processedVertsUsed(0), processVertsAllocated(0)
+	processedVertexBuffer(NULL), processedVertsUsed(0), processVertsAllocated(0), currentlyRecordingStateBlock(NULL), currentSwvpEnabled(FALSE)
 {
 #ifdef _DEBUG
 	m_FirstMember = false;
@@ -9618,6 +9716,13 @@ IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D
 	{
 		overlayFontTexture->Release();
 		overlayFontTexture = NULL;
+	}
+
+	if (currentlyRecordingStateBlock != NULL)
+	{
+		currentlyRecordingStateBlock->~IDirect3DStateBlock9Hook();
+		_aligned_free(currentlyRecordingStateBlock);
+		currentlyRecordingStateBlock = NULL;
 	}
 
 	delete currentState.currentSoftUPStream.vertexBuffer;
