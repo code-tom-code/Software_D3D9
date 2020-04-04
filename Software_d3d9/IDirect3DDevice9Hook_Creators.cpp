@@ -46,7 +46,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::CreateVolum
 	if (ppVolumeTexture)
 	{
 		IDirect3DVolumeTexture9Hook* hookRet = new IDirect3DVolumeTexture9Hook(*ppVolumeTexture, this);
-		hookRet->CreateVolumeTexture(Width, Height, Depth, Levels, Usage, Format, Pool);
+		hookRet->CreateVolumeTexture(Width, Height, Depth, Levels, (const DebuggableUsage)Usage, Format, Pool);
 		*ppVolumeTexture = hookRet;
 	}
 
@@ -62,7 +62,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::CreateCubeT
 	if (ppCubeTexture)
 	{
 		IDirect3DCubeTexture9Hook* hookRet = new IDirect3DCubeTexture9Hook(*ppCubeTexture, this);
-		hookRet->CreateCubeTexture(EdgeLength, Levels, Usage, Format, Pool);
+		hookRet->CreateCubeTexture(EdgeLength, Levels, (const DebuggableUsage)Usage, Format, Pool);
 		*ppCubeTexture = hookRet;
 	}
 
@@ -236,7 +236,7 @@ static const D3DDECLTYPE texCoordTypeLookup[4] =
 	D3DDECLTYPE_FLOAT1
 };
 
-static const unsigned texCoordSizeLookup[4] =
+static const unsigned char texCoordSizeLookup[4] =
 {
 	sizeof(D3DXVECTOR2),
 	sizeof(D3DXVECTOR3),
@@ -465,7 +465,7 @@ IDirect3DVertexDeclaration9Hook* IDirect3DDevice9Hook::CreateVertexDeclFromFVFCo
 			const unsigned texCoordTypeMask = 0x3 << texCoordTypeShift;
 			const unsigned texCoordType = (FVF.rawFVF_DWORD & texCoordTypeMask) >> texCoordTypeShift;
 			const D3DDECLTYPE texCoordTypeFormat = texCoordTypeLookup[texCoordType];
-			const unsigned texCoordTypeSize = texCoordSizeLookup[texCoordType];
+			const unsigned char texCoordTypeSize = texCoordSizeLookup[texCoordType];
 			elements[currentElementIndex++] = {0, totalVertexSizeBytes, (const BYTE)texCoordTypeFormat, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, x};
 			totalVertexSizeBytes += texCoordTypeSize;
 		}

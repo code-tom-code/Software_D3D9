@@ -270,6 +270,25 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DQuery9Hook::GetData(THIS
 		QueryPerformanceFrequency(timestampFreq);
 		break;
 	}
+	case D3DQUERYTYPE_VCACHE:
+	case D3DQUERYTYPE_RESOURCEMANAGER:
+	case D3DQUERYTYPE_VERTEXSTATS:
+	case D3DQUERYTYPE_PIPELINETIMINGS:
+	case D3DQUERYTYPE_INTERFACETIMINGS:
+	case D3DQUERYTYPE_VERTEXTIMINGS:
+	case D3DQUERYTYPE_PIXELTIMINGS:
+	case D3DQUERYTYPE_BANDWIDTHTIMINGS:
+	case D3DQUERYTYPE_CACHEUTILIZATION:
+	case D3DQUERYTYPE_MEMORYPRESSURE:
+		break; // Not yet handled
+	default:
+#ifdef _DEBUG
+	{
+		__debugbreak(); // Should never be here
+	}
+#else
+		__assume(0);
+#endif
 	}
 
 	return S_OK;

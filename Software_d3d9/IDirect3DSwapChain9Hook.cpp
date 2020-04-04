@@ -2,6 +2,7 @@
 
 #include "IDirect3DSwapChain9Hook.h"
 #include "IDirect3DSurface9Hook.h"
+#include "Overlay\DebugOverlay.h"
 
 // Comment out to disable
 //#define DUMP_FRAMES_TO_FILE 1
@@ -108,6 +109,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::Present(
 		__debugbreak();
 	}
 
+	UpdateOverlay(parentDevice);
+
 	// Blit from the software backbuffer to the hardware backbuffer:
 	InternalBlit();
 
@@ -133,7 +136,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::Present(
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DSwapChain9Hook::GetFrontBufferData(THIS_ IDirect3DSurface9* pDestSurface)
 {
-	IDirect3DSurface9Hook* hookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pDestSurface);
+	const IDirect3DSurface9Hook* const hookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pDestSurface);
 	if (hookPtr)
 		pDestSurface = hookPtr->GetUnderlyingSurface();
 #ifdef _DEBUG
@@ -324,7 +327,7 @@ void IDirect3DSwapChain9Hook::GetGammaRamp(D3DGAMMARAMP* pRamp)
 
 void IDirect3DSwapChain9Hook::InitDefaultGammaRamp(void)
 {
-	for (unsigned x = 0; x < 256; ++x)
+	for (WORD x = 0; x < 256; ++x)
 	{
 		gammaRamp.red[x] = gammaRamp.green[x] = gammaRamp.blue[x] = x;
 	}

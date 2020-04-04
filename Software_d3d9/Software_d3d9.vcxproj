@@ -121,6 +121,9 @@
     <ClCompile Include="IDirect3DVertexShader9Hook.cpp" />
     <ClCompile Include="IDirect3DVolume9Hook.cpp" />
     <ClCompile Include="IDirect3DVolumeTexture9Hook.cpp" />
+    <ClCompile Include="Overlay\DebugOverlay.cpp" />
+    <ClCompile Include="Overlay\Overlay_DeviceState.cpp" />
+    <ClCompile Include="Overlay\Overlay_WelcomeScreen.cpp" />
     <ClCompile Include="PShaderEngine.cpp" />
     <ClCompile Include="SemanticMappings.cpp" />
     <ClCompile Include="ShaderAnalysis.cpp" />
@@ -163,6 +166,7 @@
     <ClInclude Include="IDirect3DVertexShader9Hook.h" />
     <ClInclude Include="IDirect3DVolume9Hook.h" />
     <ClInclude Include="IDirect3DVolumeTexture9Hook.h" />
+    <ClInclude Include="Overlay\DebugOverlay.h" />
     <ClInclude Include="PShaderEngine.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="SemanticMappings.h" />
@@ -198,6 +202,7 @@
     <ResourceCompile Include="d3d9.rc" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Overlay\FontMap.tga" />
     <Image Include="SimpleFont256x256.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

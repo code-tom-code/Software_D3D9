@@ -241,6 +241,8 @@ static inline void ResolveSrcParameterDisasm(const ShaderInfo& shaderInfo, const
 	// Print register index:
 	switch (registerType)
 	{
+	case D3DSPR_CONST      :
+		break;
 	case D3DSPR_CONST2     :
 		index += 2048;
 		break;
@@ -249,6 +251,8 @@ static inline void ResolveSrcParameterDisasm(const ShaderInfo& shaderInfo, const
 		break;
 	case D3DSPR_CONST4     :
 		index += 6144;
+		break;
+	default:
 		break;
 	}
 	char shaderIndexBuffer[16] = {0};
@@ -460,6 +464,8 @@ static inline void ResolveSrcParameterSimpleSwizzleNoSourceMods(const ShaderInfo
 	// Print register index:
 	switch (registerType)
 	{
+	case D3DSPR_CONST      :
+		break;
 	case D3DSPR_CONST2     :
 		index += 2048;
 		break;
@@ -468,6 +474,8 @@ static inline void ResolveSrcParameterSimpleSwizzleNoSourceMods(const ShaderInfo
 		break;
 	case D3DSPR_CONST4     :
 		index += 6144;
+		break;
+	default:
 		break;
 	}
 	char shaderIndexBuffer[16] = {0};
@@ -616,6 +624,8 @@ static inline void PrintSourceRegNameAndSourceSwizzle(const srcParameterToken& s
 	// Print register index:
 	switch (registerType)
 	{
+	case D3DSPR_CONST      :
+		break;
 	case D3DSPR_CONST2     :
 		index += 2048;
 		break;
@@ -624,6 +634,8 @@ static inline void PrintSourceRegNameAndSourceSwizzle(const srcParameterToken& s
 		break;
 	case D3DSPR_CONST4     :
 		index += 6144;
+		break;
+	default:
 		break;
 	}
 
@@ -761,6 +773,8 @@ static inline void PrintRegisterName(const parameterToken& parameterToken, char*
 	// Print register index:
 	switch (registerType)
 	{
+	case D3DSPR_CONST      :
+		break;
 	case D3DSPR_CONST2     :
 		index += 2048;
 		break;
@@ -769,6 +783,8 @@ static inline void PrintRegisterName(const parameterToken& parameterToken, char*
 		break;
 	case D3DSPR_CONST4     :
 		index += 6144;
+		break;
+	default:
 		break;
 	}
 	sprintf(outBuffer, "%s%u", registerBaseString, index);
@@ -849,6 +865,7 @@ static inline const bool ParseCustomOpcode(const D3DSHADER_INSTRUCTION_OPCODE_TY
 	{
 		const DWORD dwordToken = *shaderMemory++;
 		const dstParameterToken& destParameter = *(const dstParameterToken* const)shaderMemory++;
+		UNREFERENCED_PARAMETER(destParameter);
 	}
 		break;
 	case D3DSIO_SINCOS:
@@ -865,6 +882,8 @@ static inline const bool ParseCustomOpcode(const D3DSHADER_INSTRUCTION_OPCODE_TY
 
 		for (unsigned x = 0; x < numSrcTokens; ++x)
 			AdvanceSrcParameter(shaderInfo, shaderMemory, srcParameters[x], srcAddrParameters[x]);
+
+		UNREFERENCED_PARAMETER(destParameter);
 
 		DbgBreakPrint("Error: SINCOS is not yet implemented in the JIT system!");
 	}
@@ -1946,6 +1965,8 @@ const bool JITCPPFileInternal(const ShaderInfo& shaderInfo, const char* const sh
 				case D3DSPR_TEXCRDOUT:
 					sprintf(tempRegBuffer, "\tfloat4& oT%u = *(float4* const)&(vs.outputRegisters[0]->vs_interpolated_outputs.vs_2_0_outputs.oT[%u]);\n", thisReg.registerIndex, thisReg.registerIndex);
 					AppendString(cppfile, tempRegBuffer);
+					break;
+				default:
 					break;
 				}
 			}

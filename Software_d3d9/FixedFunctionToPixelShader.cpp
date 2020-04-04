@@ -50,6 +50,12 @@ const FixedFunctionStateHash HashPixelState(const DeviceState& state)
 	}
 
 	HashContinue(retHash, state.currentRenderStates.renderStatesUnion.namedStates.fogEnable);
+	if (state.currentRenderStates.renderStatesUnion.namedStates.fogEnable)
+	{
+		HashContinue<unsigned char>(retHash, state.currentRenderStates.renderStatesUnion.namedStates.fogVertexMode);
+		HashContinue<unsigned char>(retHash, state.currentRenderStates.renderStatesUnion.namedStates.fogTableMode);
+		HashContinue<unsigned char>(retHash, state.currentRenderStates.renderStatesUnion.namedStates.rangeFogEnable);
+	}
 	HashContinue(retHash, state.currentRenderStates.renderStatesUnion.namedStates.textureFactor);
 	HashContinue<unsigned char>(retHash, state.currentRenderStates.renderStatesUnion.namedStates.shadeMode);
 
@@ -611,7 +617,7 @@ void BuildPixelShader(const DeviceState& state, IDirect3DDevice9Hook* const dev,
 		hr = D3DXCompileShader( (const char* const)resourceBytes, resourceSize, defines.empty() ? NULL : &defines.front(), D3DXIncludeHandler::GetGlobalIncludeHandlerSingleton(), 
 			"main", "ps_3_0", flags, &outBytecode, &errorMessages, NULL);
 	}
-	if (FAILED(hr) )
+	if (FAILED(hr) || !outBytecode)
 	{
 		const char* const errorMessage = errorMessages ? ( (const char* const)errorMessages->GetBufferPointer() ) : NULL;
 		printf("%s", errorMessage); // Don't optimize this away

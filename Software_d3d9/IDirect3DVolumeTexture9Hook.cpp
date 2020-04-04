@@ -171,7 +171,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DVolumeTexture9Hook::AddD
 	return ret;
 }
 
-void IDirect3DVolumeTexture9Hook::CreateVolumeTexture(UINT _Width, UINT _Height, UINT _Depth, UINT _Levels, DWORD _Usage, D3DFORMAT _Format, D3DPOOL _Pool)
+void IDirect3DVolumeTexture9Hook::CreateVolumeTexture(UINT _Width, UINT _Height, UINT _Depth, UINT _Levels, DebuggableUsage _Usage, D3DFORMAT _Format, D3DPOOL _Pool)
 {
 	InternalWidth = _Width;
 	InternalHeight = _Height;

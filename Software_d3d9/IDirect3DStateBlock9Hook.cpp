@@ -164,7 +164,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DStateBlock9Hook::Capture
 	if (FAILED(ret) )
 		return ret;
 
-	const DeviceState& currentParentDeviceState = const_cast<const IDirect3DDevice9Hook* const>(parentDevice)->GetCurrentHookState();
+	const IDirect3DDevice9Hook* const constDevice = parentDevice;
+	const DeviceState& currentParentDeviceState = constDevice->GetCurrentHookState();
 	stateBlockState.CaptureCopyState(currentParentDeviceState);
 
 	return ret;
@@ -321,6 +322,9 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DStateBlock9Hook::Apply(T
 
 	for (unsigned short textureIndex = 0; textureIndex < MAX_NUM_SAMPLERS; ++textureIndex)
 	{
+		if (textureIndex >= 16 && textureIndex < D3DDMAPSAMPLER)
+			continue;
+
 		const unsigned textureDWORD = textureIndex / 32;
 		const unsigned textureBitflag = 1 << (textureIndex % 32);
 		if (capturedStates.capturedTextures.captureTextures[textureDWORD] & textureBitflag)
@@ -425,7 +429,7 @@ void IDirect3DStateBlock9Hook::InitializeListAndCapture(const D3DSTATEBLOCKTYPE 
 		const D3DRENDERSTATETYPE typedRenderState = (const D3DRENDERSTATETYPE)x;
 		if (renderStateStateBlockTypes[typedRenderState] & rsType)
 		{
-			const unsigned char rsDWORDIndex = typedRenderState / 32;
+			const unsigned char rsDWORDIndex = (const unsigned char)(typedRenderState / 32);
 			const unsigned rsBitmask = 1 << (typedRenderState % 32);
 
 			capturedStates.capturedRenderstates.captureRenderstate[rsDWORDIndex] |= rsBitmask;

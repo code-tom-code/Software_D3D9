@@ -73,6 +73,9 @@ COM_DECLSPEC_NOTHROW ULONG STDMETHODCALLTYPE IDirect3DIndexBuffer9Hook::Release(
 /*** IDirect3DResource9 methods ***/
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DIndexBuffer9Hook::GetDevice(THIS_ IDirect3DDevice9** ppDevice)
 {
+	if (!ppDevice)
+		return D3DERR_INVALIDCALL;
+
 	if (realObject)
 	{
 		LPDIRECT3DDEVICE9 realD3D9dev = NULL;
@@ -95,13 +98,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DIndexBuffer9Hook::GetDev
 	}
 	else
 	{
-		if (ppDevice)
-		{
-			*ppDevice = parentDevice;
-			return S_OK;
-		}
-		else
-			return D3DERR_INVALIDCALL;
+		*ppDevice = parentDevice;
+		return S_OK;
 	}
 }
 

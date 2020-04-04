@@ -1065,7 +1065,7 @@ outVert main(in const inVert input)
 #endif // #ifdef OUTPUT_POINTSIZE
 
 #ifdef OUTPUT_FOG
-	ret.oFog = CalculateFogOut(pn.worldViewPos);
+	ret.oFog = saturate(CalculateFogOut(pn.worldViewPos) );
 #endif // #ifdef OUTPUT_FOG
 
 	// For texture coordinates, the order in which they pass through the fixed-function pipeline when auto-generated texture coordinates are enabled for a texcoord channel is:

@@ -454,7 +454,7 @@ public:
 
 	inline void MarkSetSamplerStateCaptured(const UINT SamplerNum, const D3DSAMPLERSTATETYPE type)
 	{
-		if (SamplerNum > MAX_NUM_SAMPLERS)
+		if (SamplerNum >= MAX_NUM_SAMPLERS)
 		{
 #ifdef _DEBUG
 			__debugbreak(); // Should never be here

@@ -197,6 +197,8 @@ static inline void ResolveDstParameter(const DWORD*& bytecode, ShaderInfo& shade
 	// Print register index:
 	switch (registerType)
 	{
+	case D3DSPR_CONST	   :
+		break;
 	case D3DSPR_CONST2     :
 		index += 2048;
 		break;
@@ -205,6 +207,8 @@ static inline void ResolveDstParameter(const DWORD*& bytecode, ShaderInfo& shade
 		break;
 	case D3DSPR_CONST4     :
 		index += 6144;
+		break;
+	default:
 		break;
 	}
 	if (print) dprintf(shaderInfo, "%u", index);
@@ -487,6 +491,8 @@ static inline void ResolveSrcParameter(ShaderInfo& shaderInfo, const DWORD*& byt
 	// Print register index:
 	switch (registerType)
 	{
+	case D3DSPR_CONST:
+		break;
 	case D3DSPR_CONST2     :
 		index += 2048;
 		break;
@@ -495,6 +501,8 @@ static inline void ResolveSrcParameter(ShaderInfo& shaderInfo, const DWORD*& byt
 		break;
 	case D3DSPR_CONST4     :
 		index += 6144;
+		break;
+	default:
 		break;
 	}
 	if (print) dprintf(shaderInfo, "%u", index);
@@ -513,6 +521,8 @@ static inline void ResolveSrcParameter(ShaderInfo& shaderInfo, const DWORD*& byt
 		break;
 	case D3DSPR_CONSTBOOL:
 		AddIfNotPresent(shaderInfo.usedConstantsB, index);
+		break;
+	default:
 		break;
 	}
 
@@ -1729,6 +1739,8 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, ShaderInfo& sha
 	case D3DSIO_CALLNZ:
 		shaderInfo.usesFunctionCalls = true;
 		break;
+	default:
+		break;
 	}
 
 	if (!shaderInfo.firstInstructionToken)
@@ -1758,6 +1770,8 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, ShaderInfo& sha
 			shaderInfo.parsingErrorDetected = true; // ddx and ddy are only available for pixel shaders!
 		shaderInfo.usesGradientInstructions = true;
 		break;
+	default:
+		break;
 	}
 
 	// Handle tabs:
@@ -1784,6 +1798,8 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, ShaderInfo& sha
 		case D3DSPR_CONSTINT:
 		case D3DSPR_CONSTBOOL:
 			shaderInfo.usesIntToFloatConversions = true;
+			break;
+		default:
 			break;
 		}
 
@@ -1968,7 +1984,7 @@ static inline void ShaderAnalysisMain(const DWORD* shaderMemory, ShaderInfo& ret
 	ret.numUniqueTempRegistersUsed = __popcnt(uniqueTempRegistersUsed);
 
 	ret.inputRegistersUsedBitmask = uniqueInputRegistersUsed;
-	ret.numUniqueInputRegistersUsed = __popcnt(uniqueInputRegistersUsed);
+	ret.numUniqueInputRegistersUsed = (const unsigned short)(__popcnt(uniqueInputRegistersUsed) );
 
 	if (ret.isPixelShader && ret.shaderMajorVersion == 1)
 		ret.usedMRTMask |= 0x1; // ps_1_* shaders leave their color output in r0 instead of moving it into one of the oC[N] registers (which don't exist for version 1.x pixel shaders because MRT didn't exist back then)
@@ -2028,7 +2044,7 @@ void outputRegisterWriteTracker::SetAddOrSkip(const D3DSHADER_PARAM_REGISTER_TYP
 	if (thisRegWriteState.writeMaskFinalState == 0x00)
 	{
 		outputRegisterIdentifier registerIdentifier;
-		registerIdentifier.outputRegisterType = registerType;
+		registerIdentifier.outputRegisterType = (const BYTE)registerType;
 		registerIdentifier.outputRegisterNumber = registerIndex;
 		registerIdentifiers.push_back(registerIdentifier);
 	}

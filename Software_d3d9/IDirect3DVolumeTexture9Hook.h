@@ -50,7 +50,42 @@ public:
 		return realObject;
 	}
 
-	void CreateVolumeTexture(UINT _Width, UINT _Height, UINT _Depth, UINT _Levels, DWORD _Usage, D3DFORMAT _Format, D3DPOOL _Pool);
+	inline const UINT GetInternalWidth() const
+	{
+		return InternalWidth;
+	}
+
+	inline const UINT GetInternalHeight() const
+	{
+		return InternalHeight;
+	}
+
+	inline const UINT GetInternalDepth() const
+	{
+		return InternalDepth;
+	}
+
+	inline const D3DFORMAT GetInternalFormat() const
+	{
+		return InternalFormat;
+	}
+
+	const UINT GetInternalMipLevels() const
+	{
+		return InternalLevels;
+	}
+
+	const DebuggableUsage GetInternalUsage() const
+	{
+		return InternalUsage;
+	}
+
+	const D3DPOOL GetInternalPool() const
+	{
+		return InternalPool;
+	}
+
+	void CreateVolumeTexture(UINT _Width, UINT _Height, UINT _Depth, UINT _Levels, DebuggableUsage _Usage, D3DFORMAT _Format, D3DPOOL _Pool);
 
 protected:
 	LPDIRECT3DVOLUMETEXTURE9 realObject;
@@ -61,7 +96,7 @@ protected:
 	UINT InternalHeight;
 	UINT InternalDepth;
 	UINT InternalLevels;
-	DWORD InternalUsage;
+	DebuggableUsage InternalUsage;
 	D3DFORMAT InternalFormat;
 	D3DPOOL InternalPool;
 };

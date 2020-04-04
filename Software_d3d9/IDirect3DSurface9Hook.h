@@ -263,6 +263,16 @@ public:
 		return InternalHeight;
 	}
 
+	inline const BOOL GetInternalDiscard(void) const
+	{
+		return DiscardRT;
+	}
+
+	inline const BOOL GetInternalLockable(void) const
+	{
+		return LockableRT;
+	}
+
 	inline const bool IsTexelValid(const unsigned x, const unsigned y) const
 	{
 		return x < InternalWidth && y < InternalHeight;

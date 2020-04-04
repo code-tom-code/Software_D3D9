@@ -222,9 +222,9 @@ struct srcParameterToken : public parameterToken
 	}
 
 	// Returns 0, 1, 2, or 3 to indicate an X, Y, Z, or W swizzle respectively
-	inline const unsigned GetChannelSwizzle(void) const
+	inline const unsigned char GetChannelSwizzle(void) const
 	{
-		return ( (internalRawToken & D3DSP_SWIZZLE_MASK) >> D3DSP_SWIZZLE_SHIFT) & 0x3;
+		return (const unsigned char)( ( (internalRawToken & D3DSP_SWIZZLE_MASK) >> D3DSP_SWIZZLE_SHIFT) & 0x3);
 	}
 
 	inline const unsigned GetChannelSwizzleXYZW(void) const

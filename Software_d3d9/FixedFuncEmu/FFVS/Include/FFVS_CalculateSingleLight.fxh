@@ -94,9 +94,6 @@ const PerLightResults FuncName(LIGHTINDEX)(in const LightData lightdata, in cons
 	ret.Specular = specComponent * lightdata.Specular;
 #endif
 
-	// HACK!
-	//ret.Specular.xyz = length(lightdata.Position.xyz - viewspaceVertexPos) / 100.0f;
-
 	return ret;
 }
 

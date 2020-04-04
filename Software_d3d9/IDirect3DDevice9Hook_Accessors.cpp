@@ -260,7 +260,7 @@ COM_DECLSPEC_NOTHROW void STDMETHODCALLTYPE IDirect3DDevice9Hook::GetGammaRamp(T
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetRenderTargetData(THIS_ IDirect3DSurface9* pRenderTarget, IDirect3DSurface9* pDestSurface)
 {
-	IDirect3DSurface9Hook* renderTargetHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pRenderTarget);
+	const IDirect3DSurface9Hook* const renderTargetHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pRenderTarget);
 	if (renderTargetHookPtr)
 		pRenderTarget = renderTargetHookPtr->GetUnderlyingSurface();
 #ifdef _DEBUG
@@ -269,7 +269,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetRenderTa
 		DbgBreakPrint("Error: GetRenderTargetData called with a non-hooked render target pointer");
 	}
 #endif
-	IDirect3DSurface9Hook* destHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pDestSurface);
+	const IDirect3DSurface9Hook* const destHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pDestSurface);
 	if (destHookPtr)
 		pDestSurface = destHookPtr->GetUnderlyingSurface();
 #ifdef _DEBUG
@@ -431,7 +431,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTransfor
 			case D3DTS_TEXTURE5:
 			case D3DTS_TEXTURE6:
 			case D3DTS_TEXTURE7:
-				targetDeviceState->currentTransforms.SetTextureTransform(*pMatrix, State - D3DTS_TEXTURE0);
+				targetDeviceState->currentTransforms.SetTextureTransform(*pMatrix, (const unsigned char)(State - D3DTS_TEXTURE0) );
 				break;
 			default:
 #ifdef _DEBUG
@@ -443,7 +443,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTransfor
 		}
 		else if (State < D3DTS_WORLDMATRIX(MAX_WORLD_TRANSFORMS) ) // World transforms
 		{
-			targetDeviceState->currentTransforms.SetWorldTransform(*pMatrix, State - D3DTS_WORLD);
+			targetDeviceState->currentTransforms.SetWorldTransform(*pMatrix, (const unsigned char)(State - D3DTS_WORLD) );
 		}
 #ifdef _DEBUG
 		else
@@ -1198,6 +1198,8 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetRenderSt
 			targetRenderStates.alphaBlendNeedsDestRead = false;
 		}
 		break;
+	default: // All other states are fine, we don't need caching for them
+		break;
 	}
 
 	return ret;
@@ -1261,6 +1263,21 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetClipStat
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetTexture(THIS_ DWORD Stage, IDirect3DBaseTexture9** ppTexture)
 {
+	if (Stage >= 16 && Stage < D3DDMAPSAMPLER)
+	{
+#ifdef _DEBUG
+		DbgBreakPrint("Error: Texture stage out of addressable bounds");
+#endif
+		return D3DERR_INVALIDCALL;
+	}
+	if (Stage >= MAX_NUM_SAMPLERS)
+	{
+#ifdef _DEBUG
+		DbgBreakPrint("Error: Texture stage out of addressable bounds");
+#endif
+		return D3DERR_INVALIDCALL;
+	}
+
 	LPDIRECT3DBASETEXTURE9 realTexture = NULL;
 	HRESULT ret = d3d9dev->GetTexture(Stage, &realTexture);
 	if (FAILED(ret) )
@@ -1312,10 +1329,18 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::GetTexture(
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetTexture(THIS_ DWORD Stage, IDirect3DBaseTexture9* pTexture)
 {
+	if (Stage >= 16 && Stage < D3DDMAPSAMPLER)
+	{
+#ifdef _DEBUG
+		__debugbreak(); // This ends up crashing real D3D9, so don't do it!
+#endif
+		return D3DERR_INVALIDCALL;
+	}
+
 	IDirect3DTexture9Hook* textureHookPtr = dynamic_cast<IDirect3DTexture9Hook*>(pTexture);
 	IDirect3DCubeTexture9Hook* cubeHookPtr = dynamic_cast<IDirect3DCubeTexture9Hook*>(pTexture);
 	IDirect3DVolumeTexture9Hook* volumeHookPtr = dynamic_cast<IDirect3DVolumeTexture9Hook*>(pTexture);
-	IDirect3DBaseTexture9Hook* baseHookPtr = dynamic_cast<IDirect3DBaseTexture9Hook*>(pTexture);
+	const IDirect3DBaseTexture9Hook* const baseHookPtr = dynamic_cast<IDirect3DBaseTexture9Hook*>(pTexture);
 	if (textureHookPtr)
 		pTexture = textureHookPtr->GetUnderlyingTexture();
 	else if (cubeHookPtr)
@@ -2218,7 +2243,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::SetStreamSo
 
 	thisStreamSource.vertexBuffer = hookPtr;
 	thisStreamSource.streamOffset = OffsetInBytes;
-	thisStreamSource.streamStride = Stride;
+	thisStreamSource.streamStride = (const unsigned short)Stride;
 
 	if (oldVertexBuffer != hookPtr)
 	{

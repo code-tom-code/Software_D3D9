@@ -56,7 +56,7 @@ void IDirect3DVertexDeclaration9Hook::CreateVertexDeclaration(const DebuggableD3
 		}
 	}
 
-	UINT currentOffset = 0;
+	USHORT currentOffset = 0;
 
 	{
 		DebuggableD3DVERTEXELEMENT9 newElement = elements[0];

@@ -170,7 +170,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DCubeTexture9Hook::AddDir
 	return ret;
 }
 
-void IDirect3DCubeTexture9Hook::CreateCubeTexture(UINT _EdgeLength, UINT _Levels, DWORD _Usage, D3DFORMAT _Format, D3DPOOL _Pool)
+void IDirect3DCubeTexture9Hook::CreateCubeTexture(UINT _EdgeLength, UINT _Levels, DebuggableUsage _Usage, D3DFORMAT _Format, D3DPOOL _Pool)
 {
 	InternalEdgeLength = _EdgeLength;
 	InternalLevels = _Levels;

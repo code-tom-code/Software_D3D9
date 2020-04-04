@@ -50,7 +50,32 @@ public:
 		return realObject;
 	}
 
-	void CreateCubeTexture(UINT _EdgeLength, UINT _Levels, DWORD _Usage, D3DFORMAT _Format, D3DPOOL _Pool);
+	inline const UINT GetInternalEdgeLength() const
+	{
+		return InternalEdgeLength;
+	}
+
+	inline const D3DFORMAT GetInternalFormat() const
+	{
+		return InternalFormat;
+	}
+
+	const UINT GetInternalMipLevels() const
+	{
+		return InternalLevels;
+	}
+
+	const DebuggableUsage GetInternalUsage() const
+	{
+		return InternalUsage;
+	}
+
+	const D3DPOOL GetInternalPool() const
+	{
+		return InternalPool;
+	}
+
+	void CreateCubeTexture(UINT _EdgeLength, UINT _Levels, DebuggableUsage _Usage, D3DFORMAT _Format, D3DPOOL _Pool);
 
 protected:
 	LPDIRECT3DCUBETEXTURE9 realObject;
@@ -59,7 +84,7 @@ protected:
 
 	UINT InternalEdgeLength;
 	UINT InternalLevels;
-	DWORD InternalUsage;
+	DebuggableUsage InternalUsage;
 	D3DFORMAT InternalFormat;
 	D3DPOOL InternalPool;
 };

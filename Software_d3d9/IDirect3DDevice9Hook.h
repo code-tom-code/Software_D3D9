@@ -98,7 +98,7 @@ static inline const bool operator!=(const D3DVIEWPORT9& lhs, const D3DVIEWPORT9&
 
 struct StreamSource
 {
-	StreamSource() : vertexBuffer(NULL), streamOffset(0), streamDividerFrequency(D3DSTREAMSOURCE_INDEXEDDATA), streamStride(0)
+	StreamSource() : vertexBuffer(NULL), streamOffset(0), streamDividerFrequency(1), streamStride(0)
 	{
 	}
 
@@ -109,7 +109,7 @@ struct StreamSource
 	{
 		vertexBuffer = NULL;
 		streamOffset = 0;
-		streamDividerFrequency = D3DSTREAMSOURCE_INDEXEDDATA;
+		streamDividerFrequency = 1;
 		streamStride = 0;
 	}
 
@@ -294,7 +294,7 @@ struct TextureStageState
 
 struct TexturePaletteState
 {
-	TexturePaletteState() : currentPaletteIndex(0), paletteEntries(NULL)
+	TexturePaletteState() : currentPaletteIndex(0xFFFF), paletteEntries(NULL)
 	{
 	}
 
@@ -312,7 +312,7 @@ struct TexturePaletteState
 
 	~TexturePaletteState()
 	{
-		currentPaletteIndex = 0;
+		currentPaletteIndex = 0xFFFF;
 
 		if (paletteEntries)
 		{
@@ -611,7 +611,7 @@ struct DeviceState
 	// Used during state block captures to copy the device state over
 	void CaptureCopyState(const DeviceState& rhs);
 
-#define MAX_NUM_SAMPLERS D3DVERTEXTEXTURESAMPLER3
+#define MAX_NUM_SAMPLERS (D3DVERTEXTEXTURESAMPLER3 + 1)
 #define MAX_NUM_TEXTURE_STAGE_STATES 8
 
 	~DeviceState()
@@ -1167,10 +1167,10 @@ public:
 	void PostShadePixel4_FailAlphaTest(const unsigned char pixelsFailAlphaTestMask) const;
 
 	template <const unsigned char pixelWriteMask>
-	void PostShadePixel4_WriteOutputColor(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
+	void PostShadePixel4_WriteOutputColor(const __m128i x4, const __m128i y4, const PShaderEngine* const pixelShader) const;
 
 	template <const unsigned char pixelWriteMask>
-	void PostShadePixel4_WriteOutputDepth(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const;
+	void PostShadePixel4_WriteOutputDepth(const __m128i x4, const __m128i y4, const PShaderEngine* const pixelShader) const;
 
 	template <const unsigned char pixelWriteMask>
 	void PostShadePixel4_WriteOutputStencil(const __m128i x4, const __m128i y4) const;
@@ -1275,14 +1275,19 @@ public:
 		return currentlyRecordingStateBlock != NULL;
 	}
 
-	inline void LockDeviceCS(void)
+	_Acquires_lock_(&deviceCS) inline void LockDeviceCS(void)
 	{
 		EnterCriticalSection(&deviceCS);
 	}
 
-	inline void UnlockDeviceCS(void)
+	_Releases_lock_(&deviceCS) inline void UnlockDeviceCS(void)
 	{
 		LeaveCriticalSection(&deviceCS);
+	}
+
+	inline const D3DPRESENT_PARAMETERS& GetInternalPresentParams() const
+	{
+		return currentPresentParams;
 	}
 
 protected:
@@ -1299,6 +1304,8 @@ protected:
 	HWND initialCreateFocusWindow;
 	HWND initialCreateDeviceWindow;
 	BOOL enableDialogs;
+
+	D3DPRESENT_PARAMETERS currentPresentParams;
 
 	mutable __declspec(align(16) ) VShaderEngine deviceMainVShaderEngine;
 	mutable __declspec(align(16) ) PShaderEngine deviceMainPShaderEngine;
@@ -1332,9 +1339,6 @@ protected:
 	mutable VS_2_0_OutputRegisters* processedVertexBuffer;
 	mutable unsigned processedVertsUsed;
 	mutable unsigned processVertsAllocated;
-
-	// TODO: Render some stats with this loaded overlay font
-	IDirect3DTexture9Hook* overlayFontTexture;
 
 	CRITICAL_SECTION deviceCS;
 };
@@ -1370,7 +1374,7 @@ inline void ColorDWORDToFloat4(const D3DCOLOR inColor, D3DXVECTOR4& outColor)
 }
 
 template <const unsigned char writeMask = 0xF>
-inline void ColorDWORDToFloat4_4(const D3DCOLOR** const inColor4, D3DXVECTOR4* const outColor4[4])
+inline void ColorDWORDToFloat4_4(const D3DCOLOR* const * const inColor4, D3DXVECTOR4* const outColor4[4])
 {
 	const __m128i colorbyte4[4] = 
 	{

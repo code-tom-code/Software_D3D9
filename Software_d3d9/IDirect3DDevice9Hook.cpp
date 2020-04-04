@@ -17,6 +17,7 @@
 #include "SemanticMappings.h"
 #include "resource.h"
 #include "DitherTables.h"
+#include "Overlay/DebugOverlay.h"
 
 #ifdef MULTITHREAD_SHADING
 	#if PARALLEL_LIBRARY == PARALLELLIB_CONCRT
@@ -202,7 +203,7 @@ static inline void VertexShadeJob4(slist_item& job, _threadItem* const myPtr)
 #endif // #ifdef RUN_SHADERS_IN_WARPS
 
 #if TRIANGLEJOBS_OR_PIXELJOBS == PIXELJOBS
-static inline void PixelShadeJob1(slist_item& job, _threadItem* const myPtr)
+static inline void PixelShadeJob1(const slist_item& job, _threadItem* const myPtr)
 {
 	const IDirect3DDevice9Hook* const devHook = myPtr->devHook;
 	const drawCallPixelJobData& drawCallData = devHook->currentDrawCallData.pixelData;
@@ -227,7 +228,7 @@ static inline void PixelShadeJob1(slist_item& job, _threadItem* const myPtr)
 			barycentricCoordsVectorF, drawCallData.offsetIntoVertexForOPosition_Bytes, verts.v0, verts.v1, verts.v2, invZ);
 }
 
-static inline void PixelShadeJob4(slist_item& job, _threadItem* const myPtr)
+static inline void PixelShadeJob4(const slist_item& job, _threadItem* const myPtr)
 {
 	const IDirect3DDevice9Hook* const devHook = myPtr->devHook;
 	const drawCallPixelJobData& drawCallData = devHook->currentDrawCallData.pixelData;
@@ -1066,6 +1067,8 @@ void IDirect3DDevice9Hook::PreReset(void)
 	implicitSwapChain->GetUnderlyingSwapChain()->Release();
 	implicitSwapChain->Release();
 	implicitSwapChain = NULL;
+
+	ResetOverlay(this);
 }
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Reset(THIS_ D3DPRESENT_PARAMETERS* pPresentationParameters)
@@ -1215,7 +1218,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Present(THI
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::UpdateSurface(THIS_ IDirect3DSurface9* pSourceSurface, CONST RECT* pSourceRect, IDirect3DSurface9* pDestinationSurface, CONST POINT* pDestPoint)
 {
-	IDirect3DSurface9Hook* sourceHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pSourceSurface);
+	const IDirect3DSurface9Hook* const sourceHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pSourceSurface);
 #ifdef _DEBUG
 	if (sourceHookPtr)
 #endif
@@ -1227,7 +1230,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::UpdateSurfa
 	}
 #endif
 
-	IDirect3DSurface9Hook* destHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pDestinationSurface);
+	IDirect3DSurface9Hook* const destHookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pDestinationSurface);
 #ifdef _DEBUG
 	if (destHookPtr)
 #endif
@@ -1250,7 +1253,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::UpdateSurfa
 
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::UpdateTexture(THIS_ IDirect3DBaseTexture9* pSourceTexture, IDirect3DBaseTexture9* pDestinationTexture)
 {
-	IDirect3DTexture9Hook* sourceHookPtr = dynamic_cast<IDirect3DTexture9Hook*>(pSourceTexture);
+	const IDirect3DTexture9Hook* const sourceHookPtr = dynamic_cast<IDirect3DTexture9Hook*>(pSourceTexture);
 #ifdef _DEBUG
 	if (sourceHookPtr)
 #endif
@@ -1262,7 +1265,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::UpdateTextu
 	}
 #endif
 
-	IDirect3DTexture9Hook* destHookPtr = dynamic_cast<IDirect3DTexture9Hook*>(pDestinationTexture);
+	IDirect3DTexture9Hook* const destHookPtr = dynamic_cast<IDirect3DTexture9Hook*>(pDestinationTexture);
 #ifdef _DEBUG
 	if (destHookPtr)
 #endif
@@ -1427,9 +1430,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::StretchRect
 COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::ColorFill(THIS_ IDirect3DSurface9* pSurface, CONST RECT* pRect, D3DCOLOR color)
 {
 	IDirect3DSurface9Hook* hookPtr = dynamic_cast<IDirect3DSurface9Hook*>(pSurface);
-#ifdef _DEBUG
 	if (hookPtr)
-#endif
 		pSurface = hookPtr->GetUnderlyingSurface();
 #ifdef _DEBUG
 	else if (pSurface != NULL)
@@ -1609,7 +1610,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::Clear(THIS_
 		unsigned char rectFillsRenderTargets = 0;
 		for (unsigned x = 0; x < D3D_MAX_SIMULTANEOUS_RENDERTARGETS; ++x)
 		{
-			IDirect3DSurface9Hook* const currentRT = currentState.currentRenderTargets[x];
+			const IDirect3DSurface9Hook* const currentRT = currentState.currentRenderTargets[x];
 			if (currentRT)
 			{
 				const int surfWidth = (const int)currentRT->GetInternalWidth();
@@ -2063,7 +2064,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 	{
 	case D3DDECLTYPE_FLOAT1    : // 1D float expanded to (value, 0., 0., 1.)
 	{
-		const float** const fData4 = (const float** const)data4;
+		const float* const * const fData4 = (const float* const * const)data4;
 
 		outRegister4[0]->x = fData4[0][0];
 		outRegister4[1]->x = fData4[1][0];
@@ -2085,7 +2086,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_FLOAT2    : // 2D float expanded to (value, value, 0., 1.)
 	{
-		const float** const fData4 = (const float** const)data4;
+		const float* const * const fData4 = (const float* const * const)data4;
 
 		outRegister4[0]->x = fData4[0][0];
 		outRegister4[1]->x = fData4[1][0];
@@ -2107,7 +2108,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_FLOAT3    : // 3D float expanded to (value, value, value, 1.)
 	{
-		const float** const fData4 = (const float** const)data4;
+		const float* const * const fData4 = (const float* const * const)data4;
 		outRegister4[0]->x = fData4[0][0];
 		outRegister4[1]->x = fData4[1][0];
 		outRegister4[2]->x = fData4[2][0];
@@ -2143,7 +2144,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_UBYTE4    : // 4D unsigned byte
 	{
-		const ubyte4** const ubyte4Data4 = (const ubyte4** const)data4;
+		const ubyte4* const * const ubyte4Data4 = (const ubyte4* const * const)data4;
 		outRegister4[0]->x = (const float)ubyte4Data4[0]->x;
 		outRegister4[1]->x = (const float)ubyte4Data4[1]->x;
 		outRegister4[2]->x = (const float)ubyte4Data4[2]->x;
@@ -2164,7 +2165,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_SHORT2    : // 2D signed short expanded to (value, value, 0., 1.)
 	{
-		const short4** const short4Data4 = (const short4** const)data4;
+		const short4* const * const short4Data4 = (const short4* const * const)data4;
 		outRegister4[0]->x = (const float)short4Data4[0]->x;
 		outRegister4[1]->x = (const float)short4Data4[1]->x;
 		outRegister4[2]->x = (const float)short4Data4[2]->x;
@@ -2185,7 +2186,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_SHORT4    : // 4D signed short
 	{
-		const short4** const short4Data4 = (const short4** const)data4;
+		const short4* const * const short4Data4 = (const short4* const * const)data4;
 		outRegister4[0]->x = (const float)short4Data4[0]->x;
 		outRegister4[1]->x = (const float)short4Data4[1]->x;
 		outRegister4[2]->x = (const float)short4Data4[2]->x;
@@ -2206,7 +2207,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_UBYTE4N   : // Each of 4 bytes is normalized by dividing to 255.0 
 	{
-		const ubyte4** const ubyte4Data4 = (const ubyte4** const)data4;
+		const ubyte4* const * const ubyte4Data4 = (const ubyte4* const * const)data4;
 		outRegister4[0]->x = ubyte4Data4[0]->x / 255.0f;
 		outRegister4[1]->x = ubyte4Data4[1]->x / 255.0f;
 		outRegister4[2]->x = ubyte4Data4[2]->x / 255.0f;
@@ -2227,7 +2228,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_SHORT2N   : // 2D signed short normalized (v[0]/32767.0,v[1]/32767.0,0,1)
 	{
-		const short4** const short4Data4 = (const short4** const)data4;
+		const short4* const * const short4Data4 = (const short4* const * const)data4;
 		outRegister4[0]->x = short4Data4[0]->x / 32767.0f;
 		outRegister4[1]->x = short4Data4[1]->x / 32767.0f;
 		outRegister4[2]->x = short4Data4[2]->x / 32767.0f;
@@ -2248,7 +2249,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_SHORT4N   : // 4D signed short normalized (v[0]/32767.0,v[1]/32767.0,v[2]/32767.0,v[3]/32767.0)
 	{
-		const short4** const short4Data4 = (const short4** const)data4;
+		const short4* const * const short4Data4 = (const short4* const * const)data4;
 		outRegister4[0]->x = short4Data4[0]->x / 32767.0f;
 		outRegister4[1]->x = short4Data4[1]->x / 32767.0f;
 		outRegister4[2]->x = short4Data4[2]->x / 32767.0f;
@@ -2269,7 +2270,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_USHORT2N  : // 2D unsigned short normalized (v[0]/65535.0,v[1]/65535.0,0,1)
 	{
-		const ushort4** const ushort4Data4 = (const ushort4** const)data4;
+		const ushort4* const * const ushort4Data4 = (const ushort4* const * const)data4;
 		outRegister4[0]->x = ushort4Data4[0]->x / 65535.0f;
 		outRegister4[1]->x = ushort4Data4[1]->x / 65535.0f;
 		outRegister4[2]->x = ushort4Data4[2]->x / 65535.0f;
@@ -2290,7 +2291,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_USHORT4N  : // 4D unsigned short normalized (v[0]/65535.0,v[1]/65535.0,v[2]/65535.0,v[3]/65535.0)
 	{
-		const ushort4** const ushort4Data4 = (const ushort4** const)data4;
+		const ushort4* const * const ushort4Data4 = (const ushort4* const * const)data4;
 		outRegister4[0]->x = ushort4Data4[0]->x / 65535.0f;
 		outRegister4[1]->x = ushort4Data4[1]->x / 65535.0f;
 		outRegister4[2]->x = ushort4Data4[2]->x / 65535.0f;
@@ -2311,7 +2312,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_UDEC3     : // 3D unsigned 10 10 10 format expanded to (value, value, value, 1)
 	{
-		const unsigned** const uData4 = (const unsigned** const)data4;
+		const unsigned* const * const uData4 = (const unsigned* const * const)data4;
 
 		const unsigned x4[4] =
 		{
@@ -2357,7 +2358,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_DEC3N     : // 3D signed 10 10 10 format normalized and expanded to (v[0]/511.0, v[1]/511.0, v[2]/511.0, 1)
 	{
-		const unsigned** const uData4 = (const unsigned** const)data4;
+		const unsigned* const * const uData4 = (const unsigned* const * const)data4;
 
 		const unsigned xData4[4] =
 		{
@@ -2428,7 +2429,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_FLOAT16_2 : // Two 16-bit floating point values, expanded to (value, value, 0, 1)
 	{
-		const D3DXVECTOR2_16F** const f16Data2_4 = (const D3DXVECTOR2_16F** const)data4;
+		const D3DXVECTOR2_16F* const * const f16Data2_4 = (const D3DXVECTOR2_16F* const * const)data4;
 
 		const D3DXVECTOR4 tempVecs[4] =
 		{
@@ -2458,7 +2459,7 @@ static inline void LoadElementToRegister4(D3DXVECTOR4* const (&outRegister4)[4],
 		break;
 	case D3DDECLTYPE_FLOAT16_4 : // Four 16-bit floating point values
 	{
-		const D3DXVECTOR2_16F** const f16Data2_4 = (const D3DXVECTOR2_16F** const)data4;
+		const D3DXVECTOR2_16F* const * const f16Data2_4 = (const D3DXVECTOR2_16F* const * const)data4;
 
 		const D3DXVECTOR4 tempVecs[4] =
 		{
@@ -3996,10 +3997,31 @@ const bool IDirect3DDevice9Hook::TotalDrawCallSkipTest(void) const
 		}
 	}
 
+	switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
+	{
+	case D3DCULL_NONE:
+	case D3DCULL_CW:
+	case D3DCULL_CCW:
+		break;
+	default:
+#ifdef _DEBUG
+	{
+		__debugbreak();
+	}
+#endif
+		return false; // Skip the draw call if we have an invalid cull mode set
+	}
+
 	if (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaTestEnable)
 	{
 		switch (currentState.currentRenderStates.renderStatesUnion.namedStates.alphaFunc)
 		{
+		default:
+#ifdef _DEBUG
+		{
+			__debugbreak(); // Should never be here
+		}
+#endif
 		case D3DCMP_NEVER:
 			return false;
 		case D3DCMP_ALWAYS:
@@ -4316,6 +4338,9 @@ static inline const int computeEdgeSidedness(const int ax, const int ay, const i
 template <const unsigned char channelWriteMask>
 void IDirect3DDevice9Hook::LoadBlend(D3DXVECTOR4& outBlend, const D3DBLEND blendMode, const D3DXVECTOR4& srcColor, const D3DXVECTOR4& dstColor) const
 {
+	if (channelWriteMask == 0)
+		return;
+
 	// Simple + fast mode:
 	if ( (channelWriteMask & 0x7) == 0x7)
 	{
@@ -7846,7 +7871,7 @@ void IDirect3DDevice9Hook::PostShadePixel4_FailAlphaTest(const unsigned char pix
 }
 
 template <const unsigned char pixelWriteMask>
-void IDirect3DDevice9Hook::PostShadePixel4_WriteOutputColor(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
+void IDirect3DDevice9Hook::PostShadePixel4_WriteOutputColor(const __m128i x4, const __m128i y4, const PShaderEngine* const pixelShader) const
 {
 	switch (pixelWriteMask)
 	{
@@ -7895,7 +7920,7 @@ void IDirect3DDevice9Hook::PostShadePixel4_WriteOutputColor(const __m128i x4, co
 }
 
 template <const unsigned char pixelWriteMask>
-void IDirect3DDevice9Hook::PostShadePixel4_WriteOutputDepth(const __m128i x4, const __m128i y4, PShaderEngine* const pixelShader) const
+void IDirect3DDevice9Hook::PostShadePixel4_WriteOutputDepth(const __m128i x4, const __m128i y4, const PShaderEngine* const pixelShader) const
 {
 	switch (pixelWriteMask)
 	{
@@ -8807,7 +8832,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawPrimiti
 	currentState.currentSoftUPStream.vertexBuffer->SoftUPSetInternalPointer( (const BYTE* const)pVertexStreamZeroData, numInputVerts * shortVertexStreamZeroStride);
 	currentState.currentSoftUPStream.streamOffset = 0;
 	currentState.currentSoftUPStream.streamStride = shortVertexStreamZeroStride;
-	currentState.currentSoftUPStream.streamDividerFrequency = D3DSTREAMSOURCE_INDEXEDDATA;
+	currentState.currentSoftUPStream.streamDividerFrequency = 1;
 
 	SwapWithCopy(currentState.currentSoftUPStream, currentState.currentStreams[0]);
 	SwapWithCopy(currentState.currentSoftUPStreamEnd, currentState.currentStreamEnds[0]);
@@ -8878,7 +8903,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::DrawIndexed
 	currentState.currentSoftUPStream.vertexBuffer->SoftUPSetInternalPointer( (const BYTE* const)pVertexStreamZeroData, NumVertices * shortVertexStreamZeroStride);
 	currentState.currentSoftUPStream.streamOffset = 0;
 	currentState.currentSoftUPStream.streamStride = shortVertexStreamZeroStride;
-	currentState.currentSoftUPStream.streamDividerFrequency = D3DSTREAMSOURCE_INDEXEDDATA;
+	currentState.currentSoftUPStream.streamDividerFrequency = 1;
 
 	currentState.currentSoftUPIndexBuffer->SoftUPSetInternalPointer(pIndexData, IndexDataFormat, PrimitiveType, PrimitiveCount);
 
@@ -8996,6 +9021,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 			const BYTE* const v2 = positionT0stream + i2 * positionT0streamStride;
 			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 			{
+			default:
+#ifdef _DEBUG
+			{
+				__debugbreak(); // Should never be here
+			}
+#else
+				__assume(0);
+#endif
 			case D3DCULL_CCW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, false, v0, v1, v2);
@@ -9046,6 +9079,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 				SwapWithCopy(v1, v2); // This alternating winding is necessary to keep triangles from flipping CW to CCW and back on every other triangle in the strip: https://msdn.microsoft.com/en-us/library/windows/desktop/bb206274(v=vs.85).aspx
 			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 			{
+			default:
+#ifdef _DEBUG
+			{
+				__debugbreak(); // Should never be here
+			}
+#else
+				__assume(0);
+#endif
 			case D3DCULL_CCW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, false, v0, v1, v2);
@@ -9095,6 +9136,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUBPretransformedSkipVS(const D3DPRIMITIV
 
 			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 			{
+			default:
+#ifdef _DEBUG
+			{
+				__debugbreak(); // Should never be here
+			}
+#else
+				__assume(0);
+#endif
 			case D3DCULL_CCW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, false, v0, v1, v2);
@@ -9199,6 +9248,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 
 			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 			{
+			default:
+#ifdef _DEBUG
+			{
+				__debugbreak();
+			}
+#else
+				__assume(0);
+#endif
 			case D3DCULL_CCW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
@@ -9254,6 +9311,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 			{
 				switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 				{
+				default:
+#ifdef _DEBUG
+				{
+					__debugbreak();
+				}
+#else
+				__assume(0);
+#endif
 				case D3DCULL_CCW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 					CreateNewTriangleRasterJob(primitiveID, i0, i2, i1, true, &processedVertsBuffer[i0], &processedVertsBuffer[i2], &processedVertsBuffer[i1]);
@@ -9283,6 +9348,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 			{
 				switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 				{
+				default:
+#ifdef _DEBUG
+				{
+					__debugbreak();
+				}
+#else
+				__assume(0);
+#endif
 				case D3DCULL_CCW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 					CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
@@ -9337,6 +9410,14 @@ void IDirect3DDevice9Hook::DrawPrimitiveUB(const D3DPRIMITIVETYPE PrimitiveType,
 
 			switch (currentState.currentRenderStates.renderStatesUnion.namedStates.cullmode)
 			{
+			default:
+#ifdef _DEBUG
+			{
+				__debugbreak();
+			}
+#else
+				__assume(0);
+#endif
 			case D3DCULL_CCW:
 #if defined(MULTITHREAD_SHADING) && TRIANGLEJOBS_OR_PIXELJOBS == TRIANGLEJOBS
 				CreateNewTriangleRasterJob(primitiveID, i0, i1, i2, true, &processedVertsBuffer[i0], &processedVertsBuffer[i1], &processedVertsBuffer[i2]);
@@ -9448,7 +9529,7 @@ COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE IDirect3DDevice9Hook::ProcessVert
 	// Don't support this?
 	DbgBreakPrint("Error: ProcessVertices() is not yet supported");
 #endif
-	IDirect3DVertexBuffer9Hook* hookPtr = dynamic_cast<IDirect3DVertexBuffer9Hook*>(pDestBuffer);
+	const IDirect3DVertexBuffer9Hook* const hookPtr = dynamic_cast<IDirect3DVertexBuffer9Hook*>(pDestBuffer);
 #ifdef _DEBUG
 	if (hookPtr)
 #endif
@@ -9507,6 +9588,8 @@ const bool IDirect3DDevice9Hook::SkipVertexProcessing(void) const
 
 void IDirect3DDevice9Hook::InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, const D3DDEVTYPE devType, const DWORD createFlags, const HWND focusWindow)
 {
+	currentPresentParams = d3dpp;
+
 	// Init the viewport:
 	currentState.cachedViewport.viewport.X = currentState.cachedViewport.viewport.Y = 0;
 	currentState.cachedViewport.viewport.MinZ = 0.0f;
@@ -9638,45 +9721,10 @@ void IDirect3DDevice9Hook::InitializeState(const D3DPRESENT_PARAMETERS& d3dpp, c
 		hConsoleHandle = INVALID_HANDLE_VALUE;
 	}
 	hConsoleHandle = CreateFileA("CONOUT$", GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-
-	if (overlayFontTexture != NULL)
-	{
-		overlayFontTexture->Release();
-		overlayFontTexture = NULL;
-	}
-
-#pragma warning(push)
-#pragma warning(disable:4302) // warning C4302: 'type cast': truncation from 'LPSTR' to 'WORD'
-	HRSRC bitmapResource = FindResourceA(hLThisDLL, MAKEINTRESOURCEA(IDB_PNG1), "PNG");
-#pragma warning(pop)
-	if (bitmapResource)
-	{
-		HGLOBAL loadedResource = LoadResource(hLThisDLL, bitmapResource);
-		if (loadedResource)
-		{
-			const unsigned resourceSize = SizeofResource(hLThisDLL, bitmapResource);
-			if (resourceSize > 0)
-			{
-				const void* const resourceBytes = LockResource(loadedResource);
-				if (resourceBytes)
-				{
-					LPDIRECT3DTEXTURE9 tempRealTexture = NULL;
-					if (SUCCEEDED(D3DXCreateTextureFromFileInMemory(this, resourceBytes, resourceSize, &tempRealTexture) ) )
-					{
-						D3DSURFACE_DESC surfDesc = {};
-						tempRealTexture->GetLevelDesc(0, &surfDesc);
-						IDirect3DTexture9Hook* hookRet = new IDirect3DTexture9Hook(tempRealTexture, this);
-						hookRet->CreateTexture(surfDesc.Width, surfDesc.Height, tempRealTexture->GetLevelCount(), (const DebuggableUsage)0, surfDesc.Format, D3DPOOL_MANAGED);
-						overlayFontTexture = hookRet;
-					}
-				}
-			}
-		}
-	}
 }
 
 IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D9Hook* _parentHook) : d3d9dev(_d3d9dev), parentHook(_parentHook), refCount(1), initialDevType(D3DDEVTYPE_HAL), initialCreateFlags(D3DCREATE_HARDWARE_VERTEXPROCESSING),
-	enableDialogs(FALSE), sceneBegun(FALSE), implicitSwapChain(NULL), hConsoleHandle(INVALID_HANDLE_VALUE), overlayFontTexture(NULL), numPixelsPassedZTest(0), initialCreateFocusWindow(NULL), initialCreateDeviceWindow(NULL),
+	enableDialogs(FALSE), sceneBegun(FALSE), implicitSwapChain(NULL), hConsoleHandle(INVALID_HANDLE_VALUE), numPixelsPassedZTest(0), initialCreateFocusWindow(NULL), initialCreateDeviceWindow(NULL),
 	processedVertexBuffer(NULL), processedVertsUsed(0), processVertsAllocated(0), currentlyRecordingStateBlock(NULL), currentSwvpEnabled(FALSE)
 {
 #ifdef _DEBUG
@@ -9712,12 +9760,6 @@ IDirect3DDevice9Hook::IDirect3DDevice9Hook(LPDIRECT3DDEVICE9 _d3d9dev, IDirect3D
 
 /*virtual*/ IDirect3DDevice9Hook::~IDirect3DDevice9Hook()
 {
-	if (overlayFontTexture != NULL)
-	{
-		overlayFontTexture->Release();
-		overlayFontTexture = NULL;
-	}
-
 	if (currentlyRecordingStateBlock != NULL)
 	{
 		currentlyRecordingStateBlock->~IDirect3DStateBlock9Hook();

@@ -310,6 +310,8 @@ void VStoPSMapping::ComputeMappingVS2ToPS2(const IDirect3DVertexShader9Hook* con
 		case D3DSPR_TEXTURE: // texcoord register
 			psInputRegistersUnion.ps_2_0_registers.texCoords[reg.registerIndex] = reg.usageIndex + D3DMCS_COLOR2;
 			break;
+		default:
+			break;
 		}
 	}
 }
@@ -425,6 +427,8 @@ void VStoPSMapping::ComputeMappingVS3ToPS1(const IDirect3DVertexShader9Hook* con
 				}
 			}
 			break;
+		default:
+			break;
 		}
 	}
 }
@@ -482,6 +486,8 @@ void VStoPSMapping::ComputeMappingVS3ToPS2(const IDirect3DVertexShader9Hook* con
 					break;
 				}
 			}
+			break;
+		default:
 			break;
 		}
 	}

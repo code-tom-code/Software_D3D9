@@ -71,6 +71,21 @@ public:
 		return InternalFormat;
 	}
 
+	const UINT GetInternalMipLevels() const
+	{
+		return InternalLevels;
+	}
+
+	const DebuggableUsage GetInternalUsage() const
+	{
+		return InternalUsage;
+	}
+
+	const D3DPOOL GetInternalPool() const
+	{
+		return InternalPool;
+	}
+
 	void CreateTexture(const UINT _Width, const UINT _Height, const UINT _Levels, const DebuggableUsage _Usage, const D3DFORMAT _Format, const D3DPOOL _Pool);
 
 	const bool UpdateTextureInternal(const IDirect3DTexture9Hook* const sourceTexture);

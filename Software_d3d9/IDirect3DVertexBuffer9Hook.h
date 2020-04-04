@@ -121,6 +121,11 @@ public:
 		return InternalLength;
 	}
 
+	inline const DWORD GetInternalFVF(void) const
+	{
+		return InternalFVF;
+	}
+
 	inline const bool IsUnlocked(void) const
 	{
 		return lockCount == 0;

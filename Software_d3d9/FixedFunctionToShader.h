@@ -78,6 +78,10 @@ struct D3DXIncludeHandler : public ID3DXInclude
 	STDMETHOD(Open)(THIS_ D3DXINCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes);
 	STDMETHOD(Close)(THIS_ LPCVOID pData);
 
+	virtual ~D3DXIncludeHandler()
+	{
+	}
+
 	static inline D3DXIncludeHandler* const GetGlobalIncludeHandlerSingleton()
 	{
 		return &globalIncludeHandlerSingleton;
