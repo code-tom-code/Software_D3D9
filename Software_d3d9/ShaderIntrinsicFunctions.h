@@ -6,9 +6,6 @@
 	#define INTRINSIC_INLINE __forceinline
 #endif
 
-static const float log2val = 0.30102999566f;
-static const float invlog2val = 1.0f / log2val;
-
 // Round-to-nearest is used when converting from floats to ints instead of C/C++'s default "round towards zero": https://msdn.microsoft.com/en-us/library/windows/desktop/bb147214(v=vs.85).aspx
 static INTRINSIC_INLINE const int RoundToNearest(const float f)
 {
@@ -295,8 +292,7 @@ static INTRINSIC_INLINE void log(D3DXVECTOR4& dst, const float src_replicateSwiz
 	const float v = fabsf(src_replicateSwizzleComponent);
 	if (v != 0.0f)
 	{
-		dst.x = dst.y = dst.z = dst.w = 
-			(const float)(logf(v) * invlog2val);
+		dst.x = dst.y = dst.z = dst.w = log2_lowp(v);
 	}
 	else
 	{
@@ -311,7 +307,7 @@ static INTRINSIC_INLINE void log(float& dst, const float src_replicateSwizzleCom
 	const float v = fabsf(src_replicateSwizzleComponent);
 	if (v != 0.0f)
 	{
-		dst = (const float)(logf(v) * invlog2val);
+		dst = log2_lowp(v);
 	}
 	else
 	{

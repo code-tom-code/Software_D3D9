@@ -92,17 +92,35 @@ static inline const bool JITBATFile(const ShaderInfo& shaderInfo, const char* co
 	static const char* const compileString = "cl.exe /c /I \"C:\\Program Files (x86)\\Microsoft DirectX SDK (June 2010)\\Include\" /FAcs /Fa /analyze- /W3 /Zc:wchar_t /Zi /GS- /GL /Gy /Gm- /O2 /Ob2 /fp:fast /GF /WX- /Zc:forScope /arch:AVX2 /Gd /Oy- /Oi /MT /Ot %s %s.cpp\r\n";
 #endif // #ifdef _DEBUG
 
+#ifdef _M_X64
+	#define LIBPATH "/LIBPATH:\"C:\\Program Files (x86)\\Microsoft DirectX SDK (June 2010)\\Lib\\x64\""
+#else
+	#define LIBPATH "/LIBPATH:\"C:\\Program Files (x86)\\Microsoft DirectX SDK (June 2010)\\Lib\\x86\""
+#endif
+
+#ifdef _M_X64
+	#define MACHINE_PLATFORM "/MACHINE:X64"
+	#define SAFESEH_FLAG "" // SafeSEH is not supported on x64
+#else
+	#define MACHINE_PLATFORM "/MACHINE:X86"
+	#define SAFESEH_FLAG "/SAFESEH"
+#endif
+
 	// TODO: Don't hardcode these paths...
 #ifdef _DEBUG
-	static const char* const linkString = "link.exe /LIBPATH:\"C:\\Program Files (x86)\\Microsoft DirectX SDK (June 2010)\\Lib\\x86\" /DEBUG /DLL /MACHINE:X86 /SUBSYSTEM:WINDOWS /NOLOGO /NXCOMPAT %s.obj\r\n";
+	static const char* const linkString = "link.exe " LIBPATH " /DEBUG /DLL " MACHINE_PLATFORM " /SUBSYSTEM:WINDOWS /NOLOGO /NXCOMPAT %s.obj\r\n";
 #else // Release
-	static const char* const linkString = "link.exe /LIBPATH:\"C:\\Program Files (x86)\\Microsoft DirectX SDK (June 2010)\\Lib\\x86\" /DEBUG /DLL /MACHINE:X86 /SUBSYSTEM:WINDOWS /NODEFAULTLIB /ENTRY:DllMain /NOLOGO /NXCOMPAT /LTCG /DLL /DYNAMICBASE \"Kernel32.lib\" \"libucrt.lib\" /OPT:REF /SAFESEH /INCREMENTAL:NO /OPT:ICF %s.obj\r\n";
+	static const char* const linkString = "link.exe " LIBPATH " /DEBUG /DLL " MACHINE_PLATFORM " /SUBSYSTEM:WINDOWS /NODEFAULTLIB /ENTRY:DllMain /NOLOGO /NXCOMPAT /LTCG /DLL /DYNAMICBASE \"Kernel32.lib\" \"libucrt.lib\" /OPT:REF " SAFESEH_FLAG " /INCREMENTAL:NO /OPT:ICF %s.obj\r\n";
 #endif // #ifdef _DEBUG
 
 	// Set up VS command prompt
 	{
 		// TODO: Don't hardcode this path...
+#ifdef _M_X64
+		static const char* const invokeVSDevCmd = "call \"C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat\"\r\n";
+#else
 		static const char* const invokeVSDevCmd = "call \"C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\Common7\\Tools\\VsDevCmd.bat\"\r\n";
+#endif
 		AppendString(batfile, invokeVSDevCmd);
 	}
 

@@ -1,5 +1,20 @@
 #pragma once
 
+// Fast log2 function that trades precision for speed
+inline float log2_lowp(float val)
+{
+	int* const exp_ptr = reinterpret_cast<int* const>(&val);
+	int x = *exp_ptr;
+	const int log_2 = ((x >> 23) & 0xFF) - 128;
+	x &= ~(255 << 23);
+	x += 127 << 23;
+	*exp_ptr = x;
+
+	val = ( (-1.0f / 3.0f) * val + 2.0f) * val - 2.0f / 3.0f;
+
+	return val + log_2;
+}
+
 // Absolute-value: https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/abs---vs
 static INTRINSIC_INLINE void abs4(D3DXVECTOR4 (&dst)[4], const D3DXVECTOR4 (&src)[4])
 {
@@ -437,22 +452,22 @@ static INTRINSIC_INLINE void log4(D3DXVECTOR4 (&dst)[4], const float (&src_repli
 	};
 
 	if (v4[0] != 0.0f)
-		dst[0].x = dst[0].y = dst[0].z = dst[0].w = (logf(v4[0]) * invlog2val);
+		dst[0].x = dst[0].y = dst[0].z = dst[0].w = log2_lowp(v4[0]);
 	else
 		dst[0].x = dst[0].y = dst[0].z = dst[0].w = -FLT_MAX;
 
 	if (v4[1] != 0.0f)
-		dst[1].x = dst[1].y = dst[1].z = dst[1].w = (logf(v4[1]) * invlog2val);
+		dst[1].x = dst[1].y = dst[1].z = dst[1].w = log2_lowp(v4[1]);
 	else
 		dst[1].x = dst[1].y = dst[1].z = dst[1].w = -FLT_MAX;
 
 	if (v4[2] != 0.0f)
-		dst[2].x = dst[2].y = dst[2].z = dst[2].w = (logf(v4[2]) * invlog2val);
+		dst[2].x = dst[2].y = dst[2].z = dst[2].w = log2_lowp(v4[2]);
 	else
 		dst[2].x = dst[2].y = dst[2].z = dst[2].w = -FLT_MAX;
 
 	if (v4[3] != 0.0f)
-		dst[3].x = dst[3].y = dst[3].z = dst[3].w = (logf(v4[3]) * invlog2val);
+		dst[3].x = dst[3].y = dst[3].z = dst[3].w = log2_lowp(v4[3]);
 	else
 		dst[3].x = dst[3].y = dst[3].z = dst[3].w = -FLT_MAX;
 }

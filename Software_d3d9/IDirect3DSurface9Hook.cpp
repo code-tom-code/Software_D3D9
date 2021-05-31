@@ -3948,73 +3948,115 @@ void IDirect3DSurface9Hook::SetPixelVec4(const __m128i x4, const __m128i y4, con
 	case D3DFMT_X8R8G8B8:
 	{
 		D3DCOLOR* const pixels = (D3DCOLOR* const)surfaceBytesRaw;
-		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 2); // Left-shift by 2 is the same as multiply by sizeof(D3DCOLOR)
 #ifdef _M_X64
-		#error This won't work on x64!
+		if (pixelWriteMask & 0x1)
+			*(pixels + pixelIndex.m128i_u32[0]) = Float4ToX8R8G8B8Clamp<channelWriteMask>(color[0]);
+		if (pixelWriteMask & 0x2)
+			*(pixels + pixelIndex.m128i_u32[1]) = Float4ToX8R8G8B8Clamp<channelWriteMask>(color[1]);
+		if (pixelWriteMask & 0x4)
+			*(pixels + pixelIndex.m128i_u32[2]) = Float4ToX8R8G8B8Clamp<channelWriteMask>(color[2]);
+		if (pixelWriteMask & 0x8)
+			*(pixels + pixelIndex.m128i_u32[3]) = Float4ToX8R8G8B8Clamp<channelWriteMask>(color[3]);
 #else
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 2); // Left-shift by 2 is the same as multiply by sizeof(D3DCOLOR)
 		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
-#endif
 		Float4ToX8R8G8B8_4Clamp4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+#endif
 	}
 		break;
 	case D3DFMT_A8R8G8B8:
 	{
 		D3DCOLOR* const pixels = (D3DCOLOR* const)surfaceBytesRaw;
-		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 2); // Left-shift by 2 is the same as multiply by sizeof(D3DCOLOR)
 #ifdef _M_X64
-		#error This won't work on x64!
+		if (pixelWriteMask & 0x1)
+			*(pixels + pixelIndex.m128i_u32[0]) = Float4ToD3DCOLORClamp<channelWriteMask>(color[0]);
+		if (pixelWriteMask & 0x2)
+			*(pixels + pixelIndex.m128i_u32[1]) = Float4ToD3DCOLORClamp<channelWriteMask>(color[1]);
+		if (pixelWriteMask & 0x4)
+			*(pixels + pixelIndex.m128i_u32[2]) = Float4ToD3DCOLORClamp<channelWriteMask>(color[2]);
+		if (pixelWriteMask & 0x8)
+			*(pixels + pixelIndex.m128i_u32[3]) = Float4ToD3DCOLORClamp<channelWriteMask>(color[3]);
 #else
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 2); // Left-shift by 2 is the same as multiply by sizeof(D3DCOLOR)
 		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
-#endif
 		Float4ToD3DCOLOR4Clamp4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+#endif
 	}
 		break;
 	case D3DFMT_A16B16G16R16:
 	{
 		A16B16G16R16* const pixels = (A16B16G16R16* const)surfaceBytesRaw;
-		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 3); // Left-shift by 3 is the same as multiply by sizeof(A16B16G16R16)
 #ifdef _M_X64
-		#error This won't work on x64!
+		if (pixelWriteMask & 0x1)
+			Float4ToA16B16G16R16<channelWriteMask>(color[0], *(pixels + pixelIndex.m128i_u32[0]));
+		if (pixelWriteMask & 0x2)
+			Float4ToA16B16G16R16<channelWriteMask>(color[1], *(pixels + pixelIndex.m128i_u32[1]));
+		if (pixelWriteMask & 0x4)
+			Float4ToA16B16G16R16<channelWriteMask>(color[2], *(pixels + pixelIndex.m128i_u32[2]));
+		if (pixelWriteMask & 0x8)
+			Float4ToA16B16G16R16<channelWriteMask>(color[3], *(pixels + pixelIndex.m128i_u32[3]));
 #else
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 3); // Left-shift by 3 is the same as multiply by sizeof(A16B16G16R16)
 		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
-#endif
 		Float4ToA16B16G16R16_4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+#endif
 	}
 		break;
 	case D3DFMT_A16B16G16R16F:
 	{
 		A16B16G16R16F* const pixels = (A16B16G16R16F* const)surfaceBytesRaw;
-		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 3); // Left-shift by 3 is the same as multiply by sizeof(A16B16G16R16F)
 #ifdef _M_X64
-		#error This won't work on x64!
+		if (pixelWriteMask & 0x1)
+			Float4ToA16B16G16R16F<channelWriteMask>(color[0], *(pixels + pixelIndex.m128i_u32[0]));
+		if (pixelWriteMask & 0x2)
+			Float4ToA16B16G16R16F<channelWriteMask>(color[1], *(pixels + pixelIndex.m128i_u32[1]));
+		if (pixelWriteMask & 0x4)
+			Float4ToA16B16G16R16F<channelWriteMask>(color[2], *(pixels + pixelIndex.m128i_u32[2]));
+		if (pixelWriteMask & 0x8)
+			Float4ToA16B16G16R16F<channelWriteMask>(color[3], *(pixels + pixelIndex.m128i_u32[3]));
 #else
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 3); // Left-shift by 3 is the same as multiply by sizeof(A16B16G16R16F)
 		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
-#endif
 		Float4ToA16B16G16R16F4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+#endif
 	}
 		break;
 	case D3DFMT_A32B32G32R32F:
 	{
 		A32B32G32R32F* const pixels = (A32B32G32R32F* const)surfaceBytesRaw;
-		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 4); // Left-shift by 4 is the same as multiply by sizeof(A32B32G32R32F)
 #ifdef _M_X64
-		#error This won't work on x64!
+		if (pixelWriteMask & 0x1)
+			Float4ToA32B32G32R32F<channelWriteMask>(color[0], *(pixels + pixelIndex.m128i_u32[0]));
+		if (pixelWriteMask & 0x2)
+			Float4ToA32B32G32R32F<channelWriteMask>(color[1], *(pixels + pixelIndex.m128i_u32[1]));
+		if (pixelWriteMask & 0x4)
+			Float4ToA32B32G32R32F<channelWriteMask>(color[2], *(pixels + pixelIndex.m128i_u32[2]));
+		if (pixelWriteMask & 0x8)
+			Float4ToA32B32G32R32F<channelWriteMask>(color[3], *(pixels + pixelIndex.m128i_u32[3]));
 #else
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 4); // Left-shift by 4 is the same as multiply by sizeof(A32B32G32R32F)
 		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
-#endif
 		Float4ToA32B32G32R32F4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+#endif
 	}
 		break;
 	case D3DFMT_R16F:
 	{
 		D3DXFLOAT16* const pixels = (D3DXFLOAT16* const)surfaceBytesRaw;
-		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 1); // Left-shift by 1 is the same as multiply by sizeof(D3DXFLOAT16)
 #ifdef _M_X64
-		#error This won't work on x64!
+		if (pixelWriteMask & 0x1)
+			Float4ToR16F<channelWriteMask>(color[0], *(pixels + pixelIndex.m128i_u32[0]));
+		if (pixelWriteMask & 0x2)
+			Float4ToR16F<channelWriteMask>(color[1], *(pixels + pixelIndex.m128i_u32[1]));
+		if (pixelWriteMask & 0x4)
+			Float4ToR16F<channelWriteMask>(color[2], *(pixels + pixelIndex.m128i_u32[2]));
+		if (pixelWriteMask & 0x8)
+			Float4ToR16F<channelWriteMask>(color[3], *(pixels + pixelIndex.m128i_u32[3]));
 #else
+		const __m128i pixelByteOffset4 = _mm_slli_epi32(pixelIndex, 1); // Left-shift by 1 is the same as multiply by sizeof(D3DXFLOAT16)
 		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelByteOffset4);
-#endif
 		Float4ToR16F4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+#endif
 
 		// Can't update the surface hash in this case...
 	}
@@ -4023,11 +4065,18 @@ void IDirect3DSurface9Hook::SetPixelVec4(const __m128i x4, const __m128i y4, con
 	{
 		unsigned char* const pixels = (unsigned char* const)surfaceBytesRaw;
 #ifdef _M_X64
-		#error This won't work on x64!
+		if (pixelWriteMask & 0x1)
+			Float4ToL8Clamp<channelWriteMask>(color[0], *(pixels + pixelIndex.m128i_u32[0]));
+		if (pixelWriteMask & 0x2)
+			Float4ToL8Clamp<channelWriteMask>(color[1], *(pixels + pixelIndex.m128i_u32[1]));
+		if (pixelWriteMask & 0x4)
+			Float4ToL8Clamp<channelWriteMask>(color[2], *(pixels + pixelIndex.m128i_u32[2]));
+		if (pixelWriteMask & 0x8)
+			Float4ToL8Clamp<channelWriteMask>(color[3], *(pixels + pixelIndex.m128i_u32[3]));
 #else
 		const __m128i writeAddresses = _mm_add_epi32(_mm_set1_epi32( (const unsigned)pixels), pixelIndex);
-#endif
 		Float4ToL8Clamp4<channelWriteMask, pixelWriteMask>(color, writeAddresses);
+#endif
 
 		// Can't update the surface hash in this case...
 	}

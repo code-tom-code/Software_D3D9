@@ -236,8 +236,8 @@ static inline void PixelShadeJob4(const slist_item& job, _threadItem* const myPt
 	const primitivePixelJobData* const primitiveData = pixelJobData.primitiveData;
 
 	SIMPLE_FUNC_SCOPE_CONDITIONAL(primitiveData->primitiveID == 0 && 
-		abs( (const int)(320 - pixelJobData.x[0]) ) < 5 && 
-		abs( (const int)(240 - pixelJobData.y[0]) ) < 5);
+		pixelJobData.x[0] % 64 == 0 &&
+		pixelJobData.y[0] % 64 == 0);
 
 	const __m128i x4 = *(const __m128i* const)(pixelJobData.x);
 	const __m128i y4 = *(const __m128i* const)(pixelJobData.y);
@@ -664,6 +664,43 @@ static inline const bool DepthTest(const float pixelDepth, const unsigned buffer
 		return quantizedPixelDepth >= bufferDepth;
 	case D3DCMP_ALWAYS      :
 		return true;
+	}
+}
+
+static inline const __m128i StencilTestNoWrite4(const __m128i stencilValues4, const D3DCMPFUNC stencilCmp, const UINT stencilRef, const DWORD stencilMask)
+{
+	switch (stencilCmp)
+	{
+	case D3DCMP_NEVER:
+		return zeroMaskVecI;
+	case D3DCMP_ALWAYS:
+		return oneMaskVec;
+	default:
+		break;
+	}
+	const UINT maskedRef = stencilRef & stencilMask;
+	const __m128i maskedQuad = _mm_loadu_si32(maskedRef);
+	switch (stencilCmp)
+	{
+	case D3DCMP_LESS:
+		return _mm_cmplt_epi32(stencilValues4, maskedQuad);
+	case D3DCMP_EQUAL:
+		return _mm_cmpeq_epi32(stencilValues4, maskedQuad);
+	case D3DCMP_LESSEQUAL:
+		return _mm_andnot_si128(_mm_cmpgt_epi32(stencilValues4, maskedQuad), oneMaskVec); // There is no _mm_cmple_epi32 so instead we'll use not _mm_cmpgt_epi32 and 0xF
+	case D3DCMP_GREATER:
+		return _mm_cmpgt_epi32(stencilValues4, maskedQuad);
+	case D3DCMP_NOTEQUAL:
+		return _mm_andnot_si128(_mm_cmpeq_epi32(stencilValues4, maskedQuad), oneMaskVec); // There is no _mm_cmpne_epi32 so instead we'll use not _mm_cmpeq_epi32 and 0xF
+	case D3DCMP_GREATEREQUAL:
+		return _mm_andnot_si128(_mm_cmplt_epi32(stencilValues4, maskedQuad), oneMaskVec); // There is no _mm_cmpge_epi32 so instead we'll use not _mm_cmplt_epi32 and 0xF
+	default:
+#ifdef _DEBUG
+		__debugbreak(); // Should never be here!
+		return zeroMaskVecI;
+#else
+		__assume(0);
+#endif
 	}
 }
 
@@ -6247,17 +6284,25 @@ void IDirect3DDevice9Hook::SetupPixel4(PShaderEngine* const pixelEngine, const v
 	unsigned char pixelWriteMask = 0xF;
 	if (currentState.currentDepthStencil)
 	{
-		// TODO: Make a StencilTestNoWrite4
-		/*for (unsigned z = 0; z < 4; ++z)
+		if (currentState.currentRenderStates.renderStatesUnion.namedStates.stencilEnable)
 		{
-			if (!StencilTestNoWrite(x4.m128i_i32[z], y4.m128i_i32[z]) )
+			const D3DCMPFUNC stencilCmp = currentState.currentRenderStates.renderStatesUnion.namedStates.stencilFunc;
+			__m128i stencilTestResult4;
+			switch (stencilCmp)
 			{
-				// Fail the stencil test!
-				pixelOutput4[z].pixelStatus = stencilFail;
-				ShadePixel(x, y, pixelEngine);
-				return;
+			case D3DCMP_NEVER:
+				stencilTestResult4 = zeroMaskVecI;
+			case D3DCMP_ALWAYS:
+				stencilTestResult4 = oneMaskVec;
+			default:
+				const __m128i stencil4 = currentState.currentDepthStencil->GetStencil4(x4, y4);
+				stencilTestResult4 = StencilTestNoWrite4(stencil4, stencilCmp, currentState.currentRenderStates.renderStatesUnion.namedStates.stencilRef, currentState.currentRenderStates.renderStatesUnion.namedStates.stencilMask);
+				break;
 			}
-		}*/
+
+			const unsigned char stencilMaskBits = _mm_movemask_ps(_mm_cvtepi32_ps(stencilTestResult4) );
+			// Question: Does stencil fail ignore the alpha test, or does the shader still run on stencilfail pixels in order to determine if they should write to the stencil buffer or not?
+		}
 
 		if (currentState.currentRenderStates.renderStatesUnion.namedStates.zEnable)
 		{
@@ -8570,6 +8615,7 @@ template <const bool rasterizerUsesEarlyZTest, const bool shadeFromShader>
 void IDirect3DDevice9Hook::RasterizeTriangle(PShaderEngine* const pShaderEngine, const void* const mappingData, const void* const v0, const void* const v1, const void* const v2,
 	const float fWidth, const float fHeight, const UINT primitiveID, const UINT vertex0index, const UINT vertex1index, const UINT vertex2index) const
 {
+	SIMPLE_FUNC_SCOPE();
 	const D3DXVECTOR4& pos0 = shadeFromShader ? currentState.currentVertexShader->GetPosition(*(const VS_2_0_OutputRegisters* const)v0) : *(const D3DXVECTOR4* const)v0;
 	const D3DXVECTOR4& pos1 = shadeFromShader ? currentState.currentVertexShader->GetPosition(*(const VS_2_0_OutputRegisters* const)v1) : *(const D3DXVECTOR4* const)v1;
 	const D3DXVECTOR4& pos2 = shadeFromShader ? currentState.currentVertexShader->GetPosition(*(const VS_2_0_OutputRegisters* const)v2) : *(const D3DXVECTOR4* const)v2;

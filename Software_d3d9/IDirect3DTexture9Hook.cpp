@@ -1122,7 +1122,7 @@ void IDirect3DTexture9Hook::SampleTextureGrad(float x, float y, const D3DXVECTOR
 		const float deltaXSquared = dot2(texDdx, texDdx);
 		const float deltaYSquared = dot2(texDdy, texDdy);
 		const float maxDeltaSquared = deltaXSquared >= deltaYSquared ? deltaXSquared : deltaYSquared;
-		const float mip = 0.5f * log2f(maxDeltaSquared) * numMipLevels;
+		const float mip = 0.5f * log2_lowp(maxDeltaSquared) * numMipLevels;
 		return SampleTextureLoD<writeMask>(x, y, mip, samplerState, outColor);
 	}
 }
@@ -1182,10 +1182,10 @@ void IDirect3DTexture9Hook::SampleTextureGrad4(float (&x4)[4], float (&y4)[4], c
 		const float halfNumMips = 0.5f * numMipLevels;
 		float mip4[4] =
 		{
-			log2f(maxDeltaSquared4[0]) * halfNumMips,
-			log2f(maxDeltaSquared4[1]) * halfNumMips,
-			log2f(maxDeltaSquared4[2]) * halfNumMips,
-			log2f(maxDeltaSquared4[3]) * halfNumMips
+			log2_lowp(maxDeltaSquared4[0]) * halfNumMips,
+			log2_lowp(maxDeltaSquared4[1]) * halfNumMips,
+			log2_lowp(maxDeltaSquared4[2]) * halfNumMips,
+			log2_lowp(maxDeltaSquared4[3]) * halfNumMips
 		};
 		return SampleTextureLoD4<writeMask>(x4, y4, mip4, samplerState, outColor4);
 	}
@@ -1220,7 +1220,7 @@ void IDirect3DTexture9Hook::SampleTextureGradBias(float x, float y, const float 
 		const float deltaXSquared = dot2(texDdx, texDdx);
 		const float deltaYSquared = dot2(texDdy, texDdy);
 		const float maxDeltaSquared = deltaXSquared >= deltaYSquared ? deltaXSquared : deltaYSquared;
-		const float mip = 0.5f * log2f(maxDeltaSquared) * numMipLevels;
+		const float mip = 0.5f * log2_lowp(maxDeltaSquared) * numMipLevels;
 		return SampleTextureLoD<writeMask>(x, y, mip + mipBias, samplerState, outColor);
 	}
 }
@@ -1272,10 +1272,10 @@ void IDirect3DTexture9Hook::SampleTextureGradBias4(float (&x4)[4], float (&y4)[4
 		const float halfNumMips = 0.5f * numMipLevels;
 		float mip4biased[4] =
 		{
-			log2f(maxDeltaSquared4[0]) * halfNumMips + mipBias4[0],
-			log2f(maxDeltaSquared4[1]) * halfNumMips + mipBias4[1],
-			log2f(maxDeltaSquared4[2]) * halfNumMips + mipBias4[2],
-			log2f(maxDeltaSquared4[3]) * halfNumMips + mipBias4[3]
+			log2_lowp(maxDeltaSquared4[0]) * halfNumMips + mipBias4[0],
+			log2_lowp(maxDeltaSquared4[1]) * halfNumMips + mipBias4[1],
+			log2_lowp(maxDeltaSquared4[2]) * halfNumMips + mipBias4[2],
+			log2_lowp(maxDeltaSquared4[3]) * halfNumMips + mipBias4[3]
 		};
 		return SampleTextureLoD4<writeMask>(x4, y4, mip4biased, samplerState, outColor4);
 	}

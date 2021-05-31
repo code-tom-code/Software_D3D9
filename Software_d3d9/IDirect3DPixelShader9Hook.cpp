@@ -98,7 +98,11 @@ void IDirect3DPixelShader9Hook::JitLoadShader()
 #pragma warning(pop)
 	HMODULE hm = LoadLibraryA(jitFilenameBuffer);
 
+#ifdef _M_X64
+	static const char* const shaderMainExportName = "PixelShaderMain";
+#else
 	static const char* const shaderMainExportName = "@PixelShaderMain@4";
+#endif
 
 	triedJit = true;
 
