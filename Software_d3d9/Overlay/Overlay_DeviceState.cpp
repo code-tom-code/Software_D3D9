@@ -1428,7 +1428,7 @@ void DrawTextureState(IDirect3DDevice9Hook* const hookDev, const DeviceState& de
 			usage = texCube->GetInternalUsage();
 			pool = texCube->GetInternalPool();
 		}
-		else
+		else if (tex3D)
 		{
 			textureType = "3D";
 			sprintf(resolutionBuffer, "%ux%ux%u", tex3D->GetInternalWidth(), tex3D->GetInternalHeight(), tex3D->GetInternalDepth() );
