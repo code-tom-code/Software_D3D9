@@ -789,7 +789,7 @@ static const char* const endOpcodes[] =
 };
 
 // Returns the opcode as a string suitable for diassembly
-const char* const ShaderInfo::GetOpcodeString(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode)
+const char* const GetOpcodeString(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode)
 {
 	if (opcode <= D3DSIO_BREAKP)
 		return opcodeToString[opcode];
@@ -903,7 +903,7 @@ static const char* const opcodeToFunction[D3DSHADER_INSTRUCTION_OPCODE_TYPE::D3D
 };
 
 // Returns the name of the function that this opcode maps to
-const char* const ShaderInfo::GetOpcodeFunctionString(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode)
+const char* const GetOpcodeFunctionString(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode)
 {
 	if (opcode <= D3DSIO_BREAKP)
 		return opcodeToFunction[opcode];
@@ -1323,7 +1323,7 @@ static const int instructionTabIndents[D3DSHADER_INSTRUCTION_OPCODE_TYPE::D3DSIO
     0, //D3DSIO_BREAKP       ,
 };
 
-const opcodeDisplayType ShaderInfo::GetOpcodeDisplayType(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode)
+const opcodeDisplayType GetOpcodeDisplayType(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode)
 {
 	if (opcode <= D3DSIO_DEFI)
 		return opcodeTypes[opcode];
@@ -1390,7 +1390,7 @@ static const char* const usageStrings[] =
 template <const bool print>
 static inline const bool ParseCustomOpcode(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const DWORD*& shaderMemory, ShaderInfo& shaderInfo, unsigned long& uniqueTempRegistersUsed, unsigned short& uniqueInputRegistersUsed, outputRegisterWriteTracker& outRegisterwriteTracker)
 {
-	if (print) dprintf(shaderInfo, "%s ", ShaderInfo::GetOpcodeString(opcode) );
+	if (print) dprintf(shaderInfo, "%s ", GetOpcodeString(opcode) );
 
 	switch (opcode)
 	{
@@ -1683,7 +1683,7 @@ static inline const bool ParseCustomOpcode(const D3DSHADER_INSTRUCTION_OPCODE_TY
 }
 
 // Returns true if this opcode is a TEX instruction, or false otherwise
-const bool ShaderInfo::IsOpcodeTexInstruction(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode)
+const bool IsOpcodeTexInstruction(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode)
 {
 	if (opcode <= D3DSIO_BREAKP)
 		return isOpcodeTexInstruction[opcode];
@@ -1713,7 +1713,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, ShaderInfo& sha
 	const instructionToken rawInstructionToken = *(const instructionToken* const)shaderMemory++;
 	const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode = (const D3DSHADER_INSTRUCTION_OPCODE_TYPE)(rawInstructionToken.opcode);
 
-	const bool opcodeIsTexInstruction = ShaderInfo::IsOpcodeTexInstruction(opcode);
+	const bool opcodeIsTexInstruction = IsOpcodeTexInstruction(opcode);
 	unsigned* const instructionCount = &(shaderInfo.numArithInstructions);
 	++instructionCount[opcodeIsTexInstruction];
 
@@ -1818,39 +1818,39 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, ShaderInfo& sha
 	if (rawInstructionToken.coIssue)
 		if (print) dprintf(shaderInfo, "+ CO_");
 
-	switch (ShaderInfo::GetOpcodeDisplayType(opcode) )
+	switch (GetOpcodeDisplayType(opcode) )
 	{
 	case customOpcode:
 		return ParseCustomOpcode<print>(opcode, shaderMemory, shaderInfo, uniqueTempRegistersUsed, uniqueInputRegistersUsed, outRegisterwriteTracker);
 	case justOpcode:
-		if (print) dprintf(shaderInfo, "%s\n", ShaderInfo::GetOpcodeString(opcode) );
+		if (print) dprintf(shaderInfo, "%s\n", GetOpcodeString(opcode) );
 		break;
 	case srcOnly:
-		if (print) dprintf(shaderInfo, "%s ", ShaderInfo::GetOpcodeString(opcode) );
+		if (print) dprintf(shaderInfo, "%s ", GetOpcodeString(opcode) );
 		ResolveSrcParameter<print>(shaderInfo, shaderMemory, shaderInfo.isPixelShader, uniqueTempRegistersUsed, uniqueInputRegistersUsed);
 		if (print) dprintf(shaderInfo, "\n");
 		break;
 	case srcSrcOnly:
-		if (print) dprintf(shaderInfo, "%s ", ShaderInfo::GetOpcodeString(opcode) );
+		if (print) dprintf(shaderInfo, "%s ", GetOpcodeString(opcode) );
 		ResolveSrcParameter<print>(shaderInfo, shaderMemory, shaderInfo.isPixelShader, uniqueTempRegistersUsed, uniqueInputRegistersUsed);
 		if (print) dprintf(shaderInfo, ", ");
 		ResolveSrcParameter<print>(shaderInfo, shaderMemory, shaderInfo.isPixelShader, uniqueTempRegistersUsed, uniqueInputRegistersUsed);
 		if (print) dprintf(shaderInfo, "\n");
 		break;
 	case dstOnly:
-		if (print) dprintf(shaderInfo, "%s ", ShaderInfo::GetOpcodeString(opcode) );
+		if (print) dprintf(shaderInfo, "%s ", GetOpcodeString(opcode) );
 		ResolveDstParameter<print, true>(shaderMemory, shaderInfo, uniqueTempRegistersUsed, outRegisterwriteTracker);
 		if (print) dprintf(shaderInfo, "\n");
 		break;
 	case srcDst:
-		if (print) dprintf(shaderInfo, "%s ", ShaderInfo::GetOpcodeString(opcode) );
+		if (print) dprintf(shaderInfo, "%s ", GetOpcodeString(opcode) );
 		ResolveDstParameter<print, true>(shaderMemory, shaderInfo, uniqueTempRegistersUsed, outRegisterwriteTracker);
 		if (print) dprintf(shaderInfo, ", ");
 		ResolveSrcParameter<print>(shaderInfo, shaderMemory, shaderInfo.isPixelShader, uniqueTempRegistersUsed, uniqueInputRegistersUsed);
 		if (print) dprintf(shaderInfo, "\n");
 		break;
 	case srcSrcDst:
-		if (print) dprintf(shaderInfo, "%s ", ShaderInfo::GetOpcodeString(opcode) );
+		if (print) dprintf(shaderInfo, "%s ", GetOpcodeString(opcode) );
 		ResolveDstParameter<print, true>(shaderMemory, shaderInfo, uniqueTempRegistersUsed, outRegisterwriteTracker);
 		if (print) dprintf(shaderInfo, ", ");
 		ResolveSrcParameter<print>(shaderInfo, shaderMemory, shaderInfo.isPixelShader, uniqueTempRegistersUsed, uniqueInputRegistersUsed);
@@ -1859,7 +1859,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, ShaderInfo& sha
 		if (print) dprintf(shaderInfo, "\n");
 		break;
 	case srcSrcSrcDst:
-		if (print) dprintf(shaderInfo, "%s ", ShaderInfo::GetOpcodeString(opcode) );
+		if (print) dprintf(shaderInfo, "%s ", GetOpcodeString(opcode) );
 		ResolveDstParameter<print, true>(shaderMemory, shaderInfo, uniqueTempRegistersUsed, outRegisterwriteTracker);
 		if (print) dprintf(shaderInfo, ", ");
 		ResolveSrcParameter<print>(shaderInfo, shaderMemory, shaderInfo.isPixelShader, uniqueTempRegistersUsed, uniqueInputRegistersUsed);
@@ -1870,7 +1870,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, ShaderInfo& sha
 		if (print) dprintf(shaderInfo, "\n");
 		break;
 	case srcSrcSrcSrcDst: // Only ever used with D3DSIO_TEXLDD
-		if (print) dprintf(shaderInfo, "%s ", ShaderInfo::GetOpcodeString(opcode) );
+		if (print) dprintf(shaderInfo, "%s ", GetOpcodeString(opcode) );
 		ResolveDstParameter<print, true>(shaderMemory, shaderInfo, uniqueTempRegistersUsed, outRegisterwriteTracker);
 		if (print) dprintf(shaderInfo, ", ");
 		ResolveSrcParameter<print>(shaderInfo, shaderMemory, shaderInfo.isPixelShader, uniqueTempRegistersUsed, uniqueInputRegistersUsed);

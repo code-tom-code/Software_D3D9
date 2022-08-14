@@ -847,7 +847,7 @@ static inline void AdvanceSrcParameter(const ShaderInfo& shaderInfo, const DWORD
 static inline const bool ParseCustomOpcode(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const DWORD*& shaderMemory, const ShaderInfo& shaderInfo, std::vector<char>& shaderbody)
 {
 	char disasm[1024] = {0};
-	sprintf(disasm, "\t// %s ", ShaderInfo::GetOpcodeString(opcode) );
+	sprintf(disasm, "\t// %s ", GetOpcodeString(opcode) );
 	AppendString(shaderbody, disasm);
 
 	switch (opcode)
@@ -1178,17 +1178,17 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 	if (!GetOpcodeImplementedForJIT(opcode) )
 	{
 		char notImplementedMessage[128] = {0};
-		sprintf(notImplementedMessage, "\t//--- Warning: Opcode \"%s\" not yet implemented for JIT! ---\n", ShaderInfo::GetOpcodeString(opcode) );
+		sprintf(notImplementedMessage, "\t//--- Warning: Opcode \"%s\" not yet implemented for JIT! ---\n", GetOpcodeString(opcode) );
 		AppendString(shaderbody, notImplementedMessage);
 	}
 
 	if (!GetOpcodeAllowChannelSplitting(opcode) )
 	{
-		const opcodeDisplayType opcodeType = ShaderInfo::GetOpcodeDisplayType(opcode);
+		const opcodeDisplayType opcodeType = GetOpcodeDisplayType(opcode);
 		if (opcodeType == customOpcode)
 			return ParseCustomOpcode(opcode, shaderMemory, shaderInfo, shaderbody);
 
-		sprintf(disasm, "\t// %s\n", ShaderInfo::GetOpcodeString(opcode) );
+		sprintf(disasm, "\t// %s\n", GetOpcodeString(opcode) );
 		AppendString(shaderbody, disasm);
 		AppendString(shaderbody, "\t{\n");
 
@@ -1251,7 +1251,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 		}
 		else
 		{
-			functionStringSource = ShaderInfo::GetOpcodeFunctionString(opcode);
+			functionStringSource = GetOpcodeFunctionString(opcode);
 		}
 
 		sprintf(buffer, "\t\t%s(%s, ", functionStringSource, hasWriteMask ? "unmaskedRet" : destRegisterName);
@@ -1329,7 +1329,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 		return false;
 	}
 
-	const opcodeDisplayType opcodeType = ShaderInfo::GetOpcodeDisplayType(opcode);
+	const opcodeDisplayType opcodeType = GetOpcodeDisplayType(opcode);
 
 	unsigned numSourceRegisters;
 	switch (opcodeType)
@@ -1366,20 +1366,20 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 	case customOpcode:
 		return ParseCustomOpcode(opcode, shaderMemory, shaderInfo, shaderbody);
 	case justOpcode:
-		sprintf(disasm, "\t// %s\n", ShaderInfo::GetOpcodeString(opcode) );
+		sprintf(disasm, "\t// %s\n", GetOpcodeString(opcode) );
 		AppendString(shaderbody, disasm);
-		sprintf(buffer, "\t%s(%cs);\n\n", ShaderInfo::GetOpcodeFunctionString(opcode), shaderInfo.isPixelShader ? 'p' : 'v');
+		sprintf(buffer, "\t%s(%cs);\n\n", GetOpcodeFunctionString(opcode), shaderInfo.isPixelShader ? 'p' : 'v');
 		AppendString(shaderbody, buffer);
 		break;
 	case srcOnly:
 	{
 		std::vector<char> sourceDisasmLine;
 		ResolveSrcParameterDisasm(shaderInfo, shaderMemory, sourceDisasmLine);
-		sprintf(disasm, "\t// %s %s\n", ShaderInfo::GetOpcodeString(opcode), &(sourceDisasmLine.front() ) );
+		sprintf(disasm, "\t// %s %s\n", GetOpcodeString(opcode), &(sourceDisasmLine.front() ) );
 		AppendString(shaderbody, disasm);
 		std::vector<char> jitLine;
 		ResolveSrcParameterSimpleSwizzleNoSourceMods(shaderInfo, shaderMemory, jitLine);
-		sprintf(buffer, "\t%s(%cs, %s);\n\n", ShaderInfo::GetOpcodeFunctionString(opcode), shaderInfo.isPixelShader ? 'p' : 'v', &(jitLine.front() ) );
+		sprintf(buffer, "\t%s(%cs, %s);\n\n", GetOpcodeFunctionString(opcode), shaderInfo.isPixelShader ? 'p' : 'v', &(jitLine.front() ) );
 		AppendString(shaderbody, buffer);
 	}
 		break;
@@ -1392,9 +1392,9 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 		ResolveSrcParameterSimpleSwizzleNoSourceMods(shaderInfo, shaderMemory, jitLine);
 		ResolveSrcParameterDisasm(shaderInfo, shaderMemory, sourceDisasmLine);
 		ResolveSrcParameterSimpleSwizzleNoSourceMods(shaderInfo, shaderMemory, jitLine);
-		sprintf(disasm, "\t// %s %s\n", ShaderInfo::GetOpcodeString(opcode), &(sourceDisasmLine.front() ) );
+		sprintf(disasm, "\t// %s %s\n", GetOpcodeString(opcode), &(sourceDisasmLine.front() ) );
 		AppendString(shaderbody, disasm);
-		sprintf(buffer, "\t%s(%cs, %s);\n\n", ShaderInfo::GetOpcodeFunctionString(opcode), shaderInfo.isPixelShader ? 'p' : 'v', &(jitLine.front() ) );
+		sprintf(buffer, "\t%s(%cs, %s);\n\n", GetOpcodeFunctionString(opcode), shaderInfo.isPixelShader ? 'p' : 'v', &(jitLine.front() ) );
 		AppendString(shaderbody, buffer);
 	}
 		break;
@@ -1424,7 +1424,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 
 			const unsigned writeMask = destParameter.GetWriteMask();
 
-			sprintf(disasm, "\t// %s %s%s\n", ShaderInfo::GetOpcodeString(opcode), registerName, writeMaskDisasmStrings[writeMask]);
+			sprintf(disasm, "\t// %s %s%s\n", GetOpcodeString(opcode), registerName, writeMaskDisasmStrings[writeMask]);
 			AppendString(shaderbody, disasm);
 
 			if (writeMask & 0x1) // x
@@ -1496,7 +1496,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 			"\t// %s %s%s, %s, %s, %s, %s\n",
 		};
 		//sprintf(disasm, "\t// %s %s%s, %s, %s, %s, %s\n", ShaderInfo::GetOpcodeString(opcode), destRegisterName, writeMaskDisasmStrings[writeMask], src0RegisterName, src1RegisterName, src2RegisterName, src3RegisterName);
-		sprintf(disasm, disasmStrings[numSourceRegisters - 1], ShaderInfo::GetOpcodeString(opcode), destRegisterName, writeMaskDisasmStrings[writeMask], srcRegisterNames[0], srcRegisterNames[1], srcRegisterNames[2], srcRegisterNames[3]);
+		sprintf(disasm, disasmStrings[numSourceRegisters - 1], GetOpcodeString(opcode), destRegisterName, writeMaskDisasmStrings[writeMask], srcRegisterNames[0], srcRegisterNames[1], srcRegisterNames[2], srcRegisterNames[3]);
 		AppendString(shaderbody, disasm);
 
 		bool needsTempDestCopy = false;
@@ -1554,7 +1554,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 			PrintSourceModifier(*srcParameters[2], src2ModifierString, src2RegisterName);
 			PrintSourceRegNameAndSourceSwizzleOrTempReg<0>(*srcParameters[3], destParameter, src3RegisterName, shaderInfo);
 			PrintSourceModifier(*srcParameters[3], src3ModifierString, src3RegisterName);*/
-			sprintf(buffer, writeMaskStrings[numSourceRegisters - 1], ShaderInfo::GetOpcodeFunctionString(opcode), destRegisterName, 'x', srcModifierStrings[0], srcModifierStrings[1], srcModifierStrings[2], srcModifierStrings[3]);
+			sprintf(buffer, writeMaskStrings[numSourceRegisters - 1], GetOpcodeFunctionString(opcode), destRegisterName, 'x', srcModifierStrings[0], srcModifierStrings[1], srcModifierStrings[2], srcModifierStrings[3]);
 			AppendString(shaderbody, buffer);
 		}
 		if (writeMask & 0x2)
@@ -1573,7 +1573,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 			PrintSourceRegNameAndSourceSwizzleOrTempReg<1>(*srcParameters[3], destParameter, src3RegisterName, shaderInfo);
 			PrintSourceModifier(*srcParameters[3], src3ModifierString, src3RegisterName);*/
 			//sprintf(buffer, "\t%s(%s.y, %s, %s, %s, %s);\n", ShaderInfo::GetOpcodeFunctionString(opcode), destRegisterName, src0ModifierString, src1ModifierString, src2ModifierString, src3ModifierString);
-			sprintf(buffer, writeMaskStrings[numSourceRegisters - 1], ShaderInfo::GetOpcodeFunctionString(opcode), destRegisterName, 'y', srcModifierStrings[0], srcModifierStrings[1], srcModifierStrings[2], srcModifierStrings[3]);
+			sprintf(buffer, writeMaskStrings[numSourceRegisters - 1], GetOpcodeFunctionString(opcode), destRegisterName, 'y', srcModifierStrings[0], srcModifierStrings[1], srcModifierStrings[2], srcModifierStrings[3]);
 			AppendString(shaderbody, buffer);
 		}
 		if (writeMask & 0x4)
@@ -1592,7 +1592,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 			PrintSourceRegNameAndSourceSwizzleOrTempReg<2>(*srcParameters[3], destParameter, src3RegisterName, shaderInfo);
 			PrintSourceModifier(*srcParameters[3], src3ModifierString, src3RegisterName);
 			sprintf(buffer, "\t%s(%s.z, %s, %s, %s, %);\n", ShaderInfo::GetOpcodeFunctionString(opcode), destRegisterName, src0ModifierString, src1ModifierString, src2ModifierString, src3ModifierString);*/
-			sprintf(buffer, writeMaskStrings[numSourceRegisters - 1], ShaderInfo::GetOpcodeFunctionString(opcode), destRegisterName, 'z', srcModifierStrings[0], srcModifierStrings[1], srcModifierStrings[2], srcModifierStrings[3]);
+			sprintf(buffer, writeMaskStrings[numSourceRegisters - 1], GetOpcodeFunctionString(opcode), destRegisterName, 'z', srcModifierStrings[0], srcModifierStrings[1], srcModifierStrings[2], srcModifierStrings[3]);
 			AppendString(shaderbody, buffer);
 		}
 		if (writeMask & 0x8)
@@ -1611,7 +1611,7 @@ static inline const bool ParseOpcode(const DWORD*& shaderMemory, const ShaderInf
 			PrintSourceRegNameAndSourceSwizzleOrTempReg<3>(*srcParameters[3], destParameter, src3RegisterName, shaderInfo);
 			PrintSourceModifier(*srcParameters[3], src3ModifierString, src3RegisterName);
 			sprintf(buffer, "\t%s(%s.w, %s, %s, %s, %s);\n", ShaderInfo::GetOpcodeFunctionString(opcode), destRegisterName, src0ModifierString, src1ModifierString, src2ModifierString, src3ModifierString);*/
-			sprintf(buffer, writeMaskStrings[numSourceRegisters - 1], ShaderInfo::GetOpcodeFunctionString(opcode), destRegisterName, 'w', srcModifierStrings[0], srcModifierStrings[1], srcModifierStrings[2], srcModifierStrings[3]);
+			sprintf(buffer, writeMaskStrings[numSourceRegisters - 1], GetOpcodeFunctionString(opcode), destRegisterName, 'w', srcModifierStrings[0], srcModifierStrings[1], srcModifierStrings[2], srcModifierStrings[3]);
 			AppendString(shaderbody, buffer);
 		}
 

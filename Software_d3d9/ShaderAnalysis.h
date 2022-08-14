@@ -269,17 +269,6 @@ struct ShaderInfo
 	unsigned char usedMRTMask; // Which render targets does this shader output to (as a bit-mask)?
 	bool usesMRT; // Does this pixel shader use MRT (multiple render targets) as output?
 	bool hasDependentTextureFetches; // Not yet implemented (always false)
-
-	static const opcodeDisplayType GetOpcodeDisplayType(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode);
-
-	// Returns the opcode as a string suitable for diassembly
-	static const char* const GetOpcodeString(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode);
-
-	// Returns the name of the function that this opcode maps to
-	static const char* const GetOpcodeFunctionString(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode);
-
-	// Returns true if this opcode is a TEX instruction, or false otherwise
-	static const bool IsOpcodeTexInstruction(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode);
 };
 
 void DisasmAndAnalyzeShader(const DWORD* shaderMemory, ShaderInfo& shaderInfoOut
@@ -293,3 +282,14 @@ void AnalyzeShader(const DWORD* shaderMemory, ShaderInfo& shaderInfoOut
 	, const char* const filename
 #endif
 	);
+
+const opcodeDisplayType GetOpcodeDisplayType(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode);
+
+// Returns the opcode as a string suitable for diassembly
+const char* const GetOpcodeString(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode);
+
+// Returns the name of the function that this opcode maps to
+const char* const GetOpcodeFunctionString(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode);
+
+// Returns true if this opcode is a TEX instruction, or false otherwise
+const bool IsOpcodeTexInstruction(const D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode);
