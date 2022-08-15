@@ -447,12 +447,20 @@ static inline void BuildVertexStateDefines(const DeviceState& state, std::vector
 		}
 
 		// LIGHTTYPE0 thru LIGHTTYPE7 (defined as strings D3DLIGHT_POINT, D3DLIGHT_SPOT, or D3DLIGHT_DIRECTIONAL)
-		for (unsigned x = 0; x < numEnabledLights; ++x)
+		unsigned foundLightTypes = 0;
+		for (unsigned y = 0; y < 8; ++y)
 		{
-			D3DXMACRO lightNType = {0};
-			lightNType.Name = lightTypesNamesStr[x];
-			lightNType.Definition = lightTypeStr[state.enabledLightIndices[x]->light.Type - 1]; // Minus one here because light types are 1-based instead of 0-based
-			defines.push_back(lightNType);
+			if (foundLightTypes < numEnabledLights)
+			{
+				const LightInfo* const thisLightInfo = state.enabledLightIndices[y];
+				if (thisLightInfo)
+				{
+					D3DXMACRO lightNType = {0};
+					lightNType.Name = lightTypesNamesStr[foundLightTypes++];
+					lightNType.Definition = lightTypeStr[thisLightInfo->light.Type - 1]; // Minus one here because light types are 1-based instead of 0-based
+					defines.push_back(lightNType);
+				}
+			}
 		}
 	}
 	else
@@ -552,11 +560,12 @@ void BuildVertexShader(const DeviceState& state, IDirect3DDevice9Hook* const dev
 	if (FAILED(hr) || !outBytecode)
 	{
 		const char* const errorMessage = errorMessages ? ( (const char* const)errorMessages->GetBufferPointer() ) : NULL;
-		printf("%s", errorMessage); // Don't optimize this away
 
 		// Should never happen for fixed-function shaders!
 		MessageBoxA(NULL, errorMessage, "Fixed Function VS Compile Failure!", MB_OK);
 		__debugbreak();
+
+		printf("%s", errorMessage); // Don't optimize this away
 
 		return;
 	}
