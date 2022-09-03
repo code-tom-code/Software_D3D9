@@ -760,7 +760,7 @@ struct drawCallPixelJobData
 
 __declspec(align(16) ) struct primitivePixelJobData
 {
-	primitivePixelJobData() : invZ(0.0f, 0.0f, 0.0f), barycentricNormalizeFactor(0.0f), primitiveID(0), VFace(true), vertex0index(0), vertex1index(0), vertex2index(0)
+	primitivePixelJobData() : invZ(0.0f, 0.0f, 0.0f), invW(0.0f, 0.0f, 0.0f), barycentricNormalizeFactor(0.0f), primitiveID(0), VFace(true), vertex0index(0), vertex1index(0), vertex2index(0)
 	{
 		pixelShadeVertexData.shadeFromShader.v0 = NULL;
 		pixelShadeVertexData.shadeFromShader.v1 = NULL;
@@ -773,6 +773,9 @@ __declspec(align(16) ) struct primitivePixelJobData
 
 	// This is: float3(1.0f / v0.z, 1.0f / v1.z, 1.0f / v2.z)
 	__declspec(align(16) ) D3DXVECTOR3 invZ;
+
+	// This is: float3(1.0f / v0.w, 1.0f / v1.w, 1.0f / v2.w)
+	__declspec(align(16) ) D3DXVECTOR3 invW;
 
 	union _pixelShadeVertexData
 	{
@@ -1065,12 +1068,12 @@ public:
 	// Handles pixel setup and depth and attribute interpolation before shading the pixel
 	template <const bool setupFromShader>
 	void SetupPixel(PShaderEngine* const pixelEngine, const void* const shaderOrStreamMapping, const unsigned x, const unsigned y, const __m128 barycentricInterpolants, 
-		const UINT offsetBytesToOPosition, const void* const v0, const void* const v1, const void* const v2, const __m128 invZ) const;
+		const UINT offsetBytesToOPosition, const void* const v0, const void* const v1, const void* const v2, const __m128 invZ, const __m128 invW) const;
 
 	// Handles pixel quad setup and depth and attribute interpolation before shading the pixel quad
 	template <const bool setupFromShader>
 	void SetupPixel4(PShaderEngine* const pixelEngine, const void* const shaderOrStreamMapping, const __m128i x4, const __m128i y4, const __m128 (&barycentricInterpolants)[4], 
-		const UINT offsetBytesToOPosition, const void* const v0, const void* const v1, const void* const v2, const __m128 invZ) const;
+		const UINT offsetBytesToOPosition, const void* const v0, const void* const v1, const void* const v2, const __m128 invZ, const __m128 invW) const;
 
 	// Handles blending and write-masking
 	void RenderOutput(IDirect3DSurface9Hook* const outSurface, const unsigned x, const unsigned y, const D3DXVECTOR4& value) const;
@@ -1107,21 +1110,21 @@ public:
 
 	// Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
 	void InterpolateStreamIntoRegisters(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, 
-		const float pixelZ, const __m128 floatBarycentricsInvZ_X, const __m128 floatBarycentricsInvZ_Y, const __m128 floatBarycentricsInvZ_Z) const;
+		const __m128 floatBarycentricsInvW_X, const __m128 floatBarycentricsInvW_Y, const __m128 floatBarycentricsInvW_Z, const __m128 barycentricInterpolants, const float interpolatedPixelW) const;
 
 	// Handles interpolating pixel shader input registers from a vertex declaration + raw vertex stream
 	template <const unsigned char pixelWriteMask>
 	void InterpolateStreamIntoRegisters4(PShaderEngine* const pixelShader, const DeclarationSemanticMapping& vertexDeclMapping, CONST BYTE* const v0, CONST BYTE* const v1, CONST BYTE* const v2, 
-		const __m128 pixelZ4, const __m128 (&floatBarycentricsInvZ_X4)[4], const __m128 (&floatBarycentricsInvZ_Y4)[4], const __m128 (&floatBarycentricsInvZ_Z4)[4]) const;
+		const __m128 floatBarycentricsInvW_X, const __m128 floatBarycentricsInvW_Y, const __m128 floatBarycentricsInvW_Z, const __m128 (&barycentricInterpolants)[4], const __m128 interpolatedPixelW4) const;
 
 	// Handles interpolating pixel shader input registers from vertex shader output registers
 	void InterpolateShaderIntoRegisters(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
-		const float pixelZ, const __m128 floatBarycentricsInvZ_X, const __m128 floatBarycentricsInvZ_Y, const __m128 floatBarycentricsInvZ_Z) const;
+		const __m128 floatBarycentricsInvW_X, const __m128 floatBarycentricsInvW_Y, const __m128 floatBarycentricsInvW_Z, const __m128 barycentricInterpolants, const float interpolatedPixelW) const;
 
 	// Handles interpolating pixel shader input registers from vertex shader output registers
 	template <const unsigned char pixelWriteMask>
 	void InterpolateShaderIntoRegisters4(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
-		const __m128 pixelZ4, const __m128 (&floatBarycentricsInvZ_X4)[4], const __m128 (&floatBarycentricsInvZ_Y4)[4], const __m128 (&floatBarycentricsInvZ_Z4)[4]) const;
+		const __m128 floatBarycentricsInvW_X, const __m128 floatBarycentricsInvW_Y, const __m128 floatBarycentricsInvW_Z, const __m128 (&barycentricInterpolants)[4], const __m128 interpolatedPixelW4) const;
 
 	const float InterpolatePixelDepth(const __m128 barycentricInterpolants, const __m128 invZ) const;
 	void InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const __m128 invZ, __m128& outPixelDepth4) const;
