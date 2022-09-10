@@ -42,7 +42,7 @@
 #define OVERRIDE_HIDE_CURSOR 1
 
 // If this is not defined, all shaders will run in solo threads rather than warps (usually of at least 2x2 pixels or vertices)
-// #define RUN_SHADERS_IN_WARPS 1
+#define RUN_SHADERS_IN_WARPS 1
 
 // Defines for different kinds of parallel libraries
 #define PARALLELLIB_CONCRT 1

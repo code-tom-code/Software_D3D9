@@ -1126,7 +1126,7 @@ public:
 	void InterpolateShaderIntoRegisters4(PShaderEngine* const pixelShader, const VStoPSMapping& vs_psMapping, const VS_2_0_OutputRegisters& v0, const VS_2_0_OutputRegisters& v1, const VS_2_0_OutputRegisters& v2, 
 		const __m128 floatBarycentricsInvW_X, const __m128 floatBarycentricsInvW_Y, const __m128 floatBarycentricsInvW_Z, const __m128 (&barycentricInterpolants)[4], const __m128 interpolatedPixelW4) const;
 
-	const float InterpolatePixelDepth(const __m128 barycentricInterpolants, const __m128 invZ) const;
+	const float InterpolatePixelDepth(__m128 barycentricInterpolants, const __m128 invZ) const;
 	void InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const __m128 invZ, __m128& outPixelDepth4) const;
 
 	// Must be called before shading a pixel to reset the pixel shader state machine!

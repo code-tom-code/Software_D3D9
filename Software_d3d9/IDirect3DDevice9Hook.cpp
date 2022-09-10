@@ -118,9 +118,11 @@ static volatile long __declspec(align(16) ) tlsThreadNumber = 0;
 
 static_assert(sizeof(_threadItem) > 64, "Error: False sharing may occur if thread struct is smaller than a cache line!");
 
-struct int3
+struct barycentricInt2
 {
-	int a, b, c;
+	// Note that we only need the B and C barycentric coordinates here because at any time we could
+	// recompute the A coordinate as A = (1.0f - B - C)
+	int b, c;
 };
 
 __declspec(align(16) ) struct slist_item
@@ -137,7 +139,7 @@ __declspec(align(16) ) struct slist_item
 		struct _pixelJobData
 		{
 			const primitivePixelJobData* primitiveData;
-			int3 barycentricCoords[4];
+			barycentricInt2 barycentricCoords[4];
 			unsigned x[4];
 			unsigned y[4];
 		} pixelJobData;
@@ -218,7 +220,7 @@ static inline void PixelShadeJob1(const slist_item& job, _threadItem* const myPt
 		abs( (const int)(240 - pixelJobData.y[0]) ) < 5);
 
 	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
-	const __m128i barycentricCoordsVector = _mm_load_si128( (const __m128i* const)&pixelJobData.barycentricCoords[0]);
+	const __m128i barycentricCoordsVector = _mm_set_epi32(0, pixelJobData.barycentricCoords[0].c, pixelJobData.barycentricCoords[0].b, 0);
 	const __m128 barycentricCoordsVectorF = _mm_mul_ps(_mm_cvtepi32_ps(barycentricCoordsVector), barycentricNormalizeFactor);
 	const __m128 invZ = _mm_load_ps( (const float* const)&(primitiveData->invZ) );
 	const __m128 invW = _mm_load_ps( (const float* const)&(primitiveData->invW) );
@@ -249,10 +251,10 @@ static inline void PixelShadeJob4(const slist_item& job, _threadItem* const myPt
 	const __m128 barycentricNormalizeFactor = _mm_set1_ps(primitiveData->barycentricNormalizeFactor);
 	const __m128i barycentricCoordIntVal4[4] =
 	{
-		*(const __m128i* const)(&pixelJobData.barycentricCoords[0]),
-		*(const __m128i* const)(&pixelJobData.barycentricCoords[1]),
-		*(const __m128i* const)(&pixelJobData.barycentricCoords[2]),
-		*(const __m128i* const)(&pixelJobData.barycentricCoords[3])
+		_mm_set_epi32(0, pixelJobData.barycentricCoords[0].c, pixelJobData.barycentricCoords[0].b, 0),
+		_mm_set_epi32(0, pixelJobData.barycentricCoords[1].c, pixelJobData.barycentricCoords[1].b, 0),
+		_mm_set_epi32(0, pixelJobData.barycentricCoords[2].c, pixelJobData.barycentricCoords[2].b, 0),
+		_mm_set_epi32(0, pixelJobData.barycentricCoords[3].c, pixelJobData.barycentricCoords[3].b, 0),
 	};
 	const __m128 barycentricCoords4[4] =
 	{
@@ -3289,7 +3291,6 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob(const unsigned x, const unsign
 	pixelJobData.primitiveData = primitiveData;
 	pixelJobData.x[0] = x;
 	pixelJobData.y[0] = y;
-	pixelJobData.barycentricCoords[0].a = barycentricAdjusted.m128i_i32[0];
 	pixelJobData.barycentricCoords[0].b = barycentricAdjusted.m128i_i32[1];
 	pixelJobData.barycentricCoords[0].c = barycentricAdjusted.m128i_i32[2];
 
@@ -3343,16 +3344,12 @@ void IDirect3DDevice9Hook::CreateNewPixelShadeJob4(const __m128i x4, const __m12
 	pixelJobData.y[1] = y4.m128i_i32[0];
 	pixelJobData.y[2] = y4.m128i_i32[2];
 	pixelJobData.y[3] = y4.m128i_i32[2];
-	pixelJobData.barycentricCoords[0].a = barycentricsAdjusted4[0].m128i_i32[0];
 	pixelJobData.barycentricCoords[0].b = barycentricsAdjusted4[0].m128i_i32[1];
 	pixelJobData.barycentricCoords[0].c = barycentricsAdjusted4[0].m128i_i32[2];
-	pixelJobData.barycentricCoords[1].a = barycentricsAdjusted4[1].m128i_i32[0];
 	pixelJobData.barycentricCoords[1].b = barycentricsAdjusted4[1].m128i_i32[1];
 	pixelJobData.barycentricCoords[1].c = barycentricsAdjusted4[1].m128i_i32[2];
-	pixelJobData.barycentricCoords[2].a = barycentricsAdjusted4[2].m128i_i32[0];
 	pixelJobData.barycentricCoords[2].b = barycentricsAdjusted4[2].m128i_i32[1];
 	pixelJobData.barycentricCoords[2].c = barycentricsAdjusted4[2].m128i_i32[2];
-	pixelJobData.barycentricCoords[3].a = barycentricsAdjusted4[3].m128i_i32[0];
 	pixelJobData.barycentricCoords[3].b = barycentricsAdjusted4[3].m128i_i32[1];
 	pixelJobData.barycentricCoords[3].c = barycentricsAdjusted4[3].m128i_i32[2];
 
@@ -6273,7 +6270,6 @@ void IDirect3DDevice9Hook::SetupPixel(PShaderEngine* const pixelEngine, const vo
 	const float interpolatedPixelW = InterpolatePixelDepth(barycentricInterpolants, invW);
 
 	// Precompute some vectors that will be used for all of attribute interpolation
-	const __m128 floatBarycentricsInvW = invW;//_mm_mul_ps(invW, barycentricInterpolants);
 	const __m128 floatBarycentricsInvW_X = _mm_permute_ps(invW, _MM_SHUFFLE(0, 0, 0, 0) );
 	const __m128 floatBarycentricsInvW_Y = _mm_permute_ps(invW, _MM_SHUFFLE(1, 1, 1, 1) );
 	const __m128 floatBarycentricsInvW_Z = _mm_permute_ps(invW, _MM_SHUFFLE(2, 2, 2, 2) );
@@ -7127,31 +7123,41 @@ void IDirect3DDevice9Hook::InterpolateStreamIntoRegisters4(PShaderEngine* const 
 #endif
 }
 
-const float IDirect3DDevice9Hook::InterpolatePixelDepth(const __m128 barycentricInterpolants, const __m128 invZ) const
+const float IDirect3DDevice9Hook::InterpolatePixelDepth(__m128 barycentricInterpolants, const __m128 invZ) const
 {
-	//const __m128 invInterpolatedDepth = _mm_dp_ps(invZ, barycentricInterpolants, 0x7F);
-	const float invZ0 = invZ.m128_f32[0];
-	const float invZ1 = invZ.m128_f32[1];
-	const float invZ2 = invZ.m128_f32[2];
+	__m128 deltaInvZ = _mm_sub_ps(invZ, _mm_shuffle_ps(invZ, invZ, _MM_SHUFFLE(0, 0, 0, 0) ) );
+	deltaInvZ.m128_f32[0] = invZ.m128_f32[0];
 
-	const float invZ10 = invZ1 - invZ0;
-	const float invZ20 = invZ2 - invZ0;
-
-	const float invInterpolatedDepth = invZ0 + barycentricInterpolants.m128_f32[1] * invZ10 + barycentricInterpolants.m128_f32[2] * invZ20;
+	barycentricInterpolants.m128_f32[0] = 1.0f;
+	const __m128 invInterpolatedDepth = _mm_dp_ps(deltaInvZ, barycentricInterpolants, 0x77);
 
 	// Re-inverting the Z depth is technically not necessary as a [0, 1] depth buffer will functionally work the same
 	// even with reciprocal depth values so long as the depth comparisons are flipped too.
 	// But for the purposes of this software rasterizer and since we're sharing this function between both the per-pixel Z
 	// and W calculations, we'll do this inversion to get the correct values out.
-	return 1.0f / invInterpolatedDepth;//_mm_div_ps(oneVec, invInterpolatedDepth).m128_f32[0];
+	return _mm_div_ps(oneVec, invInterpolatedDepth).m128_f32[0];
 }
 
 void IDirect3DDevice9Hook::InterpolatePixelDepth4(const __m128 (&barycentricInterpolants4)[4], const __m128 invZ, __m128& outPixelDepth4) const
 {
-	const __m128 dotProdResult0 = _mm_dp_ps(invZ, barycentricInterpolants4[0], 0x7F);
-	const __m128 dotProdResult1 = _mm_dp_ps(invZ, barycentricInterpolants4[1], 0x7F);
-	const __m128 dotProdResult2 = _mm_dp_ps(invZ, barycentricInterpolants4[2], 0x7F);
-	const __m128 dotProdResult3 = _mm_dp_ps(invZ, barycentricInterpolants4[3], 0x7F);
+	__m128 deltaInvZ = _mm_sub_ps(invZ, _mm_shuffle_ps(invZ, invZ, _MM_SHUFFLE(0, 0, 0, 0) ) );
+	deltaInvZ.m128_f32[0] = invZ.m128_f32[0];
+
+	__m128 barycentricInterpolantsCopy[4] =
+	{
+		barycentricInterpolants4[0],
+		barycentricInterpolants4[1],
+		barycentricInterpolants4[2],
+		barycentricInterpolants4[3]
+	};
+	barycentricInterpolantsCopy[0].m128_f32[0] = 1.0f;
+	barycentricInterpolantsCopy[1].m128_f32[0] = 1.0f;
+	barycentricInterpolantsCopy[2].m128_f32[0] = 1.0f;
+	barycentricInterpolantsCopy[3].m128_f32[0] = 1.0f;
+	const __m128 dotProdResult0 = _mm_dp_ps(deltaInvZ, barycentricInterpolantsCopy[0], 0x77);
+	const __m128 dotProdResult1 = _mm_dp_ps(deltaInvZ, barycentricInterpolantsCopy[1], 0x77);
+	const __m128 dotProdResult2 = _mm_dp_ps(deltaInvZ, barycentricInterpolantsCopy[2], 0x77);
+	const __m128 dotProdResult3 = _mm_dp_ps(deltaInvZ, barycentricInterpolantsCopy[3], 0x77);
 
 	const __m128 invInterpolatedDepth4 = 
 	{
