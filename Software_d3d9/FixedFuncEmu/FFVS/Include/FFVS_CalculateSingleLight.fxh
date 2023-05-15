@@ -60,7 +60,7 @@ const PerLightResults FuncName(LIGHTINDEX)(in const LightData lightdata, in cons
 	const float NdotL = dot(viewspaceVertexNormal, vertexToLightDirNormalized);
 	ret.Diffuse = (NdotL > 0.0f) ? (attenuation * spotlight * NdotL * lightdata.Diffuse) : float4(0.0f, 0.0f, 0.0f, 0.0f);
 #elif LIGHTTYPE == D3DLIGHT_DIRECTIONAL
-	const float NdotL = dot(viewspaceVertexNormal, lightdata.Direction.xyz);
+	const float NdotL = dot(viewspaceVertexNormal, vertexToLightDirNormalized);
 	ret.Diffuse = (NdotL > 0.0f) ? (NdotL * lightdata.Diffuse) : float4(0.0f, 0.0f, 0.0f, 0.0f);
 #endif
 
